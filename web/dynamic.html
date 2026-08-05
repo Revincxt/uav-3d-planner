@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Recorded dynamic replanning traces in three-dimensional urban UAV environments."
+    />
+    <title>Dynamic replanning — UAV 3D Planner Lab</title>
+  </head>
+  <body>
+    <main class="dynamic-page">
+      <nav class="study-nav" aria-label="Study views">
+        <a href="./">Recorded paths</a>
+        <a href="./results.html">Benchmark results</a>
+        <span aria-current="page">Dynamic replanning</span>
+      </nav>
+
+      <header class="dynamic-masthead">
+        <div>
+          <p class="eyebrow">Recorded online-planning study</p>
+          <h1>Dynamic replanning</h1>
+          <p class="scope">
+            Time-indexed UAV trajectories under temporary no-fly zones and moving obstacles.
+          </p>
+        </div>
+        <p class="evidence-label">Illustrative traces · non-confirmatory</p>
+      </header>
+
+      <p id="load-state" class="load-state" role="status" aria-live="polite">
+        Loading recorded dynamic traces…
+      </p>
+
+      <section class="selection-controls" aria-label="Trace selection and camera view">
+        <label>
+          <span>Scenario</span>
+          <select id="scenario-select"></select>
+        </label>
+        <label>
+          <span>Planner</span>
+          <select id="planner-select"></select>
+        </label>
+        <div class="view-controls" aria-label="Camera view">
+          <span>View</span>
+          <button type="button" data-view="isometric">Isometric</button>
+          <button type="button" data-view="top">Top</button>
+          <button type="button" data-view="reset">Reset</button>
+        </div>
+      </section>
+
+      <figure class="dynamic-figure">
+        <div
+          id="dynamic-viewer"
+          class="dynamic-viewer"
+          role="img"
+          aria-label="Three-dimensional dynamic replanning scene"
+        ></div>
+        <div class="playback-controls" aria-label="Playback controls">
+          <div class="button-group">
+            <button id="previous-frame" type="button" aria-label="Previous frame">Previous</button>
+            <button id="play-pause" type="button" aria-pressed="false">Play</button>
+            <button id="next-frame" type="button" aria-label="Next frame">Next</button>
+          </div>
+          <label class="timeline-control" for="timeline">
+            <span>Time <output id="timeline-value" for="timeline">0.0 s</output></span>
+            <input id="timeline" type="range" min="0" max="0" step="1" value="0" />
+          </label>
+        </div>
+        <figcaption>
+          <div class="legend" aria-label="Figure legend">
+            <span class="legend-item planned"><i aria-hidden="true"></i>Current plan</span>
+            <span class="legend-item executed"><i aria-hidden="true"></i>Executed trajectory</span>
+            <span class="legend-item temporary"><i aria-hidden="true"></i>Active temporary zone</span>
+            <span class="legend-item moving"><i aria-hidden="true"></i>Moving obstacle</span>
+            <span class="legend-item vehicle"><i aria-hidden="true"></i>Vehicle</span>
+          </div>
+          <p id="scene-caption"></p>
+        </figcaption>
+      </figure>
+
+      <section class="frame-section" aria-labelledby="frame-heading">
+        <header class="section-heading">
+          <h2 id="frame-heading">Time-indexed state</h2>
+          <p id="frame-summary">Select a recorded trace.</p>
+        </header>
+        <div class="table-wrap">
+          <table class="frame-table">
+            <caption class="sr-only">Values for the currently displayed simulation frame</caption>
+            <thead>
+              <tr>
+                <th scope="col">Time (s)</th>
+                <th scope="col">Event</th>
+                <th scope="col">Replan</th>
+                <th scope="col">Planner timing</th>
+                <th scope="col">Work used</th>
+                <th scope="col">Changed edges</th>
+                <th scope="col">Active temporary zones</th>
+                <th scope="col">Moving obstacles</th>
+              </tr>
+            </thead>
+            <tbody id="frame-metrics-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="comparison-section" aria-labelledby="comparison-heading">
+        <header class="section-heading">
+          <h2 id="comparison-heading">Scenario comparison</h2>
+          <p>One deterministic trace per planner under the same scenario and event schedule.</p>
+        </header>
+        <div class="table-wrap">
+          <table class="comparison-table">
+            <caption>
+              Work is an algorithm-specific diagnostic: expanded nodes and D* Lite queue pops are
+              not equivalent units and should not be compared directly.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Planner</th>
+                <th scope="col">Status</th>
+                <th scope="col">Completion (s)</th>
+                <th scope="col">Path length (m)</th>
+                <th scope="col">Replans</th>
+                <th scope="col">Holds</th>
+                <th scope="col">Safety-gate</th>
+                <th scope="col">Work</th>
+              </tr>
+            </thead>
+            <tbody id="comparison-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="outcome-section" aria-labelledby="outcome-heading">
+        <header class="section-heading">
+          <h2 id="outcome-heading">Recorded outcome</h2>
+          <p id="run-status"></p>
+        </header>
+        <div class="table-wrap">
+          <table class="outcome-table">
+            <caption>
+              Run-level values are descriptive outcomes for the selected scenario and planner.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Measure</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
+            <tbody id="outcome-metrics-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <details>
+        <summary>Method and provenance</summary>
+        <div id="provenance"></div>
+      </details>
+      <p id="live-region" class="sr-only" aria-live="polite"></p>
+    </main>
+    <script type="module" src="/src/dynamic.ts"></script>
+  </body>
+</html>

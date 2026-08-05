@@ -1,6 +1,13 @@
-"""Static 3D UAV path-planning benchmark."""
+"""Reproducible static planning and dynamic replanning benchmark."""
 
+from uav3d.dynamic import DynamicScenario, load_builtin_dynamic_scenario
 from uav3d.scene import Scene, load_builtin_scene
 from uav3d.version import __version__
 
-__all__ = ["Scene", "__version__", "load_builtin_scene"]
+__all__ = [
+    "DynamicScenario",
+    "Scene",
+    "__version__",
+    "load_builtin_dynamic_scenario",
+    "load_builtin_scene",
+]

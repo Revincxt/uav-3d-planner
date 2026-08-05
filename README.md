@@ -5,27 +5,41 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-555.svg)](LICENSE)
 
-A dependency-free Python benchmark for collision-aware UAV path planning in static
-three-dimensional cities. It compares **3D A\***, **Lazy Theta\***, and **RRT\*** under one
-geometry model, with explicit budgets, reproducible parameter sweeps, scene-aware statistics, and
-the same collision-certified smoothing pipeline.
+A dependency-free Python benchmark for collision-aware UAV planning in three-dimensional cities.
+The static study compares **3D A\***, **Lazy Theta\***, and **RRT\***; the separate dynamic study
+compares repeated A*, repeated Lazy Theta*, and state-reusing **3D D* Lite** under deterministic
+temporary restrictions and moving obstacles. Both studies use explicit contracts, continuous
+collision checks, reproducible records, and independent release audits.
 
 **Web study:** [recorded paths](https://revincxt.github.io/uav-3d-planner-lab/) ·
-[benchmark results](https://revincxt.github.io/uav-3d-planner-lab/results.html)
+[benchmark results](https://revincxt.github.io/uav-3d-planner-lab/results.html) ·
+[dynamic replanning](https://revincxt.github.io/uav-3d-planner-lab/dynamic.html)
 
-> The trajectory page contains non-confirmatory single runs. The results page is a descriptive,
-> small-n diagnostic study with scene-clustered intervals. Neither page is confirmatory evidence or
-> a flight-safety system.
+> The trajectory and dynamic pages contain non-confirmatory recorded runs. The static results page
+> is a descriptive, small-n diagnostic study with scene-clustered intervals. None of these pages is
+> confirmatory evidence or a flight-safety system.
 
 ## Research question
 
 How do grid-constrained, any-angle, and sampling-based planners differ in path quality and search behavior when the vehicle, buildings, fixed no-fly zones, and safety margin are held constant?
+
+The v0.3 extension asks a separate question: when the same deterministic obstacle schedule is
+presented to every planner, how do cold-start and state-reusing geometric replanners differ in
+mission outcome, route stability, and algorithm-specific work?
 
 | Planner | Search space | Characteristic | Reproducibility |
 | --- | --- | --- | --- |
 | 3D A* | 26-connected voxel graph | Resolution-complete graph search | Deterministic |
 | Lazy Theta* | Same voxel graph with delayed line-of-sight repair | Any-angle parent links | Deterministic |
 | RRT* | Continuous bounded 3D space | Seeded sampling and rewiring | Deterministic for a fixed seed and sample budget |
+
+Dynamic baselines intentionally share a conservative snapshot model and exact execution gate:
+
+| Replanner | Reused state | Characteristic |
+| --- | --- | --- |
+| Repeated 3D A* | None | Solves the current voxel graph from scratch |
+| Repeated Lazy Theta* | None | Cold-start any-angle snapshot replanning |
+| 3D D* Lite | `g`, `rhs`, priority queue | Updates affected cached edges as the vehicle and scene change |
 
 The primary outputs are planning success, planning time, raw path length, and minimum clearance. Smoothed length is secondary because a common post-processing step can hide differences between planners.
 
@@ -36,6 +50,13 @@ The primary outputs are planning success, planning time, raw path length, and mi
 - `restricted-core` — a full-height cylindrical no-fly zone at the city center.
 - `vertical-gate` — a low restricted gate where gaining altitude may help.
 - `random-city-<seed>` — deterministic random buildings with a reserved diagonal corridor.
+
+Dynamic episodes are kept separate from the static cohort:
+
+- `pop-up-nfz` — a cylindrical exclusion volume activates across the direct route.
+- `crossing-traffic` — a piecewise-linear moving sphere crosses the flight corridor.
+- `closing-gate` — a scheduled restriction closes an urban passage.
+- `vertical-escape` — a temporary low-altitude block rewards a vertical response.
 
 Scene distances use metres in an ENU frame. A spherical UAV is represented conservatively by inflating every obstacle by `vehicle radius + safety margin` and shrinking the flight boundary by the same amount.
 
@@ -88,11 +109,31 @@ RRT* budget curves come from one maximum-budget run per scene and seed; checkpoi
 shorter budgets. The timing harness randomizes case order and launches every repetition in a fresh
 Python process.
 
+Inspect and run the v0.3 dynamic protocol:
+
+```bash
+uav3d dynamic list
+uav3d dynamic simulate \
+  --scenario pop-up-nfz \
+  --algorithm dstar-lite-3d \
+  --output artifacts/dynamic-run.json
+
+uav3d export-dynamic \
+  --output-dir artifacts/dynamic-study \
+  --source-commit "$(git rev-parse HEAD)"
+```
+
+The simulator uses a deterministic clock, constant cruise speed, scheduled replanning, and a
+continuous space-time gate before executing every segment. Its committed records contain no
+machine-dependent planner timing; use algorithm-specific work counters for replayable diagnostics.
+
 ## Static web study
 
-The Vite application has two restrained academic views. The trajectory view uses Three.js to inspect
-recorded paths. The results view uses accessible inline SVG to show voxel-resolution and RRT* budget
-sensitivity plus an exact results table. No planner runs in the browser.
+The Vite application has three restrained academic views. The static trajectory view uses Three.js
+to inspect recorded paths. The results view uses accessible inline SVG to show voxel-resolution and
+RRT* budget sensitivity. The dynamic view synchronizes a Three.js scene with play, pause, stepping,
+scrubbing, event annotations, current plans, executed prefixes, and exact outcome tables. No planner
+runs in the browser.
 
 ```bash
 cd web
@@ -119,6 +160,10 @@ run, sample-count, timing, and summary identities.
   medians; success uses the mean of problem-level success proportions.
 - IQR uses linear Type-7 quantiles. The 95% percentile interval uses 10,000 fixed-seed scene-clustered
   bootstrap resamples.
+- Dynamic planners receive identical event schedules, simulation clocks, snapshot geometry,
+  resolutions, and work limits. Frames within one mission are not independent observations.
+- Dynamic replay records omit wall-clock planner time. Expanded nodes and D* Lite queue pops are
+  algorithm-specific work indicators and are never presented as equivalent units.
 
 ## Safety and validation model
 
@@ -130,6 +175,10 @@ run, sample-count, timing, and summary identities.
 - Fixed-work RRT* uses `random.Random(seed)` and records incumbent quality at requested checkpoints.
 - The shared post-processor first takes deterministic farthest-visible shortcuts, proposes a sampled cubic B-spline blend, validates every resulting segment, and falls back to the certified shortcut if needed.
 - An independent audit rechecks endpoints, collision status, path length, waypoint count, and sampled clearance before export.
+- Temporary restrictions use half-open active intervals. Moving-sphere collision uses exact relative
+  motion on every keyframe segment; touching an inflated dynamic obstacle is collision.
+- The dynamic simulator audits each executed segment in space and time. An unsafe proposal may
+  trigger one immediate replan and can become a hold only when remaining stationary is safe.
 
 See [Methodology](docs/methodology.md) for definitions, assumptions, statistical estimands, and
 comparison limits.
@@ -155,7 +204,7 @@ installs a wheel, smoke-tests the CLI, re-audits committed study data, and build
 ## Repository layout
 
 ```text
-src/uav3d/             geometry, planners, experiments, statistics, reports, CLI
+src/uav3d/             static/dynamic geometry, planners, simulation, statistics, reports, CLI
 scenarios/             four committed curated scene JSON files and schema
 tests/                 contracts, collision, planning, smoothing, CLI
 web/                   recorded Three.js paths and academic benchmark results
@@ -165,17 +214,21 @@ docs/                  methodology, schemas, and roadmap
 
 ## Current limits
 
-Version `0.2.0` assumes a known static environment, a spherical vehicle, fixed no-fly zones, and
-unconstrained point-to-point flight. It does not model vehicle dynamics, wind, sensing uncertainty,
-moving obstacles, energy, minimum-snap trajectories, PX4/MAVLink export, or regulatory compliance.
+Version `0.3.0` supports known deterministic temporary restrictions and piecewise-linear moving
+spheres while retaining a spherical vehicle and unconstrained geometric motion. It does not model
+attitude, acceleration, wind, sensing or prediction uncertainty, energy, minimum-snap trajectories,
+PX4/MAVLink export, or regulatory compliance.
 
-Planned extensions are listed in the [roadmap](docs/roadmap.md). Dynamic replanning and kinodynamic trajectory generation will be separate experiments so they do not blur the static-planning baseline.
+Planned extensions are listed in the [roadmap](docs/roadmap.md). Predictive space-time planning and
+kinodynamic trajectory generation remain separate experiments so they do not blur the static and
+reactive-replanning baselines.
 
 ## References
 
 - Hart, Nilsson, and Raphael. “A Formal Basis for the Heuristic Determination of Minimum Cost Paths.” *IEEE Transactions on Systems Science and Cybernetics*, 1968.
 - Nash, Koenig, and Tovey. “Lazy Theta*: Any-Angle Path Planning and Path Length Analysis in 3D.” *AAAI*, 2010.
 - Karaman and Frazzoli. “Sampling-based Algorithms for Optimal Motion Planning.” *International Journal of Robotics Research*, 2011.
+- Koenig and Likhachev. “D* Lite.” *AAAI*, 2002.
 
 ## Citation and license
 

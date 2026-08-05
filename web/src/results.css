@@ -31,6 +31,7 @@ body {
 
 .study-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 18px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--soft-line);

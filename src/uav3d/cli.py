@@ -28,6 +28,9 @@ from uav3d.benchmark import (
 )
 from uav3d.dataset import generate_dataset_manifest
 from uav3d.demo import build_demo_bundle
+from uav3d.dynamic import list_builtin_dynamic_scenarios, load_builtin_dynamic_scenario
+from uav3d.dynamic_study import export_dynamic_study
+from uav3d.replanning import REPLANNING_ALGORITHMS, simulate_replanning
 from uav3d.reporting import write_report_bundle
 from uav3d.scene import (
     generate_random_city,
@@ -89,7 +92,7 @@ def _add_budget_arguments(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="uav3d",
-        description="Reproducible static-city benchmark for 3D UAV path planning.",
+        description="Reproducible static and dynamic-city benchmark for 3D UAV path planning.",
     )
     parser.add_argument("--version", action="version", version=f"uav3d {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -180,6 +183,32 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_export_parser.add_argument("--output-dir", type=Path, required=True)
     benchmark_export_parser.add_argument("--source-commit", required=True)
     benchmark_export_parser.add_argument("--timing-repetitions", type=int, default=3)
+
+    dynamic_parser = commands.add_parser(
+        "dynamic", help="Inspect or simulate deterministic dynamic scenarios."
+    )
+    dynamic_commands = dynamic_parser.add_subparsers(dest="dynamic_command", required=True)
+    dynamic_commands.add_parser("list", help="List built-in dynamic scenarios.")
+    simulate_parser = dynamic_commands.add_parser(
+        "simulate", help="Run one deterministic online replanning episode."
+    )
+    simulate_parser.add_argument(
+        "--scenario", choices=list_builtin_dynamic_scenarios(), required=True
+    )
+    simulate_parser.add_argument("--algorithm", choices=REPLANNING_ALGORITHMS, required=True)
+    simulate_parser.add_argument("--time-step", type=float, default=1.0)
+    simulate_parser.add_argument("--replan-interval", type=float, default=4.0)
+    simulate_parser.add_argument("--cruise-speed", type=float, default=8.0)
+    simulate_parser.add_argument("--max-time", type=float, default=180.0)
+    simulate_parser.add_argument("--resolution", type=float, default=4.0)
+    simulate_parser.add_argument("--max-expansions", type=int, default=120_000)
+    simulate_parser.add_argument("--output", type=Path, required=True)
+
+    dynamic_export_parser = commands.add_parser(
+        "export-dynamic", help="Run and export the fixed dynamic replanning web protocol."
+    )
+    dynamic_export_parser.add_argument("--output-dir", type=Path, required=True)
+    dynamic_export_parser.add_argument("--source-commit", required=True)
     return parser
 
 
@@ -356,6 +385,37 @@ def _handle_export_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_dynamic(args: argparse.Namespace) -> int:
+    if args.dynamic_command == "list":
+        for scenario_id in list_builtin_dynamic_scenarios():
+            scenario = load_builtin_dynamic_scenario(scenario_id)
+            print(f"{scenario.scenario_id}\t{scenario.name}")
+        return 0
+    if args.dynamic_command == "simulate":
+        scenario = load_builtin_dynamic_scenario(args.scenario)
+        run = simulate_replanning(
+            scenario,
+            args.algorithm,
+            time_step=args.time_step,
+            replan_interval=args.replan_interval,
+            cruise_speed=args.cruise_speed,
+            max_time=args.max_time,
+            resolution=args.resolution,
+            max_expansions=args.max_expansions,
+        )
+        _write_json(args.output, run.to_dict())
+        print(f"saved {run.algorithm} dynamic run for {run.scenario_id} to {args.output}")
+        return 0 if run.metrics.success else 1
+    raise AssertionError("unreachable dynamic command")
+
+
+def _handle_export_dynamic(args: argparse.Namespace) -> int:
+    bundle = export_dynamic_study(args.output_dir, source_commit=args.source_commit)
+    scenarios = cast(list[object], bundle["scenarios"])
+    print(f"saved {len(scenarios)} dynamic scenarios and 12 planner runs to {args.output_dir}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -376,6 +436,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _handle_export_demo(args)
         if args.command == "export-benchmark":
             return _handle_export_benchmark(args)
+        if args.command == "dynamic":
+            return _handle_dynamic(args)
+        if args.command == "export-dynamic":
+            return _handle_export_dynamic(args)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

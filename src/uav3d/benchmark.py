@@ -155,8 +155,18 @@ def _canonical_parameter(value: object) -> object:
     raise TypeError(f"unsupported planner parameter type: {type(value).__name__}")
 
 
-def _configuration_id(algorithm: str, budget: PlanningBudget, parameters: dict[str, object]) -> str:
-    parts = [f"{algorithm}@{__version__}"]
+def _configuration_id(
+    algorithm: str,
+    budget: PlanningBudget,
+    parameters: dict[str, object],
+    *,
+    package_version: str = __version__,
+) -> str:
+    """Return a stable planner identity, with an override for auditing old releases."""
+
+    if not package_version:
+        raise ValueError("package_version must not be empty")
+    parts = [f"{algorithm}@{package_version}"]
     resolution = parameters.get("resolution")
     if resolution is not None:
         if not isinstance(resolution, (int, float)):

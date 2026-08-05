@@ -46,7 +46,10 @@ def clamp(value: float, lower: float, upper: float) -> float:
 
 
 def polyline_length(path: Sequence[Point3]) -> float:
-    return sum(distance(a, b) for a, b in pairwise(path))
+    # ``sum`` changed its float-accumulation algorithm in Python 3.12. Use the
+    # explicitly compensated operation so serialized study metrics remain stable
+    # across every supported interpreter.
+    return math.fsum(distance(a, b) for a, b in pairwise(path))
 
 
 def as_point(value: Iterable[float]) -> Point3:

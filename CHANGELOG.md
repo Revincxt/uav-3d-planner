@@ -2,6 +2,32 @@
 
 All notable changes are documented here. The project follows Semantic Versioning.
 
+## [0.3.0] - 2026-08-05
+
+### Added
+
+- Deterministic dynamic-scenario contracts for half-open temporary no-fly intervals and
+  piecewise-linear moving spheres.
+- Continuous space-time collision checks using exact interval overlap and relative-motion tests.
+- Conservative static snapshots plus an execution-time dynamic safety gate and safe-hold behavior.
+- Repeated 3D A*, repeated Lazy Theta*, and state-reusing 3D D* Lite replanning baselines.
+- Four curated dynamic scenarios covering a pop-up restriction, crossing traffic, a closing gate,
+  and a vertical escape.
+- Dynamic simulation and export CLI commands with complete frame and mission records.
+- A synchronized Three.js dynamic-replanning page with playback, stepping, scrubbing, camera views,
+  recorded work, and outcome tables.
+- Dynamic CSV/manifest downloads with source revision, SHA-256, byte-size, and deterministic replay
+  audits in CI.
+
+### Changed
+
+- Package scope now distinguishes the v0.2 static-planning baseline from the v0.3 dynamic
+  replanning experiment.
+- GitHub Pages now builds three restrained academic views: static paths, static benchmark results,
+  and dynamic replanning.
+- The committed dynamic study excludes machine-dependent wall-clock timings and reports
+  algorithm-specific planning work without treating different work units as equivalent.
+
 ## [0.2.0] - 2026-08-05
 
 ### Added
@@ -45,3 +71,4 @@ All notable changes are documented here. The project follows Semantic Versioning
 
 [0.1.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.2.0
+[0.3.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.3.0
