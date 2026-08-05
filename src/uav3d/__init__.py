@@ -1,4 +1,4 @@
-"""Reproducible static planning and dynamic replanning benchmark."""
+"""Reproducible static, reactive, and predictive 3D planning benchmark."""
 
 from uav3d.dynamic import DynamicScenario, load_builtin_dynamic_scenario
 from uav3d.scene import Scene, load_builtin_scene

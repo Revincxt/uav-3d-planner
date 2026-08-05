@@ -10,6 +10,7 @@ export default defineConfig({
         paths: "index.html",
         results: "results.html",
         dynamic: "dynamic.html",
+        predictive: "predictive.html",
       },
     },
   },

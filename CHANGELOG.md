@@ -2,6 +2,30 @@
 
 All notable changes are documented here. The project follows Semantic Versioning.
 
+## [0.4.0] - 2026-08-05
+
+### Added
+
+- A deterministic `TimedPath` contract with explicit movement and wait actions.
+- Six predictive scenarios covering opening and closing windows, periodic traffic, chained
+  restrictions, multiple moving obstacles, and a vertical time window.
+- Finite-horizon 4D Space-Time A* over `(voxel, time-step)` states with deterministic tie breaking,
+  fixed-speed moves, explicit waits, exact endpoints, and continuous space-time edge checks.
+- A controlled D* Lite reset-versus-state-reuse ablation that preserves the v0.3 default behavior.
+- Predictive CLI commands and a fixed 6-scenario by 4-planner export protocol.
+- A restrained academic predictive-study page with synchronized 3D replay, event annotations,
+  time-height traces, outcome tables, and provenance downloads.
+- Predictive CSV and scenario-manifest artifacts with stable run IDs, byte sizes, SHA-256 digests,
+  Python trajectory replay audits, and independent JavaScript structural validation.
+
+### Changed
+
+- Package scope and documentation now distinguish static planning, reactive snapshot replanning,
+  and deterministic schedule-aware planning.
+- Total stationary time is separated from wait-interval reasons so short time-lattice alignment
+  waits are not misreported as policy decisions.
+- GitHub Pages now builds four academic study views.
+
 ## [0.3.0] - 2026-08-05
 
 ### Added
@@ -72,3 +96,4 @@ All notable changes are documented here. The project follows Semantic Versioning
 [0.1.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.1.0
 [0.2.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.2.0
 [0.3.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.3.0
+[0.4.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.4.0

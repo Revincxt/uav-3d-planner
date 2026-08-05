@@ -134,3 +134,30 @@ SHA-256 digests. JavaScript validates schema, endpoint, time-order, run-count, e
 artifact contracts. The Python release audit resolves the recorded source revision, reconstructs all
 12 deterministic episodes, compares every non-timing field, rechecks executed space-time segments,
 and cross-checks the CSV and manifest.
+
+## Predictive path and Web bundle
+
+`predictive-run-v1` contains a semantic dynamic-scenario fingerprint, one of four planner-condition
+IDs, numeric protocol parameters, a timestamped path, and mission metrics. `TimedPath` timestamps
+must increase strictly. Its first action is `start`; each later segment is explicitly classified as
+`move` or `wait`, and that classification must agree with its endpoint positions.
+
+`web/public/predictive-data.json` is schema version `1` with the verification status
+`PREDICTIVE_DEMO_NON_CONFIRMATORY`. It contains six scenarios and one run for each condition:
+
+- repeated 3D A*;
+- D* Lite reset at every epoch;
+- D* Lite with state reuse;
+- 4D Space-Time A* with the complete deterministic schedule.
+
+Every run exports the complete timed path, explicit wait intervals and their reasons, mission
+metrics, and presentation frames containing the vehicle, remaining path, executed prefix, active
+temporary zones, moving-sphere states, and event annotation. `waitTimeS` is total stationary time;
+short time-lattice alignment waits are not represented as policy waits. Work units are carried in
+each metric record and are not normalized across algorithms.
+
+The bundle references `predictive-records.csv` and `predictive-scenario-manifest.json` by byte size
+and SHA-256. Python reruns all 24 deterministic missions, collision-audits every timestamped segment,
+and cross-checks the JSON/CSV/manifest identities. JavaScript independently validates structural
+geometry bounds, temporal order, endpoints, wait intervals, frames, metrics, digests, and run-count
+invariants; it does not repeat the continuous collision calculation.
