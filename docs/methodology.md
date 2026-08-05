@@ -6,6 +6,11 @@ This repository establishes a reproducible static-planning baseline. Each experi
 
 The benchmark is intended for algorithm study. It is not a certified motion planner, flight controller, or operational risk assessment.
 
+Version 0.3 preserves this static baseline and adds a separate dynamic-replanning experiment. The
+dynamic experiment does not introduce attitude, acceleration, wind, sensing uncertainty, or a flight
+controller; it studies how geometric planners respond when known exclusion geometry changes over a
+deterministic simulation clock.
+
 ## Shared collision world
 
 Let the vehicle radius be `r` and the requested safety margin be `m`. The center of the vehicle must remain at least
@@ -107,6 +112,67 @@ Raw planner paths are the primary algorithm output. Successful paths enter the s
 
 The exported “smoothed path” is the certified sampled polyline, not an unverified analytic spline. A browser or downstream consumer must not interpolate it again without another collision check.
 
+## Dynamic-replanning protocol
+
+A dynamic scenario combines one immutable static `Scene` with two schedule types:
+
+- a finite vertical cylinder active on the half-open interval `[active_from, active_until)`;
+- a moving sphere with strictly increasing timestamped keyframes and piecewise-linear motion.
+
+Scenario identity hashes the static semantic problem, every time interval, sphere radius, keyframe
+time, and keyframe position. Labels, IDs, metadata, and record order do not affect identity. The four
+committed scenarios are curated diagnostic episodes; they are not selected by planner outcome.
+
+The simulator advances on a deterministic clock. At each planning epoch the planner receives the
+same static snapshot, exact current vehicle position, goal, resolution, and work limit. The vehicle
+then follows the returned polyline at constant cruise speed for at most one simulation step. A
+continuous space-time safety gate checks every proposed executed segment before motion. If the
+segment is unsafe, the planner receives one immediate replanning opportunity; if no safe movement is
+available, the vehicle may hold only when remaining stationary is safe for the whole step.
+
+Dynamic collision checks retain the static continuous predicates. Temporary-cylinder checks
+intersect the geometric contact interval with the half-open activation interval. Moving-sphere
+checks subtract the sphere's piecewise-linear motion from the vehicle segment and minimize distance
+to the resulting relative segment. Keyframe boundaries split the query, so contact between samples
+cannot be skipped. Touching an inflated dynamic obstacle counts as collision.
+
+### Replanning baselines
+
+- **Repeated 3D A\*** discards search state and solves the current 26-connected voxel graph again.
+- **Repeated Lazy Theta\*** likewise starts from scratch but permits any-angle parent links.
+- **3D D\* Lite** retains `g`, `rhs`, and its priority queue across compatible snapshots, moves the
+  start as the vehicle advances, and updates vertices incident to changed cached edges.
+
+All three planners use the same conservative snapshot representation. A moving sphere becomes a
+finite vertical cylinder at its instantaneous position for planning, while executed motion is still
+certified against the exact moving sphere. The snapshot is therefore conservative and the execution
+audit remains the safety authority.
+
+Endpoint handling is recorded as part of each planner contract. All three return the same exact
+start-to-goal segment when it is directly visible. In obstructed cases, the current D* Lite baseline
+uses its nearest visible voxel anchor, whereas the repeated graph planners can consider multiple
+visible endpoint anchors. Consequently, route-quality differences remain diagnostic and may reflect
+both replanning strategy and endpoint anchoring; this release does not claim a controlled
+search-state-only ablation.
+
+The deterministic study records simulation time rather than planner wall-clock time. Per-replan work
+is expanded nodes for the repeated planners and queue pops for D* Lite; these units characterize each
+algorithm and are not treated as equal computational effort. Machine-dependent timing belongs in a
+separate isolated-process experiment.
+
+### Dynamic outcomes
+
+- mission success and explicit failure reason;
+- collision count for independently audited executed segments;
+- completion time on the deterministic simulation clock;
+- executed distance and excess over the direct start-goal distance;
+- scheduled and safety-triggered replans, failed replans, and safe holds;
+- total algorithm-specific planning work and D* Lite changed-edge count.
+
+Every committed Web episode stores all frames needed to reconstruct the vehicle position, current
+plan, executed prefix, active temporary zones, moving-sphere positions, replanning reason, and work
+usage. Re-running the same source revision and protocol must reproduce the non-timing records exactly.
+
 ## Experiment identity
 
 `problem_fingerprint` is a versioned SHA-256 digest of planning semantics: bounds, exact endpoints,
@@ -179,3 +245,7 @@ The committed benchmark page uses only four curated diagnostic scenes and is lab
 `DESCRIPTIVE_BENCHMARK` and exploratory small-n. It illustrates the protocol; it is not a powered or
 confirmatory comparison. Larger evaluations should generate an independently seeded random cohort
 and declare calibration and held-out splits before running planners.
+
+The committed dynamic page follows the same restraint: four curated episodes × three planners are
+recorded as `DYNAMIC_DEMO_NON_CONFIRMATORY`. Frames within an episode are repeated observations, not
+independent samples, and the page does not rank planners or make confirmatory claims.

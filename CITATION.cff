@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software in academic work, please cite it as below."
 title: "UAV 3D Planner Lab"
 type: software
-version: 0.2.0
+version: 0.3.0
 date-released: 2026-08-05
 authors:
   - name: Revincxt
@@ -12,6 +12,8 @@ license: MIT
 keywords:
   - UAV
   - path planning
+  - dynamic replanning
   - A-star
+  - D-star Lite
   - Lazy Theta-star
   - RRT-star

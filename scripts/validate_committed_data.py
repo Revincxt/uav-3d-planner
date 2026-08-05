@@ -8,14 +8,31 @@ import json
 import math
 import re
 import subprocess
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
 from uav3d.benchmark import _configuration_id, _run_id, problem_fingerprint
+from uav3d.dynamic import load_builtin_dynamic_scenario
+from uav3d.dynamic_collision import spacetime_segment_is_free
+from uav3d.dynamic_study import (
+    DOWNLOAD_ARTIFACTS as DYNAMIC_DOWNLOADS,
+)
+from uav3d.dynamic_study import (
+    RECORD_FIELDS as DYNAMIC_RECORD_FIELDS,
+)
+from uav3d.dynamic_study import (
+    WORK_UNITS as DYNAMIC_WORK_UNITS,
+)
+from uav3d.dynamic_study import (
+    build_dynamic_bundle,
+    dynamic_record_rows,
+    dynamic_run_id,
+)
+from uav3d.geometry import Point3, as_point, distance, polyline_length
 from uav3d.planners.base import PlanningBudget
 from uav3d.scene import load_builtin_scene
 from uav3d.validation import audit_path
-from uav3d.version import __version__
 
 ROOT = Path(__file__).parents[1]
 PUBLIC = ROOT / "web" / "public"
@@ -32,6 +49,41 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{path} must contain an object")
     return value
+
+
+def _validate_source_ancestor(source_commit: str, *, label: str) -> None:
+    if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", source_commit) is None:
+        raise ValueError(f"{label} sourceCommit must be a full lowercase Git object ID")
+    source_exists = subprocess.run(
+        ["git", "cat-file", "-e", f"{source_commit}^{{commit}}"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+    )
+    if source_exists.returncode != 0:
+        raise ValueError(f"{label} sourceCommit is not present in repository history")
+    source_is_ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", source_commit, "HEAD"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+    )
+    if source_is_ancestor.returncode != 0:
+        raise ValueError(f"{label} sourceCommit is not an ancestor of HEAD")
+
+
+def _package_version_at(source_commit: str) -> str:
+    result = subprocess.run(
+        ["git", "show", f"{source_commit}:src/uav3d/version.py"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']\s*$', result.stdout, re.M)
+    if match is None:
+        raise ValueError("could not resolve package version at benchmark sourceCommit")
+    return match.group(1)
 
 
 def _audit_demo() -> int:
@@ -64,24 +116,8 @@ def _audit_demo() -> int:
 def _audit_benchmark() -> int:
     bundle = _load_json(PUBLIC / "benchmark-data.json")
     source_commit = str(bundle.get("sourceCommit", ""))
-    if re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", source_commit) is None:
-        raise ValueError("benchmark sourceCommit must be a full lowercase Git object ID")
-    source_exists = subprocess.run(
-        ["git", "cat-file", "-e", f"{source_commit}^{{commit}}"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-    )
-    if source_exists.returncode != 0:
-        raise ValueError("benchmark sourceCommit is not present in repository history")
-    source_is_ancestor = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", source_commit, "HEAD"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-    )
-    if source_is_ancestor.returncode != 0:
-        raise ValueError("benchmark sourceCommit is not an ancestor of HEAD")
+    _validate_source_ancestor(source_commit, label="benchmark")
+    source_version = _package_version_at(source_commit)
 
     downloads = bundle.get("downloads")
     if not isinstance(downloads, dict) or set(downloads) != set(DOWNLOADS):
@@ -132,9 +168,14 @@ def _audit_benchmark() -> int:
         planner_seed = int(row["planner_seed"]) if row["planner_seed"] else None
         repetition = int(row["timing_repetition"]) if row["timing_repetition"] else None
         wall_limit = float(row["wall_time_limit_ms"]) if row["wall_time_limit_ms"] else None
-        budget = PlanningBudget(row["work_unit"], int(row["work_limit"]), wall_limit)
+        planning_budget = PlanningBudget(row["work_unit"], int(row["work_limit"]), wall_limit)
         parameters = json.loads(row["parameters_json"])
-        expected_configuration = _configuration_id(algorithm, budget, parameters)
+        expected_configuration = _configuration_id(
+            algorithm,
+            planning_budget,
+            parameters,
+            package_version=source_version,
+        )
         if row["configuration_id"] != expected_configuration:
             raise ValueError(f"stale configuration ID: {row['run_id']}")
         expected_run = _run_id(
@@ -146,7 +187,7 @@ def _audit_benchmark() -> int:
         )
         if row["run_id"] != expected_run:
             raise ValueError(f"stale run ID: {row['run_id']}")
-        if not row["configuration_id"].startswith(f"{algorithm}@{__version__}|"):
+        if not row["configuration_id"].startswith(f"{algorithm}@{source_version}|"):
             raise ValueError(f"configuration version mismatch: {row['run_id']}")
 
     summaries = {str(item["plannerId"]): item for item in bundle["summaries"]}
@@ -206,11 +247,11 @@ def _audit_benchmark() -> int:
 
     rrt_rows = [row for row in rows if row["algorithm"] == "rrt-star"]
     for point in bundle["sensitivity"]["rrtBudget"]:
-        budget = int(point["sampleBudget"])
+        sample_budget = int(point["sampleBudget"])
         defined = 0
         for row in rrt_rows:
             trace = json.loads(row["quality_trace_json"])
-            checkpoint = next((item for item in trace if item["work"] == budget), None)
+            checkpoint = next((item for item in trace if item["work"] == sample_budget), None)
             if checkpoint is not None and checkpoint["best_path_length_m"] is not None:
                 defined += 1
         metric = point["rawPathExcessPct"]
@@ -219,7 +260,7 @@ def _audit_benchmark() -> int:
             or metric["nScenes"] != len({row["problem_fingerprint"] for row in rrt_rows})
             or metric["nSuccesses"] != defined
         ):
-            raise ValueError(f"RRT* sensitivity counts disagree at {budget} samples")
+            raise ValueError(f"RRT* sensitivity counts disagree at {sample_budget} samples")
 
     timing = _load_json(PUBLIC / DOWNLOADS["timingManifest"])
     timing_groups: dict[str, list[dict[str, Any]]] = {algorithm: [] for algorithm in summaries}
@@ -229,7 +270,7 @@ def _audit_benchmark() -> int:
             continue
         algorithm = str(item["algorithm"])
         timing_groups[algorithm].append(planner)
-        if not str(planner["configuration_id"]).startswith(f"{algorithm}@{__version__}|"):
+        if not str(planner["configuration_id"]).startswith(f"{algorithm}@{source_version}|"):
             raise ValueError(f"timing configuration version mismatch: {planner['run_id']}")
         expected_run = _run_id(
             str(planner["problem_fingerprint"]),
@@ -289,10 +330,191 @@ def _audit_benchmark() -> int:
     return len(rows)
 
 
+def _artifact_digest(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _same_point(left: Point3, right: Point3) -> bool:
+    return all(
+        math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-8) for a, b in zip(left, right, strict=True)
+    )
+
+
+def _audit_dynamic_execution(
+    scenario_id: str,
+    run: dict[str, Any],
+    *,
+    cruise_speed: float,
+) -> None:
+    scenario = load_builtin_dynamic_scenario(scenario_id)
+    raw_frames = run.get("frames")
+    if not isinstance(raw_frames, list) or not raw_frames:
+        raise ValueError(f"dynamic run has no frames: {scenario_id}/{run.get('plannerId')}")
+    frames = [frame for frame in raw_frames if isinstance(frame, dict)]
+    if len(frames) != len(raw_frames):
+        raise ValueError(f"dynamic run contains a non-object frame: {scenario_id}")
+
+    previous_time: float | None = None
+    previous_vehicle: Point3 | None = None
+    previous_executed: tuple[Point3, ...] | None = None
+    for frame in frames:
+        time_s = float(frame["timeS"])
+        vehicle = as_point(frame["vehicle"])
+        executed = tuple(as_point(point) for point in frame["executedPath"])
+        if not executed or not _same_point(executed[0], scenario.static_scene.start):
+            raise ValueError(f"dynamic executed path has an invalid origin: {scenario_id}")
+        if not _same_point(executed[-1], vehicle):
+            raise ValueError(f"dynamic executed path does not end at vehicle: {scenario_id}")
+        if previous_time is None:
+            if not math.isclose(time_s, 0.0, abs_tol=1e-12):
+                raise ValueError(f"dynamic trace does not start at t=0: {scenario_id}")
+            previous_time = time_s
+            previous_vehicle = vehicle
+            previous_executed = executed
+            continue
+        if time_s <= previous_time:
+            raise ValueError(f"dynamic frame times are not strictly increasing: {scenario_id}")
+        if previous_vehicle is None or previous_executed is None:
+            raise AssertionError("previous dynamic state must be initialized")
+        if len(executed) < len(previous_executed) or any(
+            not _same_point(old, current)
+            for old, current in zip(previous_executed, executed, strict=False)
+        ):
+            raise ValueError(f"dynamic executed path is not cumulative: {scenario_id}")
+
+        traversal_points = (previous_vehicle, *executed[len(previous_executed) :])
+        traversal_time = previous_time
+        for start, end in pairwise(traversal_points):
+            segment_duration = distance(start, end) / cruise_speed
+            segment_end = traversal_time + segment_duration
+            if segment_end > time_s + 1e-8:
+                raise ValueError(f"dynamic motion exceeds the declared cruise speed: {scenario_id}")
+            if not spacetime_segment_is_free(scenario, start, end, traversal_time, segment_end):
+                raise ValueError(
+                    f"dynamic executed trajectory failed collision audit: "
+                    f"{scenario_id}/{run.get('plannerId')}"
+                )
+            traversal_time = segment_end
+        if traversal_time < time_s - 1e-8 and not spacetime_segment_is_free(
+            scenario, vehicle, vehicle, traversal_time, time_s
+        ):
+            raise ValueError(
+                f"dynamic hold interval failed collision audit: "
+                f"{scenario_id}/{run.get('plannerId')}"
+            )
+        previous_time = time_s
+        previous_vehicle = vehicle
+        previous_executed = executed
+    if previous_executed is None or not math.isclose(
+        polyline_length(previous_executed),
+        float(run["metrics"]["executedPathLengthM"]),
+        rel_tol=1e-10,
+        abs_tol=1e-8,
+    ):
+        raise ValueError(f"dynamic executed length mismatch: {scenario_id}/{run.get('plannerId')}")
+
+
+def _without_dynamic_provenance(bundle: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in bundle.items()
+        if key not in {"generatedAt", "sourceCommit", "downloads"}
+    }
+
+
+def _audit_dynamic() -> int:
+    bundle = _load_json(PUBLIC / "dynamic-data.json")
+    source_commit = str(bundle.get("sourceCommit", ""))
+    _validate_source_ancestor(source_commit, label="dynamic")
+
+    downloads = bundle.get("downloads")
+    if not isinstance(downloads, dict) or set(downloads) != set(DYNAMIC_DOWNLOADS):
+        raise ValueError("dynamic downloads must list exactly recordsCsv and scenarioManifest")
+    for key, filename in DYNAMIC_DOWNLOADS.items():
+        reference = downloads.get(key)
+        if not isinstance(reference, dict) or reference.get("path") != filename:
+            raise ValueError(f"invalid dynamic download reference: {key}")
+        artifact = PUBLIC / filename
+        if (
+            reference.get("sha256") != _artifact_digest(artifact)
+            or reference.get("bytes") != artifact.stat().st_size
+        ):
+            raise ValueError(f"dynamic download provenance mismatch: {filename}")
+
+    expected, expected_manifest = build_dynamic_bundle(
+        source_commit=source_commit,
+        generated_at=str(bundle.get("generatedAt", "ignored")),
+    )
+    if _without_dynamic_provenance(bundle) != _without_dynamic_provenance(expected):
+        raise ValueError("committed dynamic bundle differs from 12 deterministic reruns")
+
+    manifest = _load_json(PUBLIC / DYNAMIC_DOWNLOADS["scenarioManifest"])
+    if manifest != expected_manifest:
+        raise ValueError("dynamic scenario manifest differs from the fixed protocol selection")
+
+    with (PUBLIC / DYNAMIC_DOWNLOADS["recordsCsv"]).open(encoding="utf-8", newline="") as stream:
+        reader = csv.DictReader(stream)
+        rows = list(reader)
+        if tuple(reader.fieldnames or ()) != DYNAMIC_RECORD_FIELDS:
+            raise ValueError("dynamic records CSV columns differ from the declared schema")
+    expected_rows = dynamic_record_rows(expected)
+    if rows != expected_rows:
+        raise ValueError("dynamic records CSV differs from dynamic-data.json")
+
+    protocol = bundle.get("protocol")
+    if not isinstance(protocol, dict):
+        raise ValueError("dynamic protocol must be an object")
+    cruise_speed = float(protocol["cruiseSpeedMps"])
+    scenarios = bundle.get("scenarios")
+    if not isinstance(scenarios, list):
+        raise ValueError("dynamic scenarios must be an array")
+    audited = 0
+    run_ids: set[str] = set()
+    for raw_scenario in scenarios:
+        if not isinstance(raw_scenario, dict):
+            raise ValueError("dynamic scenario must be an object")
+        scenario_id = str(raw_scenario["id"])
+        scenario_fingerprint = str(raw_scenario["fingerprint"])
+        runs = raw_scenario.get("runs")
+        if not isinstance(runs, list):
+            raise ValueError(f"dynamic scenario has no runs: {scenario_id}")
+        for run in runs:
+            if not isinstance(run, dict):
+                raise ValueError(f"dynamic run must be an object: {scenario_id}")
+            run_id = str(run.get("runId", ""))
+            planner_id = str(run.get("plannerId", ""))
+            parameters = run.get("parameters")
+            if not isinstance(parameters, dict):
+                raise ValueError(f"dynamic run parameters must be an object: {scenario_id}")
+            expected_run_id = dynamic_run_id(
+                scenario_fingerprint,
+                planner_id,
+                protocol,
+                parameters,
+            )
+            if run_id != expected_run_id or run_id in run_ids:
+                raise ValueError(f"stale or duplicate dynamic run ID: {scenario_id}/{planner_id}")
+            run_ids.add(run_id)
+            metrics = run.get("metrics")
+            if not isinstance(metrics, dict) or metrics.get("workUnit") != DYNAMIC_WORK_UNITS.get(
+                planner_id
+            ):
+                raise ValueError(f"dynamic work unit mismatch: {scenario_id}/{planner_id}")
+            _audit_dynamic_execution(scenario_id, run, cruise_speed=cruise_speed)
+            audited += 1
+    if audited != 12:
+        raise ValueError("dynamic bundle must contain exactly four scenarios by three planners")
+    return audited
+
+
 def main() -> int:
     trajectories = _audit_demo()
     records = _audit_benchmark()
-    print(f"audited {trajectories} demo trajectories and {records} benchmark records")
+    dynamic_runs = _audit_dynamic()
+    print(
+        f"audited {trajectories} demo trajectories, {records} benchmark records, "
+        f"and {dynamic_runs} dynamic runs"
+    )
     return 0
 
 

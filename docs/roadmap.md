@@ -23,12 +23,19 @@ The committed Pages study is explicitly descriptive and uses the four curated sc
 small-n diagnostic cohort. The CLI supports larger seeded random cohorts without filtering on any
 planner outcome.
 
-## v0.3 — dynamic replanning
+## v0.3 — dynamic replanning (released)
 
-- time-indexed temporary no-fly volumes and moving obstacles;
-- receding-horizon replanning baselines;
-- D* Lite or an equivalent incremental graph-search baseline;
-- latency and path-disruption metrics.
+- time-indexed temporary cylindrical no-fly volumes and piecewise-linear moving spheres;
+- an exact continuous space-time safety audit for executed motion;
+- deterministic receding-horizon simulation with scheduled replanning and safe holds;
+- repeated 3D A*, repeated Lazy Theta*, and state-reusing 3D D* Lite;
+- queue-pop, changed-edge, completion, route-length, hold, and safety-gate metrics;
+- four curated dynamic episodes with a synchronized Three.js timeline;
+- committed run records, scenario manifest, provenance digests, and replay audit.
+
+The v0.3 comparison is deliberately a deterministic, small-n diagnostic study. Planner wall-clock
+timing is excluded from the replay records because it varies by machine; the records compare
+algorithm-specific work and mission outcomes under one event stream.
 
 ## Later, deliberately separate
 
@@ -36,6 +43,7 @@ planner outcome.
 - minimum-snap trajectory generation;
 - wind and energy models;
 - perception uncertainty;
+- predictive space-time planning and uncertain obstacle forecasts;
 - PX4/MAVLink export and simulator integration.
 
 These features should not be added to the static comparison retroactively because they change the

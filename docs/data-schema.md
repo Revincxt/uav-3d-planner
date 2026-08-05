@@ -98,3 +98,38 @@ counts, budget references, artifact digests, and schema invariants. The nominal 
 report path-quality and timing sample counts separately. `scripts/validate_committed_data.py`
 independently re-audits trajectories, resolves the source revision, recomputes configuration and run
 IDs, verifies every download digest, and cross-checks CSV/timing sample counts against the JSON bundle.
+
+## Dynamic scenario and run
+
+The Python `dynamic-scenario-v1` contract contains one complete static scene plus:
+
+- `temporary_cylinders`: finite cylinders with an inclusive `active_from` and exclusive
+  `active_until` time in seconds;
+- `moving_spheres`: positive radii and at least two strictly increasing keyframes, each carrying a
+  simulation time and ENU position;
+- a semantic dynamic fingerprint that excludes labels and IDs while retaining all geometry and
+  schedule values.
+
+`dynamic-run-v1` records the scenario fingerprint, replanning algorithm, complete simulation
+parameters, deterministic frames, and mission metrics. Each frame stores its simulation time,
+vehicle position, current planned polyline, replanning status/reason, algorithm-specific work, and
+changed-edge count. Planner wall-clock timing is intentionally absent from this deterministic
+record.
+
+## Dynamic Web bundle
+
+`web/public/dynamic-data.json` is schema version `1` with the evidence label
+`DYNAMIC_DEMO_NON_CONFIRMATORY`. It contains exactly four curated dynamic scenarios and one run for
+each of the three replanning baselines. Presentation frames additionally materialize:
+
+- the complete executed prefix ending at the current vehicle position;
+- active temporary-zone IDs under half-open interval semantics;
+- every moving-sphere position at the frame time;
+- a structured event annotation and nullable planner timing field;
+- the current path, per-frame work, and D* Lite edge-change count.
+
+The bundle points to `dynamic-records.csv` and `dynamic-scenario-manifest.json` with byte counts and
+SHA-256 digests. JavaScript validates schema, endpoint, time-order, run-count, event, path, and
+artifact contracts. The Python release audit resolves the recorded source revision, reconstructs all
+12 deterministic episodes, compares every non-timing field, rechecks executed space-time segments,
+and cross-checks the CSV and manifest.

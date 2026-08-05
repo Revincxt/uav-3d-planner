@@ -8,6 +8,7 @@ import pytest
 
 from uav3d.analysis import clustered_metric_summary, quantile
 from uav3d.benchmark import (
+    _configuration_id,
     problem_fingerprint,
     run_benchmark,
     run_experiment,
@@ -16,6 +17,7 @@ from uav3d.benchmark import (
 )
 from uav3d.geometry import polyline_length
 from uav3d.planners import RRTStar, RRTStarConfig
+from uav3d.planners.base import PlanningBudget
 from uav3d.scene import AABB, Bounds3D, Scene, load_builtin_scene, load_scene, save_scene
 
 
@@ -103,6 +105,16 @@ def test_equivalent_numeric_spellings_share_configuration_and_run_identity() -> 
 
     assert integer_spelling.configuration_id == float_spelling.configuration_id
     assert integer_spelling.run_id == float_spelling.run_id
+
+
+def test_configuration_identity_can_reproduce_an_older_release() -> None:
+    identifier = _configuration_id(
+        "astar-3d",
+        PlanningBudget("expanded-nodes", 120_000),
+        {"resolution": 4.0},
+        package_version="0.2.0",
+    )
+    assert identifier.startswith("astar-3d@0.2.0|resolution=4|")
 
 
 @pytest.mark.parametrize(
