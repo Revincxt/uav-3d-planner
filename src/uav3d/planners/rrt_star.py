@@ -9,7 +9,13 @@ from dataclasses import dataclass
 
 from uav3d.collision import point_is_free, segment_is_free
 from uav3d.geometry import Point3, add, distance, scale, subtract
-from uav3d.planners.base import PlanningResult, Scalar
+from uav3d.planners.base import (
+    BudgetUsage,
+    PlanningBudget,
+    PlanningResult,
+    QualityTracePoint,
+    Scalar,
+)
 from uav3d.scene import Scene
 
 
@@ -21,6 +27,8 @@ class RRTStarConfig:
     goal_tolerance: float = 9.0
     neighbor_radius: float = 15.0
     rewire_gamma: float = 45.0
+    max_wall_time_ms: float | None = None
+    quality_checkpoints: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         if self.max_samples <= 0:
@@ -34,6 +42,12 @@ class RRTStarConfig:
             raise ValueError("RRT* distances must be positive")
         if not 0 <= self.goal_bias <= 1:
             raise ValueError("goal_bias must be in [0, 1]")
+        if self.max_wall_time_ms is not None and self.max_wall_time_ms <= 0:
+            raise ValueError("max_wall_time_ms must be positive when supplied")
+        if any(checkpoint <= 0 for checkpoint in self.quality_checkpoints):
+            raise ValueError("quality checkpoints must be positive")
+        if len(set(self.quality_checkpoints)) != len(self.quality_checkpoints):
+            raise ValueError("quality checkpoints must be unique")
 
 
 class RRTStar:
@@ -52,103 +66,170 @@ class RRTStar:
             "goal_tolerance": self.config.goal_tolerance,
             "neighbor_radius": self.config.neighbor_radius,
             "rewire_gamma": self.config.rewire_gamma,
+            "max_wall_time_ms": self.config.max_wall_time_ms,
+            "quality_checkpoints": tuple(sorted(self.config.quality_checkpoints)),
         }
-        if not point_is_free(scene, scene.start) or not point_is_free(scene, scene.goal):
-            return self._failure(started, "invalid-start-or-goal", parameters)
+        budget = PlanningBudget(
+            "sample-attempts", self.config.max_samples, self.config.max_wall_time_ms
+        )
+        if self._wall_time_exhausted(started):
+            return self._failure(started, "wall-time-budget-exhausted", parameters, budget=budget)
+        endpoints_are_free = point_is_free(scene, scene.start) and point_is_free(scene, scene.goal)
+        if self._wall_time_exhausted(started):
+            return self._failure(started, "wall-time-budget-exhausted", parameters, budget=budget)
+        if not endpoints_are_free:
+            return self._failure(started, "invalid-start-or-goal", parameters, budget=budget)
 
         rng = random.Random(seed)
         nodes: list[Point3] = [scene.start]
         parents: list[int] = [-1]
         costs: list[float] = [0.0]
         accepted = 0
+        completed_iterations = 0
+        search_started = time.perf_counter()
+        checkpoint_set = {
+            checkpoint
+            for checkpoint in self.config.quality_checkpoints
+            if checkpoint <= self.config.max_samples
+        }
+        trace: list[QualityTracePoint] = []
+        terminated_by = "sample-budget-completed"
 
-        for _iteration in range(1, self.config.max_samples + 1):
+        for iteration in range(1, self.config.max_samples + 1):
+            if self._wall_time_exhausted(started):
+                terminated_by = "wall-time-budget-exhausted"
+                break
             sample = (
                 scene.goal if rng.random() < self.config.goal_bias else self._sample(scene, rng)
             )
             nearest = min(range(len(nodes)), key=lambda index: distance(nodes[index], sample))
             candidate = self._steer(nodes[nearest], sample)
-            if distance(nodes[nearest], candidate) <= 1e-9:
-                continue
-            if not point_is_free(scene, candidate) or not segment_is_free(
-                scene, nodes[nearest], candidate
-            ):
-                continue
+            candidate_moves = distance(nodes[nearest], candidate) > 1e-9
+            candidate_is_safe = candidate_moves and point_is_free(scene, candidate)
+            if candidate_is_safe:
+                candidate_is_safe = segment_is_free(scene, nodes[nearest], candidate)
+            if candidate_is_safe:
+                node_count = len(nodes) + 1
+                asymptotic_radius = self.config.rewire_gamma * (
+                    math.log(node_count) / node_count
+                ) ** (1 / 3)
+                near_radius = min(self.config.neighbor_radius, asymptotic_radius)
+                near_set = {
+                    index
+                    for index, point in enumerate(nodes)
+                    if distance(point, candidate) <= near_radius
+                    and segment_is_free(scene, point, candidate)
+                }
+                near_set.add(nearest)
+                near = sorted(near_set)
+                parent = nearest
+                candidate_cost = costs[nearest] + distance(nodes[nearest], candidate)
+                for index in near:
+                    alternative = costs[index] + distance(nodes[index], candidate)
+                    if alternative + 1e-12 < candidate_cost:
+                        parent = index
+                        candidate_cost = alternative
 
-            node_count = len(nodes) + 1
-            asymptotic_radius = self.config.rewire_gamma * (math.log(node_count) / node_count) ** (
-                1 / 3
+                new_index = len(nodes)
+                nodes.append(candidate)
+                parents.append(parent)
+                costs.append(candidate_cost)
+                accepted += 1
+
+                for index in near:
+                    if index == parent or index == 0:
+                        continue
+                    if self._is_ancestor(index, new_index, parents):
+                        continue
+                    rewired_cost = candidate_cost + distance(candidate, nodes[index])
+                    if rewired_cost + 1e-12 < costs[index]:
+                        old_cost = costs[index]
+                        parents[index] = new_index
+                        costs[index] = rewired_cost
+                        self._propagate_cost_delta(index, old_cost - rewired_cost, parents, costs)
+
+            completed_iterations = iteration
+            if iteration in checkpoint_set:
+                trace.append(self._quality_point(scene, nodes, costs, iteration, started))
+            if self._wall_time_exhausted(started):
+                terminated_by = "wall-time-budget-exhausted"
+                break
+
+        best_goal_parent = self._best_goal_parent(scene, nodes, costs)
+        if self._wall_time_exhausted(started):
+            terminated_by = "wall-time-budget-exhausted"
+
+        if best_goal_parent is None:
+            reason = (
+                "wall-time-budget-exhausted"
+                if terminated_by == "wall-time-budget-exhausted"
+                else "sample-budget-exhausted"
             )
-            near_radius = min(self.config.neighbor_radius, asymptotic_radius)
-            near_set = {
-                index
-                for index, point in enumerate(nodes)
-                if distance(point, candidate) <= near_radius
-                and segment_is_free(scene, point, candidate)
-            }
-            near_set.add(nearest)
-            near = sorted(near_set)
-            parent = nearest
-            candidate_cost = costs[nearest] + distance(nodes[nearest], candidate)
-            for index in near:
-                alternative = costs[index] + distance(nodes[index], candidate)
-                if alternative + 1e-12 < candidate_cost:
-                    parent = index
-                    candidate_cost = alternative
+            return self._failure(
+                started,
+                reason,
+                parameters,
+                expanded=len(nodes),
+                generated=accepted,
+                iterations=completed_iterations,
+                search_started=search_started,
+                budget=budget,
+                quality_trace=tuple(trace),
+            )
 
-            new_index = len(nodes)
-            nodes.append(candidate)
-            parents.append(parent)
-            costs.append(candidate_cost)
-            accepted += 1
+        path = self._reconstruct(nodes, parents, best_goal_parent)
+        if path[-1] != scene.goal:
+            path.append(scene.goal)
+        elapsed = (time.perf_counter() - started) * 1000
+        setup_ms = (search_started - started) * 1000
+        return PlanningResult(
+            self.algorithm_id,
+            True,
+            tuple(path),
+            elapsed,
+            expanded_nodes=len(nodes),
+            generated_nodes=accepted,
+            iterations=completed_iterations,
+            parameters=parameters,
+            setup_ms=setup_ms,
+            search_ms=max(0.0, elapsed - setup_ms),
+            budget=budget,
+            budget_usage=BudgetUsage(completed_iterations, elapsed, terminated_by),
+            quality_trace=tuple(trace),
+        )
 
-            for index in near:
-                if index == parent or index == 0:
-                    continue
-                if self._is_ancestor(index, new_index, parents):
-                    continue
-                rewired_cost = candidate_cost + distance(candidate, nodes[index])
-                if rewired_cost + 1e-12 < costs[index]:
-                    old_cost = costs[index]
-                    parents[index] = new_index
-                    costs[index] = rewired_cost
-                    self._propagate_cost_delta(index, old_cost - rewired_cost, parents, costs)
+    def _wall_time_exhausted(self, started: float) -> bool:
+        limit = self.config.max_wall_time_ms
+        return limit is not None and (time.perf_counter() - started) * 1000 >= limit
 
+    def _best_goal_parent(
+        self, scene: Scene, nodes: list[Point3], costs: list[float]
+    ) -> int | None:
         goal_candidates = [
             index
             for index, point in enumerate(nodes)
             if distance(point, scene.goal) <= self.config.goal_tolerance
             and segment_is_free(scene, point, scene.goal)
         ]
-        best_goal_parent = min(
+        return min(
             goal_candidates,
             key=lambda index: (costs[index] + distance(nodes[index], scene.goal), index),
             default=None,
         )
 
-        if best_goal_parent is None:
-            return self._failure(
-                started,
-                "sample-budget-exhausted",
-                parameters,
-                expanded=len(nodes),
-                generated=accepted,
-                iterations=self.config.max_samples,
-            )
-
-        path = self._reconstruct(nodes, parents, best_goal_parent)
-        if path[-1] != scene.goal:
-            path.append(scene.goal)
-        return PlanningResult(
-            self.algorithm_id,
-            True,
-            tuple(path),
-            (time.perf_counter() - started) * 1000,
-            expanded_nodes=len(nodes),
-            generated_nodes=accepted,
-            iterations=self.config.max_samples,
-            parameters=parameters,
+    def _quality_point(
+        self,
+        scene: Scene,
+        nodes: list[Point3],
+        costs: list[float],
+        iteration: int,
+        started: float,
+    ) -> QualityTracePoint:
+        parent = self._best_goal_parent(scene, nodes, costs)
+        best_length = (
+            costs[parent] + distance(nodes[parent], scene.goal) if parent is not None else None
         )
+        return QualityTracePoint(iteration, (time.perf_counter() - started) * 1000, best_length)
 
     def _sample(self, scene: Scene, rng: random.Random) -> Point3:
         clearance = scene.required_clearance
@@ -206,15 +287,25 @@ class RRTStar:
         expanded: int = 0,
         generated: int = 0,
         iterations: int = 0,
+        search_started: float | None = None,
+        budget: PlanningBudget | None = None,
+        quality_trace: tuple[QualityTracePoint, ...] = (),
     ) -> PlanningResult:
+        elapsed = (time.perf_counter() - started) * 1000
+        setup_ms = elapsed if search_started is None else (search_started - started) * 1000
         return PlanningResult(
             self.algorithm_id,
             False,
             (),
-            (time.perf_counter() - started) * 1000,
+            elapsed,
             expanded_nodes=expanded,
             generated_nodes=generated,
             iterations=iterations,
             failure_reason=reason,
             parameters=parameters,
+            setup_ms=setup_ms,
+            search_ms=max(0.0, elapsed - setup_ms),
+            budget=budget,
+            budget_usage=BudgetUsage(iterations, elapsed, reason) if budget else None,
+            quality_trace=quality_trace,
         )

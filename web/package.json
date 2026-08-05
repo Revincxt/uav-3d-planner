@@ -1,11 +1,11 @@
 {
   "name": "uav-3d-planner-lab-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "validate:data": "node scripts/validate-demo.mjs",
+    "validate:data": "node scripts/validate-demo.mjs && node scripts/validate-benchmark.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "pnpm validate:data && pnpm typecheck && vite build"
@@ -19,5 +19,8 @@
     "vite": "7.1.2",
     "vitest": "3.2.4"
   },
-  "packageManager": "pnpm@11.9.0"
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24"
+  }
 }

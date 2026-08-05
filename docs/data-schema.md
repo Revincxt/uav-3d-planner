@@ -12,21 +12,53 @@ Required physical fields:
 - `buildings`: axis-aligned boxes with unique IDs;
 - `no_fly_zones`: finite vertical cylinders with unique IDs.
 
-`metadata` is descriptive and must not change planner semantics. The canonical SHA-256 scene fingerprint sorts obstacles by ID before serialization so harmless input ordering does not change experiment identity.
+`metadata` is descriptive and must not change planner semantics. The v2 semantic problem
+fingerprint excludes IDs, names, obstacle labels, and metadata; normalizes every number with
+`float.hex()`; and sorts obstacles by geometry. Integer and floating-point JSON spellings therefore
+produce the same fingerprint for the same physical problem.
+Start and goal must be distinct because path excess is normalized by their Euclidean separation.
 
 ## Experiment record
 
-`uav3d plan` and `uav3d benchmark` include:
+`uav3d plan`, `uav3d benchmark`, and both sweep commands emit schema `2.0` records with:
 
-- scene ID and fingerprint;
-- planner ID, complete parameter snapshot, and seed;
-- status and explicit failure reason;
-- timing and search-effort counters;
+- stable run ID, run purpose, scene ID, and semantic problem fingerprint;
+- planner ID, configuration ID, complete parameter snapshot, and nullable planner seed;
+- primary status, explicit failure reason, raw-path validity, and separate post-processing status;
+- algorithmic budget, optional wall-clock limit, observed usage, and termination reason;
+- planning, setup, search, smoothing, and validation timings;
+- search-effort counters and optional RRT* quality checkpoints;
 - raw and smoothed certified polylines;
 - independent audits for both paths;
 - smoothing method, sample count, and optional blend factor.
 
-Failed runs contain no fabricated trajectory. `sample-budget-exhausted` for RRT* and graph exhaustion for a voxel planner have different meanings.
+Failed runs contain no fabricated trajectory. `budget-exhausted`, `timeout`, `no-path`, and `invalid`
+remain distinct top-level outcomes. Algorithm-specific reasons such as
+`sample-budget-exhausted`, `expansion-budget-exhausted`, and `graph-exhausted` are preserved.
+
+## Dataset manifest
+
+`uav3d dataset` writes `manifest.json` plus accepted scene files. The manifest stores the generator
+name and version, complete generation parameters, requested/accepted/rejected counts, and one record
+per seed. Accepted records include the semantic fingerprint and relative scene path. Rejected records
+include the exception type and reason. No planner is invoked during dataset acceptance.
+
+## Timing bundle
+
+`uav3d timing` writes schema `2.0` data containing the randomized order seed, fixed planner seed,
+repetition count, process timeout, Python/package/platform context, and one record per isolated child
+process. Process status and wall time are distinct from the nested planner record and planner time.
+
+## Reports
+
+Passing `--report-dir` to a nominal benchmark or sweep creates:
+
+- `records.csv`: one metric/provenance row per run, including parameters, validity flags, both
+  budget dimensions, observed usage, and quality traces while excluding bulky paths;
+- `summary.csv`: tidy metric summaries with conditioning and sample counts;
+- `summary.json`: the scene-clustered statistical contract and planner summaries;
+- `planner-summary.svg`: an accessible dependency-free interval figure;
+- `checksums.json`: SHA-256 and byte size for every exported report file.
 
 ## Demo bundle
 
@@ -40,5 +72,29 @@ Failed runs contain no fabricated trajectory. `sample-budget-exhausted` for RRT*
 - one recorded result per planner and scene;
 - scenario fingerprints and RRT* seeds.
 
-The build-time validator recomputes every raw and smoothed polyline length, checks exact endpoints, requires all four scenes and three planners, and rejects any successful record that was not collision-certified by Python.
+The JavaScript build-time validator recomputes every raw and smoothed polyline length, checks exact
+endpoints, and requires all four scenes and three planners. The separate Python release audit reloads
+the physical scenes and independently collision-certifies every committed trajectory.
 
+## Benchmark web bundle
+
+`web/public/benchmark-data.json` is schema version `2` and carries the
+`DESCRIPTIVE_BENCHMARK` evidence label. It declares:
+
+- full source revision, protocol ID, bootstrap seed/resamples, path-quality seeds, and timing
+  repetitions;
+- diagnostic dataset counts and the SHA-256 of `dataset-manifest.json`;
+- explicit nominal and sensitivity budgets;
+- exactly one dataset-level summary per planner;
+- graph-planner voxel-resolution sensitivity;
+- RRT* sample-budget sensitivity.
+- paths, byte sizes, and SHA-256 digests for the records CSV, summary CSV, dataset manifest, and
+  timing manifest.
+
+Metric summaries state their estimator and conditioning. Undefined successful-run metrics are JSON
+`null`; `nDefinedScenes` makes their actual problem support explicit, and NaN/zero substitution is
+forbidden. Browser validation checks interval ordering,
+counts, budget references, artifact digests, and schema invariants. The nominal table and summary CSV
+report path-quality and timing sample counts separately. `scripts/validate_committed_data.py`
+independently re-audits trajectories, resolves the source revision, recomputes configuration and run
+IDs, verifies every download digest, and cross-checks CSV/timing sample counts against the JSON bundle.

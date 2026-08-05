@@ -5,6 +5,11 @@ export default defineConfig({
   build: {
     target: "es2022",
     sourcemap: true,
+    rollupOptions: {
+      input: {
+        paths: "index.html",
+        results: "results.html",
+      },
+    },
   },
 });
-

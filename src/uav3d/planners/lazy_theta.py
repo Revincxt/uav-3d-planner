@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from uav3d.collision import point_is_free, segment_is_free
 from uav3d.geometry import distance
-from uav3d.planners.base import PlanningResult, Scalar
+from uav3d.planners.base import BudgetUsage, PlanningBudget, PlanningResult, Scalar
 from uav3d.planners.grid import GridIndex, VoxelGrid, attach_exact_endpoints
 from uav3d.scene import Scene
 
@@ -19,6 +19,15 @@ from uav3d.scene import Scene
 class LazyThetaStarConfig:
     resolution: float = 4.0
     max_expansions: int = 120_000
+    max_wall_time_ms: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.resolution <= 0:
+            raise ValueError("resolution must be positive")
+        if self.max_expansions <= 0:
+            raise ValueError("max_expansions must be positive")
+        if self.max_wall_time_ms is not None and self.max_wall_time_ms <= 0:
+            raise ValueError("max_wall_time_ms must be positive when supplied")
 
 
 class LazyThetaStar:
@@ -33,25 +42,43 @@ class LazyThetaStar:
         parameters: dict[str, Scalar] = {
             "resolution": self.config.resolution,
             "max_expansions": self.config.max_expansions,
+            "max_wall_time_ms": self.config.max_wall_time_ms,
             "connectivity": 26,
         }
-        if not point_is_free(scene, scene.start) or not point_is_free(scene, scene.goal):
-            return self._failure(started, "invalid-start-or-goal", parameters)
-        if segment_is_free(scene, scene.start, scene.goal):
+        budget = PlanningBudget(
+            "expanded-nodes", self.config.max_expansions, self.config.max_wall_time_ms
+        )
+        if self._wall_time_exhausted(started):
+            return self._failure(started, "wall-time-budget-exhausted", parameters, budget=budget)
+        endpoints_are_free = point_is_free(scene, scene.start) and point_is_free(scene, scene.goal)
+        if self._wall_time_exhausted(started):
+            return self._failure(started, "wall-time-budget-exhausted", parameters, budget=budget)
+        if not endpoints_are_free:
+            return self._failure(started, "invalid-start-or-goal", parameters, budget=budget)
+        direct_path_is_free = segment_is_free(scene, scene.start, scene.goal)
+        if self._wall_time_exhausted(started):
+            return self._failure(started, "wall-time-budget-exhausted", parameters, budget=budget)
+        if direct_path_is_free:
+            elapsed = (time.perf_counter() - started) * 1000
             return PlanningResult(
                 self.algorithm_id,
                 True,
                 (scene.start, scene.goal),
-                (time.perf_counter() - started) * 1000,
+                elapsed,
                 generated_nodes=2,
                 parameters=parameters,
+                setup_ms=elapsed,
+                budget=budget,
+                budget_usage=BudgetUsage(0, elapsed, "goal-reached"),
             )
 
         grid = VoxelGrid(scene, self.config.resolution)
         starts = set(grid.anchor_indices(scene.start))
         goals = set(grid.anchor_indices(scene.goal))
+        if self._wall_time_exhausted(started):
+            return self._failure(started, "wall-time-budget-exhausted", parameters, budget=budget)
         if not starts or not goals:
-            return self._failure(started, "no-free-grid-anchor", parameters)
+            return self._failure(started, "no-free-grid-anchor", parameters, budget=budget)
 
         parents: dict[GridIndex, GridIndex] = {start: start for start in starts}
         g_score: dict[GridIndex, float] = {
@@ -67,8 +94,29 @@ class LazyThetaStar:
             )
         closed: set[GridIndex] = set()
         generated = len(starts)
+        search_started = time.perf_counter()
 
-        while queue and len(closed) < self.config.max_expansions:
+        while queue:
+            if len(closed) >= self.config.max_expansions:
+                return self._failure(
+                    started,
+                    "expansion-budget-exhausted",
+                    parameters,
+                    len(closed),
+                    generated,
+                    search_started,
+                    budget,
+                )
+            if self._wall_time_exhausted(started):
+                return self._failure(
+                    started,
+                    "wall-time-budget-exhausted",
+                    parameters,
+                    len(closed),
+                    generated,
+                    search_started,
+                    budget,
+                )
             _, _, _, current = heapq.heappop(queue)
             if current in closed:
                 continue
@@ -80,17 +128,39 @@ class LazyThetaStar:
                 path = attach_exact_endpoints(scene, grid_path, scene.start, scene.goal)
                 if not path:
                     return self._failure(
-                        started, "endpoint-connection-failed", parameters, len(closed), generated
+                        started,
+                        "endpoint-connection-failed",
+                        parameters,
+                        len(closed),
+                        generated,
+                        search_started,
+                        budget,
                     )
+                if self._wall_time_exhausted(started):
+                    return self._failure(
+                        started,
+                        "wall-time-budget-exhausted",
+                        parameters,
+                        len(closed),
+                        generated,
+                        search_started,
+                        budget,
+                    )
+                elapsed = (time.perf_counter() - started) * 1000
+                setup_ms = (search_started - started) * 1000
                 return PlanningResult(
                     self.algorithm_id,
                     True,
                     path,
-                    (time.perf_counter() - started) * 1000,
+                    elapsed,
                     expanded_nodes=len(closed),
                     generated_nodes=generated,
                     iterations=len(closed),
                     parameters=parameters,
+                    setup_ms=setup_ms,
+                    search_ms=max(0.0, elapsed - setup_ms),
+                    budget=budget,
+                    budget_usage=BudgetUsage(len(closed), elapsed, "goal-reached"),
                 )
 
             closed.add(current)
@@ -111,8 +181,24 @@ class LazyThetaStar:
                 )
                 generated += 1
 
-        reason = "expansion-budget-exhausted" if queue else "no-path"
-        return self._failure(started, reason, parameters, len(closed), generated)
+        reason = (
+            "wall-time-budget-exhausted"
+            if self._wall_time_exhausted(started)
+            else "graph-exhausted"
+        )
+        return self._failure(
+            started,
+            reason,
+            parameters,
+            len(closed),
+            generated,
+            search_started,
+            budget,
+        )
+
+    def _wall_time_exhausted(self, started: float) -> bool:
+        limit = self.config.max_wall_time_ms
+        return limit is not None and (time.perf_counter() - started) * 1000 >= limit
 
     def _set_vertex(
         self,
@@ -168,15 +254,23 @@ class LazyThetaStar:
         parameters: dict[str, Scalar],
         expanded: int = 0,
         generated: int = 0,
+        search_started: float | None = None,
+        budget: PlanningBudget | None = None,
     ) -> PlanningResult:
+        elapsed = (time.perf_counter() - started) * 1000
+        setup_ms = elapsed if search_started is None else (search_started - started) * 1000
         return PlanningResult(
             self.algorithm_id,
             False,
             (),
-            (time.perf_counter() - started) * 1000,
+            elapsed,
             expanded_nodes=expanded,
             generated_nodes=generated,
             iterations=expanded,
             failure_reason=reason,
             parameters=parameters,
+            setup_ms=setup_ms,
+            search_ms=max(0.0, elapsed - setup_ms),
+            budget=budget,
+            budget_usage=BudgetUsage(expanded, elapsed, reason) if budget else None,
         )

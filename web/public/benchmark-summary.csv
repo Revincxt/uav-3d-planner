@@ -1,0 +1,4 @@
+planner_id,budget_id,runs,success_rate,success_ci95_low,success_ci95_high,planning_time_median_ms,raw_path_excess_median_pct,minimum_clearance_median_m
+astar-3d,astar-r4-e120000,4,1.0,1.0,1.0,360.620646039024,38.247391404034424,1.4611038290728666
+lazy-theta-star,theta-r4-e120000,4,1.0,1.0,1.0,275.41364601347595,28.222187463088165,1.2418428492991302
+rrt-star,rrt-s3000,20,1.0,1.0,1.0,836.1605625832453,51.0481725849653,1.59667628468579

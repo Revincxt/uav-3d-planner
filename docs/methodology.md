@@ -32,7 +32,7 @@ Segment/AABB queries use the slab intersection algorithm. Segment/cylinder queri
 
 3D A* and Lazy Theta* use the same lattice and 26-connected local graph. Edge cost is three-dimensional Euclidean distance, and every local edge undergoes the same continuous segment check.
 
-Start and goal are not silently rounded to one voxel. Each is a virtual node connected to every collision-free lattice vertex in the local `3 x 3 x 3` stencil around its nearest index. If that stencil has no valid anchor, the implementation searches for the nearest visible free vertex. A direct start-to-goal edge is used when visible. Every reported path retains the exact supplied endpoints, and the connector lengths are included in metrics.
+Start and goal are not silently rounded to one voxel. Each is a virtual node connected to every collision-free lattice vertex in the local `3 x 3 x 3` stencil around its nearest index. If that stencil has no valid anchor, the implementation searches for the nearest visible free vertex. A direct start-to-goal edge is used when visible. Every reported path retains the exact supplied endpoints, and the connector lengths are included in metrics. Scene contracts reject coincident endpoints because the study's path-excess denominator must be strictly positive.
 
 ## Planner configurations
 
@@ -67,6 +67,32 @@ This delayed check distinguishes the implementation from ordinary Theta*. It doe
 
 RRT* continues until the fixed sample-attempt budget even after finding a first solution. A finite-budget result is the best path in that run, not a claim of optimality or continuous infeasibility.
 
+## Budget and timing contract
+
+Each planner exposes the same two-part finite-budget contract:
+
+- an algorithmic work unit and positive work limit;
+- an optional positive wall-clock protection limit.
+
+The graph planners consume expanded nodes. RRT* consumes sample attempts, including rejected
+samples. The two work units describe different algorithms and are not comparable measures of equal
+effort. When both limits exist, planning stops at the first limit reached. A wall-clock stop may vary
+across machines and therefore is not used as the primary path-quality budget.
+
+The wall-clock deadline begins at planner entry. Planner timing is divided into:
+
+- **setup**: endpoint checks, direct line of sight, grid anchoring, or tree initialization;
+- **search**: the search loop, goal scan, path reconstruction, and requested trace observations.
+
+Smoothing and independent audits are timed separately. Isolated-process timing repetitions use a
+fixed algorithmic budget, one fresh Python process per case, randomized execution order, and a
+planner seed distinct from the repetition index. Process startup time is recorded by the harness but
+is not included in planner time.
+
+RRT* can record the best goal-connectable path at fixed sample-attempt checkpoints. A single maximum
+budget run supplies the full curve, preserving one common random prefix. Once an incumbent exists,
+its recorded length must be non-increasing within that run.
+
 ## Shared smoothing pipeline
 
 Raw planner paths are the primary algorithm output. Successful paths enter the same post-processing sequence:
@@ -81,10 +107,27 @@ Raw planner paths are the primary algorithm output. Successful paths enter the s
 
 The exported “smoothed path” is the certified sampled polyline, not an unverified analytic spline. A browser or downstream consumer must not interpolate it again without another collision check.
 
+## Experiment identity
+
+`problem_fingerprint` is a versioned SHA-256 digest of planning semantics: bounds, exact endpoints,
+vehicle radius, safety margin, building geometry, and finite-cylinder geometry. It excludes scene
+ID, name, obstacle labels, and descriptive metadata. Numeric values are normalized through their
+floating-point representation, so `1` and `1.0` identify the same problem. Obstacles are sorted by
+geometry before hashing.
+
+Every v2 run also receives a stable `run_id` derived from the problem fingerprint, algorithm
+configuration, budget, planner seed, run purpose, and optional timing repetition. A full source-file
+digest is provenance for the document, not for physical problem identity.
+Configuration parameters use the same canonical floating-point representation, so equivalent Python
+spellings such as `4` and `4.0` produce the same configuration and run identities.
+
 ## Metrics
 
-- **Success**: the planner returned an exact-endpoint path and both raw and post-processed audits passed.
-- **Planning time**: wall time inside the planner, including its data-structure setup. It excludes smoothing and JSON export.
+- **Success**: the planner returned an exact-endpoint raw path and the independent raw audit passed.
+- **Post-processing status**: whether the separate smoothing pipeline returned a certified path. A
+  smoothing failure does not erase a valid planner solution.
+- **Planning time**: setup plus search time inside the planner. It excludes smoothing, audit, process
+  startup, and serialization.
 - **Raw length**: Euclidean length of the planner's exact-endpoint polyline.
 - **Smoothed length**: Euclidean length after the shared pipeline.
 - **Minimum clearance**: minimum sampled distance from the vehicle surface to physical obstacles or boundary. Collision status itself remains continuous and exact.
@@ -97,7 +140,7 @@ Clearance sampling defaults to `0.5 m`. It is a descriptive approximation; colli
 For a formal evaluation:
 
 1. freeze map-generation seeds separately from RRT* planner seeds;
-2. store the scene fingerprint with every run;
+2. store the semantic problem fingerprint and stable run ID with every run;
 3. calibrate parameters on maps excluded from final evaluation;
 4. report success rate before conditional path-quality metrics;
 5. report deterministic planners once per scene for path quality and repeat only timing measurements;
@@ -107,5 +150,32 @@ For a formal evaluation:
 9. keep raw-path findings primary and smoothing findings secondary;
 10. retain failed scenes instead of filtering them from the dataset.
 
-The recorded web demo deliberately does not aggregate a single seed into a general conclusion.
+Dataset generation records every requested seed as accepted or rejected. Acceptance depends only on
+scene construction, never on the outcome of a planner under comparison. The identity
 
+```text
+requested scenes = accepted scenes + rejected scenes
+```
+
+must hold in every manifest.
+
+## Descriptive statistics
+
+RRT* seeds are repeated measurements nested within a scene. Deterministic planners contribute one
+path-quality run per scene; their repeated processes contribute only to timing. Analysis proceeds in
+two stages:
+
+1. compute a problem-level success proportion or median for each semantic problem fingerprint and
+   planner condition;
+2. aggregate those problem-level values while giving every physical problem equal weight.
+
+Success is the mean of scene success proportions. Continuous metrics are the median of scene
+medians. Q1 and Q3 use linear Type-7 quantiles. The descriptive 95% interval is the 2.5th and 97.5th
+percentile of 10,000 scene-clustered bootstrap resamples generated with seed `20260805`. Path length,
+path excess, and clearance condition on successful raw paths; success rate retains every attempt.
+Missing values remain null and are never replaced by zero or infinity.
+
+The committed benchmark page uses only four curated diagnostic scenes and is labeled
+`DESCRIPTIVE_BENCHMARK` and exploratory small-n. It illustrates the protocol; it is not a powered or
+confirmatory comparison. Larger evaluations should generate an independently seeded random cohort
+and declare calibration and held-out splits before running planners.

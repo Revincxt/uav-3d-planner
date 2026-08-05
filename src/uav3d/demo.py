@@ -10,7 +10,7 @@ from uav3d.scene import Scene
 
 
 def _demo_result(record: ExperimentRecord) -> dict[str, Any]:
-    success = record.status == "success"
+    success = record.status == "success" and record.smoothed_path_valid
     effort_kind = "samples" if record.algorithm == "rrt-star" else "expanded-nodes"
     raw_audit = record.raw_audit
     smoothed_audit = record.smoothed_audit
@@ -18,8 +18,14 @@ def _demo_result(record: ExperimentRecord) -> dict[str, Any]:
         "plannerId": record.algorithm,
         "runId": f"{record.scene_id}:{record.algorithm}:seed-{record.seed}",
         "plannerSeed": record.seed if record.algorithm == "rrt-star" else None,
-        "status": record.status,
-        "failureReason": record.failure_reason,
+        "status": record.status if success else "invalid",
+        "failureReason": (
+            record.failure_reason
+            if record.status != "success"
+            else "postprocessing-certification-failed"
+            if not success
+            else None
+        ),
         "budget": {
             "maxIterations": record.parameters.get(
                 "max_samples", record.parameters.get("max_expansions")

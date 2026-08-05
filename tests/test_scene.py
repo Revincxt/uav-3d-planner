@@ -86,6 +86,13 @@ def test_fingerprint_ignores_obstacle_order() -> None:
             (AABB("same", (2, 2, 0), (3, 3, 3)),),
             (Cylinder("same", (5, 5), 1, 0, 4),),
         ),
+        lambda: Scene(
+            "stationary",
+            "Stationary",
+            Bounds3D((0, 0, 0), (10, 10, 10)),
+            (5, 5, 5),
+            (5, 5, 5),
+        ),
     ],
 )
 def test_invalid_scene_contracts_are_rejected(constructor: Callable[[], object]) -> None:

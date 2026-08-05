@@ -9,7 +9,7 @@
 - four curated and seeded random city scenes;
 - CLI benchmark records and static Three.js comparison page.
 
-## v0.2 — stronger experiments
+## v0.2 — stronger experiments (released)
 
 - explicit wall-clock and algorithmic budget contracts;
 - voxel-resolution sweeps;
@@ -18,6 +18,10 @@
 - per-scene RRT* quality–budget curves;
 - median, interquartile range, and scene-clustered bootstrap intervals;
 - CSV and publication-ready plot export.
+
+The committed Pages study is explicitly descriptive and uses the four curated scenes as a
+small-n diagnostic cohort. The CLI supports larger seeded random cohorts without filtering on any
+planner outcome.
 
 ## v0.3 — dynamic replanning
 
@@ -34,5 +38,5 @@
 - perception uncertainty;
 - PX4/MAVLink export and simulator integration.
 
-These features should not be added to the v0.1 comparison retroactively because they change the research question and planner interface.
-
+These features should not be added to the static comparison retroactively because they change the
+research question and planner interface.

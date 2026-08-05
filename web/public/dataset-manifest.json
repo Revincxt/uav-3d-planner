@@ -1,0 +1,31 @@
+{
+  "accepted": 4,
+  "dataset_id": "curated-static-diagnostic-v1",
+  "records": [
+    {
+      "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
+      "scene_id": "open-blocks",
+      "status": "accepted"
+    },
+    {
+      "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
+      "scene_id": "urban-canyon",
+      "status": "accepted"
+    },
+    {
+      "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
+      "scene_id": "restricted-core",
+      "status": "accepted"
+    },
+    {
+      "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
+      "scene_id": "vertical-gate",
+      "status": "accepted"
+    }
+  ],
+  "rejected": 0,
+  "requested": 4,
+  "schema_version": "1.0",
+  "selection": "all committed curated scenes; no planner-based filtering",
+  "split": "diagnostic"
+}

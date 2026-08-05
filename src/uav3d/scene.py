@@ -95,6 +95,8 @@ class Scene:
             raise ValueError("scene endpoints and clearances must be finite")
         if self.drone_radius < 0 or self.safety_margin < 0:
             raise ValueError("drone radius and safety margin must be non-negative")
+        if self.start == self.goal:
+            raise ValueError("scene start and goal must be distinct")
         obstacle_ids = [building.obstacle_id for building in self.buildings]
         obstacle_ids.extend(zone.zone_id for zone in self.no_fly_zones)
         if len(obstacle_ids) != len(set(obstacle_ids)):

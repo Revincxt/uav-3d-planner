@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-05T05:26:32+00:00",
+  "generatedAt": "2026-08-05T06:18:54+00:00",
   "verificationStatus": "DEMO_NON_CONFIRMATORY",
   "coordinateSystem": {
     "frame": "ENU",
@@ -28,7 +28,7 @@
       "label": "Open blocks",
       "description": "Irregular open city blocks.",
       "scenarioSeed": null,
-      "fingerprint": "sha256:a7fb5970183e511c90e1d2ec8adfc0db3730353790019eeee9070cad699ab8a9",
+      "fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
       "bounds": {
         "min": [
           0,
@@ -166,7 +166,7 @@
       "results": [
         {
           "plannerId": "astar-3d",
-          "runId": "open-blocks:astar-3d:seed-17",
+          "runId": "open-blocks:astar-3d:seed-None",
           "plannerSeed": null,
           "status": "success",
           "failureReason": null,
@@ -808,7 +808,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 379.929,
+            "planningTimeMs": 379.856,
             "rawLengthM": 150.626,
             "smoothedLengthM": 140.365,
             "minClearanceM": 1.597
@@ -816,7 +816,7 @@
         },
         {
           "plannerId": "lazy-theta-star",
-          "runId": "open-blocks:lazy-theta-star:seed-17",
+          "runId": "open-blocks:lazy-theta-star:seed-None",
           "plannerSeed": null,
           "status": "success",
           "failureReason": null,
@@ -1353,7 +1353,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 301.477,
+            "planningTimeMs": 299.202,
             "rawLengthM": 141.923,
             "smoothedLengthM": 139.963,
             "minClearanceM": 1.522
@@ -1968,7 +1968,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 983.704,
+            "planningTimeMs": 975.975,
             "rawLengthM": 155.953,
             "smoothedLengthM": 143.753,
             "minClearanceM": 1.507
@@ -1981,7 +1981,7 @@
       "label": "Urban canyon",
       "description": "Alternating canyon gates.",
       "scenarioSeed": null,
-      "fingerprint": "sha256:efc85cadebfe30d2bb2e94fad2cbaa13a8a6d73e5fb9873246bb382f7e7e6c72",
+      "fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
       "bounds": {
         "min": [
           0,
@@ -2093,7 +2093,7 @@
       "results": [
         {
           "plannerId": "astar-3d",
-          "runId": "urban-canyon:astar-3d:seed-18",
+          "runId": "urban-canyon:astar-3d:seed-None",
           "plannerSeed": null,
           "status": "success",
           "failureReason": null,
@@ -2315,7 +2315,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 370.189,
+            "planningTimeMs": 371.111,
             "rawLengthM": 178.417,
             "smoothedLengthM": 170.559,
             "minClearanceM": 1.326
@@ -2323,7 +2323,7 @@
         },
         {
           "plannerId": "lazy-theta-star",
-          "runId": "urban-canyon:lazy-theta-star:seed-18",
+          "runId": "urban-canyon:lazy-theta-star:seed-None",
           "plannerSeed": null,
           "status": "success",
           "failureReason": null,
@@ -2405,7 +2405,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 312.904,
+            "planningTimeMs": 317.78,
             "rawLengthM": 165.8,
             "smoothedLengthM": 165.6,
             "minClearanceM": 1.326
@@ -2585,7 +2585,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 602.176,
+            "planningTimeMs": 597.481,
             "rawLengthM": 198.201,
             "smoothedLengthM": 175.735,
             "minClearanceM": 2.376
@@ -2598,7 +2598,7 @@
       "label": "Restricted core",
       "description": "Central full-height no-fly zone.",
       "scenarioSeed": null,
-      "fingerprint": "sha256:805d98207847efd9875966c988d9a5e1a783c5fc82408dde6b2f9a712a4933d6",
+      "fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
       "bounds": {
         "min": [
           0,
@@ -2722,7 +2722,7 @@
       "results": [
         {
           "plannerId": "astar-3d",
-          "runId": "restricted-core:astar-3d:seed-19",
+          "runId": "restricted-core:astar-3d:seed-None",
           "plannerSeed": null,
           "status": "success",
           "failureReason": null,
@@ -2904,7 +2904,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 340.953,
+            "planningTimeMs": 342.245,
             "rawLengthM": 133.043,
             "smoothedLengthM": 123.302,
             "minClearanceM": 1.196
@@ -2912,7 +2912,7 @@
         },
         {
           "plannerId": "lazy-theta-star",
-          "runId": "restricted-core:lazy-theta-star:seed-19",
+          "runId": "restricted-core:lazy-theta-star:seed-None",
           "plannerSeed": null,
           "status": "success",
           "failureReason": null,
@@ -3014,7 +3014,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 247.108,
+            "planningTimeMs": 247.821,
             "rawLengthM": 122.997,
             "smoothedLengthM": 122.648,
             "minClearanceM": 1.076
@@ -3584,7 +3584,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 845.062,
+            "planningTimeMs": 840.159,
             "rawLengthM": 146.5,
             "smoothedLengthM": 130.145,
             "minClearanceM": 1.046
@@ -3597,7 +3597,7 @@
       "label": "Vertical gate",
       "description": "A low restricted gate rewards altitude.",
       "scenarioSeed": null,
-      "fingerprint": "sha256:d8e80d9b6da0028f1941a28a3de7aceb6a24b0133b18d148e5b10707dd26fcdb",
+      "fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
       "bounds": {
         "min": [
           0,
@@ -3721,7 +3721,7 @@
       "results": [
         {
           "plannerId": "astar-3d",
-          "runId": "vertical-gate:astar-3d:seed-20",
+          "runId": "vertical-gate:astar-3d:seed-None",
           "plannerSeed": null,
           "status": "success",
           "failureReason": null,
@@ -4218,7 +4218,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 87.404,
+            "planningTimeMs": 87.409,
             "rawLengthM": 110.15,
             "smoothedLengthM": 106.642,
             "minClearanceM": 2.821
@@ -4226,7 +4226,7 @@
         },
         {
           "plannerId": "lazy-theta-star",
-          "runId": "vertical-gate:lazy-theta-star:seed-20",
+          "runId": "vertical-gate:lazy-theta-star:seed-None",
           "plannerSeed": null,
           "status": "success",
           "failureReason": null,
@@ -4633,7 +4633,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 64.27,
+            "planningTimeMs": 64.905,
             "rawLengthM": 101.933,
             "smoothedLengthM": 100.755,
             "minClearanceM": 1.158
@@ -5168,7 +5168,7 @@
             "collisionFree": true
           },
           "metrics": {
-            "planningTimeMs": 780.132,
+            "planningTimeMs": 775.888,
             "rawLengthM": 136.23,
             "smoothedLengthM": 118.751,
             "minClearanceM": 1.942

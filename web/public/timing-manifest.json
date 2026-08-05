@@ -1,0 +1,1459 @@
+{
+  "schema_version": "2.0",
+  "harness": "isolated-process-v1",
+  "order_seed": 20260805,
+  "planner_seed": 17,
+  "repetitions_per_cell": 3,
+  "process_timeout_s": 120.0,
+  "environment": {
+    "python": "3.14.0",
+    "implementation": "CPython",
+    "package_version": "0.2.0",
+    "platform": "macOS-15.6-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "processor": "arm",
+    "cpu_count": 10
+  },
+  "records": [
+    {
+      "case_id": "timing-985cab99e94c7f63",
+      "order_index": 0,
+      "scene_reference": "open-blocks",
+      "algorithm": "rrt-star",
+      "timing_repetition": 0,
+      "planner_seed": 17,
+      "pid": 88217,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 1057.2237079031765,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-657802432d932f9d52be",
+        "scene_id": "open-blocks",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 980.970999924466,
+        "timing": {
+          "planning_ms": 980.970999924466,
+          "setup_ms": 0.026250025257468224,
+          "search_ms": 980.9447498992085,
+          "smoothing_ms": 1.0650840122252703,
+          "validation_ms": 3.052624873816967
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 980.970999924466,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-2ec48ca3fb9594fe",
+      "order_index": 1,
+      "scene_reference": "vertical-gate",
+      "algorithm": "astar-3d",
+      "timing_repetition": 2,
+      "planner_seed": null,
+      "pid": 88236,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 144.63566686026752,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-bed9c6c163377610a678",
+        "scene_id": "vertical-gate",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 88.13983295112848,
+        "timing": {
+          "planning_ms": 88.13983295112848,
+          "setup_ms": 0.5671670660376549,
+          "search_ms": 87.57266588509083,
+          "smoothing_ms": 1.1349159758538008,
+          "validation_ms": 2.1363748237490654
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 497,
+          "wall_time_used_ms": 88.13983295112848,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-03441ba3b794f17b",
+      "order_index": 2,
+      "scene_reference": "restricted-core",
+      "algorithm": "rrt-star",
+      "timing_repetition": 2,
+      "planner_seed": 17,
+      "pid": 88237,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 867.8496659267694,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-b08671a095b0aa8c8cd7",
+        "scene_id": "restricted-core",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 812.9626251757145,
+        "timing": {
+          "planning_ms": 812.9626251757145,
+          "setup_ms": 0.02695806324481964,
+          "search_ms": 812.9356671124697,
+          "smoothing_ms": 1.3339999131858349,
+          "validation_ms": 2.3153338115662336
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 812.9626251757145,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-2191a9941ef71959",
+      "order_index": 3,
+      "scene_reference": "vertical-gate",
+      "algorithm": "rrt-star",
+      "timing_repetition": 2,
+      "planner_seed": 17,
+      "pid": 88240,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 911.020124796778,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-5320f00db493f556f9a5",
+        "scene_id": "vertical-gate",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 857.7097500674427,
+        "timing": {
+          "planning_ms": 857.7097500674427,
+          "setup_ms": 0.028791138902306557,
+          "search_ms": 857.6809589285403,
+          "smoothing_ms": 0.806041993200779,
+          "validation_ms": 1.7698330339044333
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 857.7097500674427,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-1b3e032acf9215de",
+      "order_index": 4,
+      "scene_reference": "open-blocks",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 0,
+      "planner_seed": null,
+      "pid": 88241,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 356.8817500490695,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-2ebef24c80eb6f1ec9e5",
+        "scene_id": "open-blocks",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 300.9548750706017,
+        "timing": {
+          "planning_ms": 300.9548750706017,
+          "setup_ms": 0.501084141433239,
+          "search_ms": 300.45379092916846,
+          "smoothing_ms": 0.9823751170188189,
+          "validation_ms": 2.838167129084468
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1241,
+          "wall_time_used_ms": 300.9548750706017,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-c7c47d11cfb64687",
+      "order_index": 5,
+      "scene_reference": "restricted-core",
+      "algorithm": "astar-3d",
+      "timing_repetition": 2,
+      "planner_seed": null,
+      "pid": 88242,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 399.4644160848111,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-7ab3f9f0e563eac06126",
+        "scene_id": "restricted-core",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 344.33604194782674,
+        "timing": {
+          "planning_ms": 344.33604194782674,
+          "setup_ms": 0.5525418091565371,
+          "search_ms": 343.7835001386702,
+          "smoothing_ms": 0.9976669680327177,
+          "validation_ms": 2.0760418847203255
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1798,
+          "wall_time_used_ms": 344.33604194782674,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-45d4bae7922ba61e",
+      "order_index": 6,
+      "scene_reference": "urban-canyon",
+      "algorithm": "astar-3d",
+      "timing_repetition": 0,
+      "planner_seed": null,
+      "pid": 88243,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 429.36070798896253,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-1c0ce77d9d9d677ac51a",
+        "scene_id": "urban-canyon",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 374.50625002384186,
+        "timing": {
+          "planning_ms": 374.50625002384186,
+          "setup_ms": 0.5063330754637718,
+          "search_ms": 373.9999169483781,
+          "smoothing_ms": 0.8875001221895218,
+          "validation_ms": 2.5130831636488438
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 2247,
+          "wall_time_used_ms": 374.50625002384186,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-8d444e2d049a8346",
+      "order_index": 7,
+      "scene_reference": "urban-canyon",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 1,
+      "planner_seed": null,
+      "pid": 88244,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 373.32437513396144,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-bbacb3c2963e9e909718",
+        "scene_id": "urban-canyon",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 318.11879109591246,
+        "timing": {
+          "planning_ms": 318.11879109591246,
+          "setup_ms": 0.5124160088598728,
+          "search_ms": 317.6063750870526,
+          "smoothing_ms": 0.7492499426007271,
+          "validation_ms": 2.27516726590693
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1645,
+          "wall_time_used_ms": 318.11879109591246,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-f18d7e61e30b4d98",
+      "order_index": 8,
+      "scene_reference": "vertical-gate",
+      "algorithm": "rrt-star",
+      "timing_repetition": 1,
+      "planner_seed": 17,
+      "pid": 88245,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 917.5228329841048,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-bc95dbc8a2a34e18d35c",
+        "scene_id": "vertical-gate",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 863.2701248861849,
+        "timing": {
+          "planning_ms": 863.2701248861849,
+          "setup_ms": 0.028499867767095566,
+          "search_ms": 863.2416250184178,
+          "smoothing_ms": 0.9113331325352192,
+          "validation_ms": 1.7672078683972359
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 863.2701248861849,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-afead40677cc0823",
+      "order_index": 9,
+      "scene_reference": "urban-canyon",
+      "algorithm": "rrt-star",
+      "timing_repetition": 0,
+      "planner_seed": 17,
+      "pid": 88246,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 728.8015407975763,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-9d6dd57f0f3bb78918da",
+        "scene_id": "urban-canyon",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 673.9150420762599,
+        "timing": {
+          "planning_ms": 673.9150420762599,
+          "setup_ms": 0.027542002499103546,
+          "search_ms": 673.8875000737607,
+          "smoothing_ms": 0.8344158995896578,
+          "validation_ms": 2.631582785397768
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 673.9150420762599,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-fcca8529ac4079c4",
+      "order_index": 10,
+      "scene_reference": "restricted-core",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 2,
+      "planner_seed": null,
+      "pid": 88247,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 303.41220810078084,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-a694f2751aabd6e48e7f",
+        "scene_id": "restricted-core",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 250.07599988020957,
+        "timing": {
+          "planning_ms": 250.07599988020957,
+          "setup_ms": 0.5700828041881323,
+          "search_ms": 249.50591707602143,
+          "smoothing_ms": 0.8672920521348715,
+          "validation_ms": 1.8667508848011494
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1104,
+          "wall_time_used_ms": 250.07599988020957,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-95af017d2c075fa2",
+      "order_index": 11,
+      "scene_reference": "restricted-core",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 0,
+      "planner_seed": null,
+      "pid": 88249,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 305.27295800857246,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-154bc95c136cece4bd0f",
+        "scene_id": "restricted-core",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 249.8409589752555,
+        "timing": {
+          "planning_ms": 249.8409589752555,
+          "setup_ms": 0.5822500679641962,
+          "search_ms": 249.2587089072913,
+          "smoothing_ms": 0.8782499935477972,
+          "validation_ms": 1.8809579778462648
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1104,
+          "wall_time_used_ms": 249.8409589752555,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-3cf8fa9ff3d06015",
+      "order_index": 12,
+      "scene_reference": "restricted-core",
+      "algorithm": "rrt-star",
+      "timing_repetition": 1,
+      "planner_seed": 17,
+      "pid": 88251,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 868.9384157769382,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-31291c86cfcc5ee5b97d",
+        "scene_id": "restricted-core",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 813.8951251748949,
+        "timing": {
+          "planning_ms": 813.8951251748949,
+          "setup_ms": 0.030875205993652344,
+          "search_ms": 813.8642499689013,
+          "smoothing_ms": 1.3041668571531773,
+          "validation_ms": 2.2953751031309366
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 813.8951251748949,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-28691a9b8a19b09c",
+      "order_index": 13,
+      "scene_reference": "open-blocks",
+      "algorithm": "rrt-star",
+      "timing_repetition": 1,
+      "planner_seed": 17,
+      "pid": 88252,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 1038.218708941713,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-302be70be68b29decf63",
+        "scene_id": "open-blocks",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 981.6152919083834,
+        "timing": {
+          "planning_ms": 981.6152919083834,
+          "setup_ms": 0.03200001083314419,
+          "search_ms": 981.5832918975502,
+          "smoothing_ms": 1.0950409341603518,
+          "validation_ms": 3.0921250581741333
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 981.6152919083834,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-486c6b970a3d209a",
+      "order_index": 14,
+      "scene_reference": "urban-canyon",
+      "algorithm": "rrt-star",
+      "timing_repetition": 1,
+      "planner_seed": 17,
+      "pid": 88253,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 723.4760830178857,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-4f3c649726230a1a043f",
+        "scene_id": "urban-canyon",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 668.1097079999745,
+        "timing": {
+          "planning_ms": 668.1097079999745,
+          "setup_ms": 0.027165981009602547,
+          "search_ms": 668.0825420189649,
+          "smoothing_ms": 0.8473340421915054,
+          "validation_ms": 2.736541908234358
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 668.1097079999745,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-c1624ebe3f2203d8",
+      "order_index": 15,
+      "scene_reference": "open-blocks",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 1,
+      "planner_seed": null,
+      "pid": 88254,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 357.2475831024349,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-b3ada0cc4b0bdd53951f",
+        "scene_id": "open-blocks",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 300.9979580529034,
+        "timing": {
+          "planning_ms": 300.9979580529034,
+          "setup_ms": 0.5145000759512186,
+          "search_ms": 300.4834579769522,
+          "smoothing_ms": 0.9679589420557022,
+          "validation_ms": 2.8186659328639507
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1241,
+          "wall_time_used_ms": 300.9979580529034,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-d3bd316fe083770d",
+      "order_index": 16,
+      "scene_reference": "urban-canyon",
+      "algorithm": "rrt-star",
+      "timing_repetition": 2,
+      "planner_seed": 17,
+      "pid": 88255,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 731.4896250609308,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-4cd1c408fdee04816dd0",
+        "scene_id": "urban-canyon",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 676.3331659603864,
+        "timing": {
+          "planning_ms": 676.3331659603864,
+          "setup_ms": 0.024165958166122437,
+          "search_ms": 676.3090000022203,
+          "smoothing_ms": 0.8251250255852938,
+          "validation_ms": 2.6629590429365635
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 676.3331659603864,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-a7c0aad53e28719e",
+      "order_index": 17,
+      "scene_reference": "vertical-gate",
+      "algorithm": "rrt-star",
+      "timing_repetition": 0,
+      "planner_seed": 17,
+      "pid": 88256,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 912.3725830577314,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-83aa774c0550853e762e",
+        "scene_id": "vertical-gate",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 858.4259999915957,
+        "timing": {
+          "planning_ms": 858.4259999915957,
+          "setup_ms": 0.028999987989664078,
+          "search_ms": 858.3970000036061,
+          "smoothing_ms": 0.7927080150693655,
+          "validation_ms": 1.7369159031659365
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 858.4259999915957,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-92a1f1b176b6cc1b",
+      "order_index": 18,
+      "scene_reference": "open-blocks",
+      "algorithm": "astar-3d",
+      "timing_repetition": 0,
+      "planner_seed": null,
+      "pid": 88258,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 444.4712500553578,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-b08423d4bbdc8302f3f5",
+        "scene_id": "open-blocks",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 387.5196671579033,
+        "timing": {
+          "planning_ms": 387.5196671579033,
+          "setup_ms": 0.5050001200288534,
+          "search_ms": 387.01466703787446,
+          "smoothing_ms": 1.1349169071763754,
+          "validation_ms": 3.1317498069256544
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1921,
+          "wall_time_used_ms": 387.5196671579033,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-274ebb3ada1e59fa",
+      "order_index": 19,
+      "scene_reference": "open-blocks",
+      "algorithm": "astar-3d",
+      "timing_repetition": 1,
+      "planner_seed": null,
+      "pid": 88260,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 443.4324998874217,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-63c49ab5ef1b49e58ad4",
+        "scene_id": "open-blocks",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 387.24395795725286,
+        "timing": {
+          "planning_ms": 387.24395795725286,
+          "setup_ms": 0.5196668207645416,
+          "search_ms": 386.7242911364883,
+          "smoothing_ms": 1.1225410271435976,
+          "validation_ms": 3.120498964563012
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1921,
+          "wall_time_used_ms": 387.24395795725286,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-29e02ad4f15578b0",
+      "order_index": 20,
+      "scene_reference": "urban-canyon",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 0,
+      "planner_seed": null,
+      "pid": 88261,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 375.8581660222262,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-848e4bab464b1b7ae702",
+        "scene_id": "urban-canyon",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 320.59066696092486,
+        "timing": {
+          "planning_ms": 320.59066696092486,
+          "setup_ms": 0.5217080470174551,
+          "search_ms": 320.0689589139074,
+          "smoothing_ms": 0.8262500632554293,
+          "validation_ms": 2.4707510601729155
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1645,
+          "wall_time_used_ms": 320.59066696092486,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-ef6aacee4e2e6ada",
+      "order_index": 21,
+      "scene_reference": "restricted-core",
+      "algorithm": "astar-3d",
+      "timing_repetition": 1,
+      "planner_seed": null,
+      "pid": 88262,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 401.5207909978926,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-02c561152e1d8b2854b5",
+        "scene_id": "restricted-core",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 346.95570915937424,
+        "timing": {
+          "planning_ms": 346.95570915937424,
+          "setup_ms": 0.56983414106071,
+          "search_ms": 346.3858750183135,
+          "smoothing_ms": 0.9930829983204603,
+          "validation_ms": 2.0880827214568853
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1798,
+          "wall_time_used_ms": 346.95570915937424,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-6d5816ab9d8630c2",
+      "order_index": 22,
+      "scene_reference": "urban-canyon",
+      "algorithm": "astar-3d",
+      "timing_repetition": 2,
+      "planner_seed": null,
+      "pid": 88263,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 427.75204102508724,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-20c472bc198fcc126cb9",
+        "scene_id": "urban-canyon",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 372.95262492261827,
+        "timing": {
+          "planning_ms": 372.95262492261827,
+          "setup_ms": 0.5024578422307968,
+          "search_ms": 372.4501670803875,
+          "smoothing_ms": 0.8964999578893185,
+          "validation_ms": 2.5155418552458286
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 2247,
+          "wall_time_used_ms": 372.95262492261827,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-55444ccff179fd1e",
+      "order_index": 23,
+      "scene_reference": "urban-canyon",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 2,
+      "planner_seed": null,
+      "pid": 88264,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 371.59462505951524,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-bc927138150646bead1a",
+        "scene_id": "urban-canyon",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 317.06245918758214,
+        "timing": {
+          "planning_ms": 317.06245918758214,
+          "setup_ms": 0.4994170740246773,
+          "search_ms": 316.56304211355746,
+          "smoothing_ms": 0.7738748099654913,
+          "validation_ms": 2.3825832176953554
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1645,
+          "wall_time_used_ms": 317.06245918758214,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-697477f38f8497fe",
+      "order_index": 24,
+      "scene_reference": "restricted-core",
+      "algorithm": "rrt-star",
+      "timing_repetition": 0,
+      "planner_seed": 17,
+      "pid": 88265,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 869.4535000249743,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-609c786bc032d45c7011",
+        "scene_id": "restricted-core",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 814.5463748369366,
+        "timing": {
+          "planning_ms": 814.5463748369366,
+          "setup_ms": 0.030166935175657272,
+          "search_ms": 814.5162079017609,
+          "smoothing_ms": 1.2912920210510492,
+          "validation_ms": 2.290333155542612
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 814.5463748369366,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-5c02444e1df34ff1",
+      "order_index": 25,
+      "scene_reference": "vertical-gate",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 1,
+      "planner_seed": null,
+      "pid": 88266,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 118.31966694444418,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-ba015ab0c561410e59af",
+        "scene_id": "vertical-gate",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 64.50224993750453,
+        "timing": {
+          "planning_ms": 64.50224993750453,
+          "setup_ms": 0.5728329997509718,
+          "search_ms": 63.92941693775356,
+          "smoothing_ms": 0.8484169375151396,
+          "validation_ms": 1.8971660174429417
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 305,
+          "wall_time_used_ms": 64.50224993750453,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-21bb3a79b51aef2e",
+      "order_index": 26,
+      "scene_reference": "open-blocks",
+      "algorithm": "astar-3d",
+      "timing_repetition": 2,
+      "planner_seed": null,
+      "pid": 88267,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 444.26925014704466,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-d8fa3bfa5ae53ea9f933",
+        "scene_id": "open-blocks",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 388.2046660874039,
+        "timing": {
+          "planning_ms": 388.2046660874039,
+          "setup_ms": 0.5055409856140614,
+          "search_ms": 387.69912510178983,
+          "smoothing_ms": 1.113958191126585,
+          "validation_ms": 3.3005420118570328
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1921,
+          "wall_time_used_ms": 388.2046660874039,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-82df08c1c113a06d",
+      "order_index": 27,
+      "scene_reference": "vertical-gate",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 0,
+      "planner_seed": null,
+      "pid": 88268,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 118.80075000226498,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-9263943a02ffea3d9dce",
+        "scene_id": "vertical-gate",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 64.85904194414616,
+        "timing": {
+          "planning_ms": 64.85904194414616,
+          "setup_ms": 0.5689579993486404,
+          "search_ms": 64.29008394479752,
+          "smoothing_ms": 0.8706250227987766,
+          "validation_ms": 1.9056671299040318
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 305,
+          "wall_time_used_ms": 64.85904194414616,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-1993c50daa9c0431",
+      "order_index": 28,
+      "scene_reference": "open-blocks",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 2,
+      "planner_seed": null,
+      "pid": 88269,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 355.88608402758837,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-2db6c7803582a60604c6",
+        "scene_id": "open-blocks",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 300.8508749771863,
+        "timing": {
+          "planning_ms": 300.8508749771863,
+          "setup_ms": 0.5137079861015081,
+          "search_ms": 300.3371669910848,
+          "smoothing_ms": 0.9657919872552156,
+          "validation_ms": 2.799584064632654
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1241,
+          "wall_time_used_ms": 300.8508749771863,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-95214c7d056c96e4",
+      "order_index": 29,
+      "scene_reference": "vertical-gate",
+      "algorithm": "astar-3d",
+      "timing_repetition": 0,
+      "planner_seed": null,
+      "pid": 88270,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 142.60525000281632,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-623c453041c866c1cf0e",
+        "scene_id": "vertical-gate",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 87.57629105821252,
+        "timing": {
+          "planning_ms": 87.57629105821252,
+          "setup_ms": 0.5626659840345383,
+          "search_ms": 87.01362507417798,
+          "smoothing_ms": 1.1592090595513582,
+          "validation_ms": 2.2024160716682673
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 497,
+          "wall_time_used_ms": 87.57629105821252,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-f17d0caf45653bfc",
+      "order_index": 30,
+      "scene_reference": "restricted-core",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 1,
+      "planner_seed": null,
+      "pid": 88271,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 304.11995807662606,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-6d71a92c4163fb9e17ae",
+        "scene_id": "restricted-core",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 249.8724169563502,
+        "timing": {
+          "planning_ms": 249.8724169563502,
+          "setup_ms": 0.5624168552458286,
+          "search_ms": 249.31000010110438,
+          "smoothing_ms": 0.880667008459568,
+          "validation_ms": 1.8712910823523998
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1104,
+          "wall_time_used_ms": 249.8724169563502,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-c9f30c4d857e30e9",
+      "order_index": 31,
+      "scene_reference": "restricted-core",
+      "algorithm": "astar-3d",
+      "timing_repetition": 0,
+      "planner_seed": null,
+      "pid": 88272,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 402.17737504281104,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-cebbcf6f066325ed9207",
+        "scene_id": "restricted-core",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 347.9903331026435,
+        "timing": {
+          "planning_ms": 347.9903331026435,
+          "setup_ms": 0.5588328931480646,
+          "search_ms": 347.4315002094954,
+          "smoothing_ms": 0.9804998990148306,
+          "validation_ms": 2.0125419832766056
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 1798,
+          "wall_time_used_ms": 347.9903331026435,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-efff99653eb7ebb2",
+      "order_index": 32,
+      "scene_reference": "vertical-gate",
+      "algorithm": "astar-3d",
+      "timing_repetition": 1,
+      "planner_seed": null,
+      "pid": 88274,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 144.28216591477394,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-400062c896e720f855a7",
+        "scene_id": "vertical-gate",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 89.15649983100593,
+        "timing": {
+          "planning_ms": 89.15649983100593,
+          "setup_ms": 0.5641670431941748,
+          "search_ms": 88.59233278781176,
+          "smoothing_ms": 1.1442091781646013,
+          "validation_ms": 2.10687518119812
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 497,
+          "wall_time_used_ms": 89.15649983100593,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-a3547329ced3ddca",
+      "order_index": 33,
+      "scene_reference": "urban-canyon",
+      "algorithm": "astar-3d",
+      "timing_repetition": 1,
+      "planner_seed": null,
+      "pid": 88276,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 429.1782910004258,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-f52bddd9651d0883670d",
+        "scene_id": "urban-canyon",
+        "algorithm": "astar-3d",
+        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 374.28558291867375,
+        "timing": {
+          "planning_ms": 374.28558291867375,
+          "setup_ms": 0.49899984151124954,
+          "search_ms": 373.7865830771625,
+          "smoothing_ms": 0.8920419495552778,
+          "validation_ms": 2.534667029976845
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 2247,
+          "wall_time_used_ms": 374.28558291867375,
+          "termination": "goal-reached"
+        }
+      }
+    },
+    {
+      "case_id": "timing-23b0955c145cc847",
+      "order_index": 34,
+      "scene_reference": "open-blocks",
+      "algorithm": "rrt-star",
+      "timing_repetition": 2,
+      "planner_seed": 17,
+      "pid": 88277,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 1035.5496660340577,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-fd6dda8dd7fa45671e17",
+        "scene_id": "open-blocks",
+        "algorithm": "rrt-star",
+        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 980.0252499990165,
+        "timing": {
+          "planning_ms": 980.0252499990165,
+          "setup_ms": 0.027625123038887978,
+          "search_ms": 979.9976248759776,
+          "smoothing_ms": 1.1499999091029167,
+          "validation_ms": 3.121041925624013
+        },
+        "budget": {
+          "work_unit": "sample-attempts",
+          "work_limit": 3000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 3000,
+          "wall_time_used_ms": 980.0252499990165,
+          "termination": "sample-budget-completed"
+        }
+      }
+    },
+    {
+      "case_id": "timing-2b83e158f7f7989b",
+      "order_index": 35,
+      "scene_reference": "vertical-gate",
+      "algorithm": "lazy-theta-star",
+      "timing_repetition": 2,
+      "planner_seed": null,
+      "pid": 88278,
+      "process_status": "completed",
+      "process_returncode": 0,
+      "process_wall_time_ms": 119.6510421577841,
+      "stderr": null,
+      "parse_error": null,
+      "planner_record": {
+        "run_id": "run-16a0368e27d16252f659",
+        "scene_id": "vertical-gate",
+        "algorithm": "lazy-theta-star",
+        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "status": "success",
+        "failure_reason": null,
+        "planning_time_ms": 65.50404196605086,
+        "timing": {
+          "planning_ms": 65.50404196605086,
+          "setup_ms": 0.5807499401271343,
+          "search_ms": 64.92329202592373,
+          "smoothing_ms": 0.8435409981757402,
+          "validation_ms": 1.912000123411417
+        },
+        "budget": {
+          "work_unit": "expanded-nodes",
+          "work_limit": 120000,
+          "wall_time_limit_ms": null
+        },
+        "budget_usage": {
+          "work_used": 305,
+          "wall_time_used_ms": 65.50404196605086,
+          "termination": "goal-reached"
+        }
+      }
+    }
+  ]
+}

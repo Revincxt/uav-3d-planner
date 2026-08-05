@@ -1,0 +1,546 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-05T06:09:25+00:00",
+  "evidenceLabel": "DESCRIPTIVE_BENCHMARK",
+  "sourceCommit": "worktree-v0.2.0",
+  "protocol": {
+    "id": "static-city-descriptive-v2",
+    "rawPathPrimary": true,
+    "confidenceLevel": 0.95,
+    "pathExcessDefinition": "(path_length / euclidean_start_goal - 1) * 100",
+    "bootstrap": {
+      "method": "scene-clustered-percentile",
+      "resamples": 10000,
+      "seed": 20260805
+    },
+    "timing": {
+      "isolatedProcesses": true,
+      "repetitionsPerCell": 3
+    }
+  },
+  "dataset": {
+    "id": "curated-static-diagnostic-v1",
+    "label": "Four curated static-city scenes (exploratory small-n)",
+    "split": "diagnostic",
+    "attemptedScenes": 4,
+    "acceptedScenes": 4,
+    "rejectedScenes": 0,
+    "manifestSha256": "sha256:bda5e674b8ef454c008fed5d7898fe5dad86c212398bde1bd81faf97903353c5"
+  },
+  "planners": [
+    {
+      "id": "astar-3d",
+      "label": "3D A*"
+    },
+    {
+      "id": "lazy-theta-star",
+      "label": "Lazy Theta*"
+    },
+    {
+      "id": "rrt-star",
+      "label": "RRT*"
+    }
+  ],
+  "budgets": [
+    {
+      "id": "astar-r3-e120000",
+      "kind": "voxel",
+      "plannerId": "astar-3d",
+      "voxelResolutionM": 3.0,
+      "maxExpansions": 120000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "astar-r4-e120000",
+      "kind": "voxel",
+      "plannerId": "astar-3d",
+      "voxelResolutionM": 4.0,
+      "maxExpansions": 120000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "astar-r6-e120000",
+      "kind": "voxel",
+      "plannerId": "astar-3d",
+      "voxelResolutionM": 6.0,
+      "maxExpansions": 120000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "astar-r8-e120000",
+      "kind": "voxel",
+      "plannerId": "astar-3d",
+      "voxelResolutionM": 8.0,
+      "maxExpansions": 120000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "theta-r3-e120000",
+      "kind": "voxel",
+      "plannerId": "lazy-theta-star",
+      "voxelResolutionM": 3.0,
+      "maxExpansions": 120000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "theta-r4-e120000",
+      "kind": "voxel",
+      "plannerId": "lazy-theta-star",
+      "voxelResolutionM": 4.0,
+      "maxExpansions": 120000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "theta-r6-e120000",
+      "kind": "voxel",
+      "plannerId": "lazy-theta-star",
+      "voxelResolutionM": 6.0,
+      "maxExpansions": 120000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "theta-r8-e120000",
+      "kind": "voxel",
+      "plannerId": "lazy-theta-star",
+      "voxelResolutionM": 8.0,
+      "maxExpansions": 120000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "rrt-s250",
+      "kind": "samples",
+      "plannerId": "rrt-star",
+      "sampleBudget": 250,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "rrt-s500",
+      "kind": "samples",
+      "plannerId": "rrt-star",
+      "sampleBudget": 500,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "rrt-s1000",
+      "kind": "samples",
+      "plannerId": "rrt-star",
+      "sampleBudget": 1000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "rrt-s2000",
+      "kind": "samples",
+      "plannerId": "rrt-star",
+      "sampleBudget": 2000,
+      "wallClockLimitMs": null
+    },
+    {
+      "id": "rrt-s3000",
+      "kind": "samples",
+      "plannerId": "rrt-star",
+      "sampleBudget": 3000,
+      "wallClockLimitMs": null
+    }
+  ],
+  "nominalBudgetSetId": "nominal-v0.2",
+  "summaries": [
+    {
+      "plannerId": "astar-3d",
+      "budgetId": "astar-r4-e120000",
+      "successRate": {
+        "estimator": "scene-weighted-mean",
+        "value": 1.0,
+        "ci95Low": 1.0,
+        "ci95High": 1.0,
+        "nScenes": 4,
+        "nRuns": 4,
+        "nSuccesses": 4
+      },
+      "planningTimeMs": {
+        "estimator": "median-of-scene-medians",
+        "median": 360.620646039024,
+        "q1": 282.2517401073128,
+        "q3": 377.59410397848114,
+        "ci95Low": 88.13983295112848,
+        "ci95High": 387.5196671579033,
+        "conditioning": "all-runs",
+        "nScenes": 4,
+        "nRuns": 12,
+        "nSuccesses": 12
+      },
+      "rawPathExcessPct": {
+        "estimator": "median-of-scene-medians",
+        "median": 38.247391404034424,
+        "q1": 26.835436635407927,
+        "q3": 49.98498370672981,
+        "ci95Low": 23.09612801955041,
+        "ci95High": 54.701204924793956,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 4,
+        "nSuccesses": 4
+      },
+      "smoothedPathExcessPct": {
+        "estimator": "median-of-scene-medians",
+        "median": 32.939891226402494,
+        "q1": 21.679873965663568,
+        "q3": 42.25121420197246,
+        "ci95Low": 14.710829665511426,
+        "ci95High": 43.37417564661767,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 4,
+        "nSuccesses": 4
+      },
+      "minimumClearanceM": {
+        "estimator": "median-of-scene-medians",
+        "median": 1.4611038290728666,
+        "q1": 1.2931334828682428,
+        "q3": 1.9028051710390494,
+        "ci95Low": 1.1960018416736276,
+        "ci95High": 2.8211297995183426,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 4,
+        "nSuccesses": 4
+      }
+    },
+    {
+      "plannerId": "lazy-theta-star",
+      "budgetId": "theta-r4-e120000",
+      "successRate": {
+        "estimator": "scene-weighted-mean",
+        "value": 1.0,
+        "ci95Low": 1.0,
+        "ci95High": 1.0,
+        "nScenes": 4,
+        "nRuns": 4,
+        "nSuccesses": 4
+      },
+      "planningTimeMs": {
+        "estimator": "median-of-scene-medians",
+        "median": 275.41364601347595,
+        "q1": 203.6190732032992,
+        "q3": 305.2458540769294,
+        "ci95Low": 64.85904194414616,
+        "ci95High": 318.11879109591246,
+        "conditioning": "all-runs",
+        "nScenes": 4,
+        "nRuns": 12,
+        "nSuccesses": 12
+      },
+      "rawPathExcessPct": {
+        "estimator": "median-of-scene-medians",
+        "median": 28.222187463088165,
+        "q1": 17.89104801086238,
+        "q3": 39.1932445750726,
+        "ci95Low": 15.984394209351539,
+        "ci95High": 43.01965135585941,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 4,
+        "nSuccesses": 4
+      },
+      "smoothedPathExcessPct": {
+        "estimator": "median-of-scene-medians",
+        "median": 27.454451878045116,
+        "q1": 16.46335241868932,
+        "q3": 38.967350995479876,
+        "ci95Low": 14.382345881364046,
+        "ci95High": 42.61375650704204,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 4,
+        "nSuccesses": 4
+      },
+      "minimumClearanceM": {
+        "estimator": "median-of-scene-medians",
+        "median": 1.2418428492991302,
+        "q1": 1.1375102469767997,
+        "q3": 1.3747837484270913,
+        "ci95Low": 1.0764439586116694,
+        "ci95High": 1.521674927209113,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 4,
+        "nSuccesses": 4
+      }
+    },
+    {
+      "plannerId": "rrt-star",
+      "budgetId": "rrt-s3000",
+      "successRate": {
+        "estimator": "scene-weighted-mean",
+        "value": 1.0,
+        "ci95Low": 1.0,
+        "ci95High": 1.0,
+        "nScenes": 4,
+        "nRuns": 20,
+        "nSuccesses": 20
+      },
+      "planningTimeMs": {
+        "estimator": "median-of-scene-medians",
+        "median": 836.1605625832453,
+        "q1": 778.9001044002362,
+        "q3": 889.0622499748133,
+        "ci95Low": 673.9150420762599,
+        "ci95High": 980.970999924466,
+        "conditioning": "all-runs",
+        "nScenes": 4,
+        "nRuns": 12,
+        "nSuccesses": 12
+      },
+      "rawPathExcessPct": {
+        "estimator": "median-of-scene-medians",
+        "median": 51.0481725849653,
+        "q1": 39.6816590201316,
+        "q3": 62.188698053866226,
+        "ci95Low": 28.06005215209573,
+        "ci95High": 73.13234063410374,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 20,
+        "nSuccesses": 20
+      },
+      "smoothedPathExcessPct": {
+        "estimator": "median-of-scene-medians",
+        "median": 33.60156829058084,
+        "q1": 20.981917214870304,
+        "q3": 49.951168950310475,
+        "ci95Low": 20.099238898142737,
+        "ci95High": 62.02369601909532,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 20,
+        "nSuccesses": 20
+      },
+      "minimumClearanceM": {
+        "estimator": "median-of-scene-medians",
+        "median": 1.59667628468579,
+        "q1": 1.5330736436381573,
+        "q3": 1.6577846826176341,
+        "ci95Low": 1.5131893970446337,
+        "ci95High": 1.6701861998637915,
+        "conditioning": "successful-runs",
+        "nScenes": 4,
+        "nRuns": 20,
+        "nSuccesses": 20
+      }
+    }
+  ],
+  "sensitivity": {
+    "resolution": [
+      {
+        "plannerId": "astar-3d",
+        "voxelResolutionM": 3.0,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 38.65175691815542,
+          "q1": 26.667492925514924,
+          "q3": 50.85733537803521,
+          "ci95Low": 22.568146975590906,
+          "ci95High": 55.62062472967708,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 4,
+          "nSuccesses": 4
+        }
+      },
+      {
+        "plannerId": "astar-3d",
+        "voxelResolutionM": 4.0,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 38.247391404034424,
+          "q1": 26.835436635407927,
+          "q3": 49.98498370672981,
+          "ci95Low": 23.09612801955041,
+          "ci95High": 54.701204924793956,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 4,
+          "nSuccesses": 4
+        }
+      },
+      {
+        "plannerId": "astar-3d",
+        "voxelResolutionM": 6.0,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 40.72405399072436,
+          "q1": 28.3226115425977,
+          "q3": 54.16832535625703,
+          "ci95Low": 24.702768640528895,
+          "ci95High": 60.916655010543884,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 4,
+          "nSuccesses": 4
+        }
+      },
+      {
+        "plannerId": "astar-3d",
+        "voxelResolutionM": 8.0,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 40.6075313885118,
+          "q1": 30.335300614823304,
+          "q3": 52.77246230669458,
+          "ci95Low": 25.211142710444,
+          "ci95High": 63.57472064455671,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 4,
+          "nSuccesses": 4
+        }
+      },
+      {
+        "plannerId": "lazy-theta-star",
+        "voxelResolutionM": 3.0,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 28.164885471653136,
+          "q1": 17.04320898025559,
+          "q3": 39.965452938564624,
+          "ci95Low": 14.695362678964452,
+          "ci95High": 44.34997216639758,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 4,
+          "nSuccesses": 4
+        }
+      },
+      {
+        "plannerId": "lazy-theta-star",
+        "voxelResolutionM": 4.0,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 28.222187463088165,
+          "q1": 17.89104801086238,
+          "q3": 39.1932445750726,
+          "ci95Low": 15.984394209351539,
+          "ci95High": 43.01965135585941,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 4,
+          "nSuccesses": 4
+        }
+      },
+      {
+        "plannerId": "lazy-theta-star",
+        "voxelResolutionM": 6.0,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 32.10419337416186,
+          "q1": 21.45258373884994,
+          "q3": 43.8897633546769,
+          "ci95Low": 19.660565282774357,
+          "ci95High": 49.08366284636183,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 4,
+          "nSuccesses": 4
+        }
+      },
+      {
+        "plannerId": "lazy-theta-star",
+        "voxelResolutionM": 8.0,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 35.65812326903409,
+          "q1": 26.2152170796658,
+          "q3": 45.16951749788066,
+          "ci95Low": 20.773166346092676,
+          "ci95High": 50.817032349888635,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 4,
+          "nSuccesses": 4
+        }
+      }
+    ],
+    "rrtBudget": [
+      {
+        "sampleBudget": 250,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 46.72162156815565,
+          "q1": 41.58533965655212,
+          "q3": 69.49377325712824,
+          "ci95Low": 36.4490577449486,
+          "ci95High": 92.26592494610082,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 20,
+          "nSuccesses": 9
+        }
+      },
+      {
+        "sampleBudget": 500,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 48.617127106150576,
+          "q1": 41.15868899440889,
+          "q3": 61.808585888963165,
+          "ci95Low": 33.968172049205016,
+          "ci95High": 86.19816484737974,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 20,
+          "nSuccesses": 16
+        }
+      },
+      {
+        "sampleBudget": 1000,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 52.57067032433016,
+          "q1": 40.848460061711336,
+          "q3": 65.28410025846469,
+          "ci95Low": 32.7272563184148,
+          "ci95High": 76.3789630163084,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 20,
+          "nSuccesses": 20
+        }
+      },
+      {
+        "sampleBudget": 2000,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 51.94379366917455,
+          "q1": 40.52672082148405,
+          "q3": 63.95896033687567,
+          "ci95Low": 31.44029935750565,
+          "ci95High": 74.83966326088594,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 20,
+          "nSuccesses": 20
+        }
+      },
+      {
+        "sampleBudget": 3000,
+        "rawPathExcessPct": {
+          "estimator": "median-of-scene-medians",
+          "median": 51.04817258496528,
+          "q1": 39.68165902013156,
+          "q3": 62.18869805386623,
+          "ci95Low": 28.060052152095704,
+          "ci95High": 73.13234063410381,
+          "conditioning": "successful-runs",
+          "nScenes": 4,
+          "nRuns": 20,
+          "nSuccesses": 20
+        }
+      }
+    ]
+  },
+  "downloads": {
+    "recordsCsv": "benchmark-records.csv",
+    "summariesCsv": "benchmark-summary.csv",
+    "datasetManifest": "dataset-manifest.json",
+    "timingManifest": "timing-manifest.json"
+  }
+}
