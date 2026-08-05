@@ -1,0 +1,39 @@
+{
+  "datasetId": "curated-dynamic-diagnostic-v1",
+  "generatedAt": "2026-08-05T09:58:17+00:00",
+  "protocolId": "dynamic-replanning-demo-v1",
+  "runCount": 12,
+  "scenarioCount": 4,
+  "scenarios": [
+    {
+      "fingerprint": "sha256:5c6c195545528bc52941ebf528bdb972b3fcd9fd27d9543dab67b120057926f9",
+      "id": "pop-up-nfz",
+      "label": "Pop-up no-fly zone",
+      "selected": true
+    },
+    {
+      "fingerprint": "sha256:6fda5fa064c9a86b7e07889bcf8e4545cf7ced4a239a6dc6da58e8d1ec0330fd",
+      "id": "crossing-traffic",
+      "label": "Crossing traffic",
+      "selected": true
+    },
+    {
+      "fingerprint": "sha256:5ed75811cef8a5b6eae1f5bb4ecdbde207eaaa08fed27b8902ab021b0df15a3b",
+      "id": "closing-gate",
+      "label": "Closing urban gate",
+      "selected": true
+    },
+    {
+      "fingerprint": "sha256:0ea92095672e79e95bef1313bfc92e9b7db422ac2b35b660cf2bfd7b61a89834",
+      "id": "vertical-escape",
+      "label": "Vertical escape",
+      "selected": true
+    }
+  ],
+  "schemaVersion": 1,
+  "selection": {
+    "algorithmFiltering": "none",
+    "scenarioRule": "all built-in dynamic scenarios"
+  },
+  "sourceCommit": "d9f90e3f48681a7632356e0c869d5d2a3e595a31"
+}
