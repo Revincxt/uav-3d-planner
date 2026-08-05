@@ -15,6 +15,7 @@ from uav3d.dynamic_study import (
     PLANNER_LABELS,
     PROTOCOL_ID,
     RECORD_FIELDS,
+    SERIALIZATION_DECIMAL_PLACES,
     VERIFICATION_STATUS,
     build_dynamic_bundle,
     dynamic_record_rows,
@@ -69,6 +70,17 @@ def test_fixed_dynamic_bundle_contract_and_determinism(
     assert manifest["sourceCommit"] == SOURCE_COMMIT
     assert manifest["generatedAt"] == "2026-08-05T00:00:00+00:00"
     assert manifest["runCount"] == 12
+    assert SERIALIZATION_DECIMAL_PLACES == 12
+    assert all(
+        value == round(value, SERIALIZATION_DECIMAL_PLACES)
+        for scenario in bundle["scenarios"]
+        for run in scenario["runs"]
+        for value in (
+            run["metrics"]["completionTimeS"],
+            run["metrics"]["executedPathLengthM"],
+        )
+        if value is not None
+    )
 
 
 def test_bundle_covers_four_scenarios_three_planners_and_complete_frames(

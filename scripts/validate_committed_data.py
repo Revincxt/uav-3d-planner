@@ -422,6 +422,30 @@ def _without_dynamic_provenance(bundle: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _first_difference(left: object, right: object, path: str = "root") -> str | None:
+    """Return the first structural/value difference for actionable CI diagnostics."""
+
+    if isinstance(left, dict) and isinstance(right, dict):
+        if left.keys() != right.keys():
+            return f"{path} keys differ: {sorted(left)} != {sorted(right)}"
+        for key in left:
+            difference = _first_difference(left[key], right[key], f"{path}.{key}")
+            if difference is not None:
+                return difference
+        return None
+    if isinstance(left, list) and isinstance(right, list):
+        if len(left) != len(right):
+            return f"{path} lengths differ: {len(left)} != {len(right)}"
+        for index, (left_item, right_item) in enumerate(zip(left, right, strict=True)):
+            difference = _first_difference(left_item, right_item, f"{path}[{index}]")
+            if difference is not None:
+                return difference
+        return None
+    if left != right:
+        return f"{path} differs: {left!r} != {right!r}"
+    return None
+
+
 def _audit_dynamic() -> int:
     bundle = _load_json(PUBLIC / "dynamic-data.json")
     source_commit = str(bundle.get("sourceCommit", ""))
@@ -445,8 +469,14 @@ def _audit_dynamic() -> int:
         source_commit=source_commit,
         generated_at=str(bundle.get("generatedAt", "ignored")),
     )
-    if _without_dynamic_provenance(bundle) != _without_dynamic_provenance(expected):
-        raise ValueError("committed dynamic bundle differs from 12 deterministic reruns")
+    difference = _first_difference(
+        _without_dynamic_provenance(bundle),
+        _without_dynamic_provenance(expected),
+    )
+    if difference is not None:
+        raise ValueError(
+            "committed dynamic bundle differs from 12 deterministic reruns: " + difference
+        )
 
     manifest = _load_json(PUBLIC / DYNAMIC_DOWNLOADS["scenarioManifest"])
     if manifest != expected_manifest:

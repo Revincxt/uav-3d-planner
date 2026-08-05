@@ -28,6 +28,7 @@ MAX_TIME_S = 180.0
 RESOLUTION_M = 4.0
 MAX_EXPANSIONS = 120_000
 VERIFICATION_STATUS = "DYNAMIC_DEMO_NON_CONFIRMATORY"
+SERIALIZATION_DECIMAL_PLACES = 12
 
 PLANNER_LABELS = {
     "repeated-astar-3d": "Repeated 3D A*",
@@ -141,6 +142,19 @@ def dynamic_run_id(
         allow_nan=False,
     ).encode()
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _normalize_record_numbers(value: object) -> object:
+    """Round deterministic float records at the public serialization boundary."""
+
+    if isinstance(value, float):
+        rounded = round(value, SERIALIZATION_DECIMAL_PLACES)
+        return 0.0 if rounded == 0 else rounded
+    if isinstance(value, list):
+        return [_normalize_record_numbers(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _normalize_record_numbers(item) for key, item in value.items()}
+    return value
 
 
 def run_dynamic_study() -> list[tuple[DynamicScenario, list[DynamicRun]]]:
@@ -521,7 +535,9 @@ def build_dynamic_bundle(
             {"id": algorithm, "label": PLANNER_LABELS[algorithm]}
             for algorithm in REPLANNING_ALGORITHMS
         ],
-        "scenarios": [_export_scenario(scenario, runs) for scenario, runs in study],
+        "scenarios": [
+            _normalize_record_numbers(_export_scenario(scenario, runs)) for scenario, runs in study
+        ],
     }
     return bundle, _scenario_manifest(
         study,
@@ -583,6 +599,7 @@ __all__ = [
     "RECORD_FIELDS",
     "REPLAN_INTERVAL_S",
     "RESOLUTION_M",
+    "SERIALIZATION_DECIMAL_PLACES",
     "TIME_STEP_S",
     "VERIFICATION_STATUS",
     "WORK_UNITS",

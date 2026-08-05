@@ -8,7 +8,7 @@ from itertools import pairwise
 
 from uav3d.collision import EPSILON, point_is_free, segment_is_free
 from uav3d.dynamic import DynamicScenario, MovingSphere, TemporaryCylinder
-from uav3d.geometry import Point3, clamp, distance, lerp, subtract
+from uav3d.geometry import Point3, clamp, distance, dot, lerp, subtract
 
 
 def _clearance(scenario: DynamicScenario, clearance: float | None) -> float:
@@ -99,16 +99,13 @@ def _temporary_cylinder_collision(
 
 def _relative_segment_hits_sphere(relative_a: Point3, relative_b: Point3, radius: float) -> bool:
     direction = subtract(relative_b, relative_a)
-    denominator = sum(component * component for component in direction)
+    denominator = dot(direction, direction)
     if denominator <= EPSILON:
         closest = relative_a
     else:
-        projection = (
-            -sum(origin * delta for origin, delta in zip(relative_a, direction, strict=True))
-            / denominator
-        )
+        projection = -dot(relative_a, direction) / denominator
         closest = lerp(relative_a, relative_b, clamp(projection, 0.0, 1.0))
-    squared = sum(component * component for component in closest)
+    squared = dot(closest, closest)
     return squared <= radius * radius + EPSILON
 
 

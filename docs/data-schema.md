@@ -114,7 +114,8 @@ The Python `dynamic-scenario-v1` contract contains one complete static scene plu
 parameters, deterministic frames, and mission metrics. Each frame stores its simulation time,
 vehicle position, current planned polyline, replanning status/reason, algorithm-specific work, and
 changed-edge count. Planner wall-clock timing is intentionally absent from this deterministic
-record.
+record. Public floating-point records are rounded to 12 decimal places at the serialization boundary
+so all supported Python versions emit the same evidence bytes.
 
 ## Dynamic Web bundle
 
