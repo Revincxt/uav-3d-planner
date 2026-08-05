@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 760" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="760" viewBox="0 0 1600 760" role="img" aria-labelledby="title desc">
   <title id="title">UAV 3D Planner Lab study design</title>
   <desc id="desc">A three-panel academic schematic showing structured urban airspace, static and dynamic planning conditions, and the shared collision audit used to export recorded evidence.</desc>
   <defs>
