@@ -1,94 +1,81 @@
+<div align="center">
+
 # UAV 3D Planner Lab
+
+**Reproducible 3D planning and space–time replanning in structured urban airspace**
 
 [![CI](https://github.com/Revincxt/uav-3d-planner-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Revincxt/uav-3d-planner-lab/actions/workflows/ci.yml)
 [![Pages](https://github.com/Revincxt/uav-3d-planner-lab/actions/workflows/pages.yml/badge.svg)](https://github.com/Revincxt/uav-3d-planner-lab/actions/workflows/pages.yml)
+[![Release](https://img.shields.io/github/v/release/Revincxt/uav-3d-planner-lab?display_name=tag&sort=semver)](https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.5.0)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-555.svg)](LICENSE)
 
-A dependency-free Python benchmark for collision-aware UAV planning in three-dimensional cities.
-The static study compares **3D A\***, **Lazy Theta\***, and **RRT\***; the separate dynamic study
-compares repeated A*, repeated Lazy Theta*, and state-reusing **3D D* Lite** under deterministic
-temporary restrictions and moving obstacles. The predictive study adds **4D Space-Time A\*** with
-explicit waits and compares complete schedule access against reactive snapshots. Version 0.5 moves
-that comparison into eight denser urban missions and adds a common, collision-certified
-circular-fillet post-processor while preserving each planner's raw timed path. Every study uses
-explicit contracts, continuous collision checks, reproducible records, and independent release
-audits.
+[**Open the live study**](https://revincxt.github.io/uav-3d-planner-lab/predictive.html) ·
+[Reproduce a run](#quick-start) ·
+[Read the methodology](docs/methodology.md) ·
+[Download v0.5.0](https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.5.0)
 
-**Web study:** [recorded paths](https://revincxt.github.io/uav-3d-planner-lab/) ·
-[benchmark results](https://revincxt.github.io/uav-3d-planner-lab/results.html) ·
-[dynamic replanning](https://revincxt.github.io/uav-3d-planner-lab/dynamic.html) ·
-[predictive planning](https://revincxt.github.io/uav-3d-planner-lab/predictive.html)
+</div>
 
-> The trajectory, dynamic, and predictive pages contain non-confirmatory recorded runs. The static
-> results page is a descriptive, small-n diagnostic study with scene-clustered intervals. None of
-> these pages is confirmatory evidence or a flight-safety system.
+<a href="https://revincxt.github.io/uav-3d-planner-lab/predictive.html?scenario=urban-canyon-merge&amp;planner=space-time-astar-4d&amp;path=certified&amp;time=0.00">
+  <img src="docs/assets/readme/predictive-urban-canyon-focused.jpg" alt="Predictive planning study showing a dense urban canyon, no-fly volumes, moving hazards, a certified trajectory, and the recorded-state panel">
+</a>
 
-## Research question
+<p align="center"><sub><strong>Recorded v0.5 evidence.</strong> Urban canyon merge · 15 buildings · 4 hazards · 4D Space-Time A* · certified trajectory.</sub></p>
 
-How do grid-constrained, any-angle, and sampling-based planners differ in path quality and search behavior when the vehicle, buildings, fixed no-fly zones, and safety margin are held constant?
+UAV 3D Planner Lab is an experiment-first Python benchmark for studying how grid, any-angle,
+sampling-based, incremental, and space–time planners behave in the same declared urban geometry.
+Planning output, downstream trajectory rounding, continuous collision auditing, and browser
+presentation remain separate so that each result can be inspected and reproduced.
 
-The v0.3 extension asks a separate question: when the same deterministic obstacle schedule is
-presented to every planner, how do cold-start and state-reusing geometric replanners differ in
-mission outcome, route stability, and algorithm-specific work?
+The Python package has no runtime dependencies. The web application does not run a planner or
+smoother: it replays committed records that Python regenerates and independently validates.
 
-The predictive extension asks whether complete deterministic look-ahead can avoid late holds,
-detours, or no-safe-action outcomes produced by snapshot-only planning, while separately
-controlling D* Lite state reuse with reset and reuse conditions. Version 0.5 changes the environment
-and presentation, not that causal boundary: it asks the same descriptive question in more
-structured city geometry and reports raw and certified execution polylines separately.
+## What the lab studies
 
-| Planner | Search space | Characteristic | Reproducibility |
+| Study track | Research question | Planner conditions | Explore |
 | --- | --- | --- | --- |
-| 3D A* | 26-connected voxel graph | Resolution-complete graph search | Deterministic |
-| Lazy Theta* | Same voxel graph with delayed line-of-sight repair | Any-angle parent links | Deterministic |
-| RRT* | Continuous bounded 3D space | Seeded sampling and rewiring | Deterministic for a fixed seed and sample budget |
+| **Static 3D** | How do graph, any-angle, and sampling-based methods differ when geometry and safety margin are fixed? | 3D A* · Lazy Theta* · RRT* | [Paths](https://revincxt.github.io/uav-3d-planner-lab/) · [Results](https://revincxt.github.io/uav-3d-planner-lab/results.html) |
+| **Reactive dynamic** | How do cold-start and state-reusing replanners respond to the same deterministic obstacle schedule? | Repeated 3D A* · Repeated Lazy Theta* · 3D D* Lite | [Replay](https://revincxt.github.io/uav-3d-planner-lab/dynamic.html) |
+| **Predictive 4D** | What changes when snapshot-only conditions are compared with access to a complete deterministic schedule? | Repeated 3D A* · D* Lite reset/reuse · 4D Space-Time A* | [Study](https://revincxt.github.io/uav-3d-planner-lab/predictive.html) |
 
-Dynamic baselines intentionally share a conservative snapshot model and exact execution gate:
+<img src="docs/assets/readme/study-overview.svg" alt="Study-design schematic from urban airspace through planning protocols to collision-certified recorded evidence">
 
-| Replanner | Reused state | Characteristic |
+<p align="center"><sub>Study design. Planner families are compared within explicit information, discretization, execution, and work-budget contracts.</sub></p>
+
+## Recorded evidence in v0.5
+
+| Scope | Recorded result |
+| --- | ---: |
+| Curated deterministic missions | **8** — 1 calibration case + 7 complex city cases |
+| Planner conditions per mission | **4** |
+| Completed recorded runs | **32 / 32** |
+| Safety violations in the declared continuous space–time audit | **0** |
+| Runs accepting sampled circular-fillet rounding | **26 / 32** |
+| Runs retaining a certified execution polyline | **32 / 32** |
+
+Each non-calibration map contains 14–16 unequal-height buildings, at least one static no-fly zone,
+and at least two scheduled or moving hazards. The raw timed path is retained for every run. Rounding
+is a common downstream operation—not a property attributed to any planner—and falls back to the
+certified raw polyline if a candidate fails the audit.
+
+> These are curated, non-preregistered diagnostic cases. “0 violations” describes the fixed v0.5
+> records under the declared geometry and deterministic schedule; it is not a general safety claim
+> or flight certification. The independent unit is the scenario (n = 8), not the 32 planner runs,
+> playback frames, waits, or replanning epochs.
+
+## Algorithm map
+
+| Track | Search / information model | Methods |
 | --- | --- | --- |
-| Repeated 3D A* | None | Solves the current voxel graph from scratch |
-| Repeated Lazy Theta* | None | Cold-start any-angle snapshot replanning |
-| 3D D* Lite | `g`, `rhs`, priority queue | Updates affected cached edges as the vehicle and scene change |
+| Static | 26-connected voxel graph or bounded continuous 3D space | 3D A* · Lazy Theta* · seeded RRT* |
+| Dynamic | Current conservative snapshot with deterministic execution gating | Repeated 3D A* · Repeated Lazy Theta* · state-reusing 3D D* Lite |
+| Predictive | Three snapshot conditions plus one complete-schedule condition | Repeated 3D A* · 3D D* Lite (reset) · 3D D* Lite (state reuse) · 4D Space-Time A* |
 
-Predictive conditions keep the v0.3 execution audit but change the information contract:
-
-| Condition | Information | Characteristic |
-| --- | --- | --- |
-| Repeated 3D A* | Current snapshot | Cold-start reactive baseline |
-| 3D D* Lite (reset) | Current snapshot | Fresh backward search at every epoch |
-| 3D D* Lite (reuse) | Current snapshot | Controlled incremental-state ablation |
-| 4D Space-Time A* | Complete schedule | Six-connected `(voxel, time-step)` search with waits |
-
-For the static benchmark, the primary outputs are planning success, planning time, raw path length,
-and minimum clearance. The dynamic and predictive recorded studies omit machine-dependent planning
-time and report mission outcomes plus algorithm-specific work units instead. Smoothed length is
-secondary because a common post-processing step can hide differences between planners.
-
-## Included scenes
-
-- `open-blocks` — irregular city blocks with several broad route choices.
-- `urban-canyon` — alternating narrow gates between tall building slabs.
-- `restricted-core` — a full-height cylindrical no-fly zone at the city center.
-- `vertical-gate` — a low restricted gate where gaining altitude may help.
-- `random-city-<seed>` — deterministic random buildings with a reserved diagonal corridor.
-
-Dynamic episodes are kept separate from the static cohort:
-
-- `pop-up-nfz` — a cylindrical exclusion volume activates across the direct route.
-- `crossing-traffic` — a piecewise-linear moving sphere crosses the flight corridor.
-- `closing-gate` — a scheduled restriction closes an urban passage.
-- `vertical-escape` — a temporary low-altitude block rewards a vertical response.
-
-The v0.5 predictive cohort contains eight curated deterministic episodes: `wait-then-straight`,
-`closing-window`, `periodic-traffic`, `chained-restrictions`, `multi-obstacle`,
-`vertical-time-window`, `urban-canyon-merge`, and `rooftop-transfer`. Except for the calibration
-case, each map contains 14–16 unequal-height buildings, a static no-fly zone, and at least two
-scheduled or moving hazards. Scenario acceptance is based on construction contracts, never planner
-outcome. These are diagnostic cases in this source revision, not preregistered held-out data.
-
-Scene distances use metres in an ENU frame. A spherical UAV is represented conservatively by inflating every obstacle by `vehicle radius + safety margin` and shrinking the flight boundary by the same amount.
+Space-Time A* is earliest-arrival on a declared `4 m × 0.5 s` finite lattice with explicit waits;
+it is not a claim of continuous state–time optimality. Expanded spatial nodes, D* Lite queue pops,
+and expanded space–time states remain algorithm-specific work indicators and are not normalized
+into a single compute metric.
 
 ## Quick start
 
@@ -96,203 +83,75 @@ Scene distances use metres in an ENU frame. A spherical UAV is represented conse
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-
 uav3d scene list
-uav3d plan --scene restricted-core --algorithm lazy-theta-star --output result.json
-uav3d benchmark \
-  --scenes open-blocks,urban-canyon,restricted-core,vertical-gate \
-  --algorithms astar-3d,lazy-theta-star,rrt-star \
-  --seeds 0,1,2 \
-  --output benchmark.json \
-  --report-dir artifacts/nominal
+uav3d predictive plan --scenario urban-canyon-merge --algorithm space-time-astar-4d
 ```
 
-The seed list applies only to stochastic RRT*. Deterministic planners run once per scene for path
-quality; timing repetition is a separate experiment.
-
-Generate a reusable random city:
+Export the complete recorded predictive study:
 
 ```bash
-uav3d dataset --seeds 40,41,42 --buildings 18 --output-dir artifacts/random-cohort
-uav3d plan --scene artifacts/random-cohort/scenes/random-city-42.json \
-  --algorithm rrt-star --seed 7
-```
-
-Run the v0.2 sensitivity and timing protocols:
-
-```bash
-uav3d sweep resolution \
-  --scenes open-blocks,urban-canyon,restricted-core,vertical-gate \
-  --resolutions 3,4,6,8 \
-  --output artifacts/resolution.json
-
-uav3d sweep rrt-budget \
-  --scenes open-blocks,urban-canyon,restricted-core,vertical-gate \
-  --budgets 250,500,1000,2000,3000 \
-  --seeds 11,23,37,47,59 \
-  --output artifacts/rrt-budget.json
-
-uav3d timing --repetitions 5 --output artifacts/timing.json
-```
-
-RRT* budget curves come from one maximum-budget run per scene and seed; checkpoints do not rerun
-shorter budgets. The timing harness randomizes case order and launches every repetition in a fresh
-Python process.
-
-Inspect and run the v0.3 dynamic protocol:
-
-```bash
-uav3d dynamic list
-uav3d dynamic simulate \
-  --scenario pop-up-nfz \
-  --algorithm dstar-lite-3d \
-  --output artifacts/dynamic-run.json
-
-uav3d export-dynamic \
-  --output-dir artifacts/dynamic-study \
-  --source-commit "$(git rev-parse HEAD)"
-```
-
-The simulator uses a deterministic clock, constant cruise speed, scheduled replanning, and a
-continuous space-time gate before executing every segment. Its committed records contain no
-machine-dependent planner timing; use algorithm-specific work counters for replayable diagnostics.
-
-Inspect and run the v0.5 predictive protocol:
-
-```bash
-uav3d predictive list
-uav3d predictive plan \
-  --scenario urban-canyon-merge \
-  --algorithm space-time-astar-4d \
-  --output artifacts/predictive-run.json
-
 uav3d export-predictive \
   --output-dir artifacts/predictive-study \
   --source-commit "$(git rev-parse HEAD)"
 ```
 
-Space-Time A* is earliest-arrival on its declared `4 m × 0.5 s` lattice, not in continuous
-state-time space. Public `waitTimeS` is total stationary time and includes separately labelled
-time-lattice alignment waits. The exported `rawTimedPath` is the planner/simulator result;
-`timedPath` is the common certified dense polyline used for execution and display.
-
-## Web studies
-
-The Vite application has four restrained academic views. The static trajectory view uses Three.js
-to inspect recorded paths. The results view uses accessible inline SVG to show voxel-resolution and
-RRT* budget sensitivity. The dynamic view synchronizes a Three.js scene with play, pause, stepping,
-scrubbing, event annotations, current plans, executed prefixes, and exact outcome tables. The
-predictive view is a restrained research figure with eight selectable city missions, raw/certified
-trajectory comparison, orthographic and isometric views, a continuous timeline, layer controls,
-algorithm outcomes, smoothing diagnostics, and provenance downloads. No planner or trajectory
-smoother runs in the browser.
+Run the academic web views locally:
 
 ```bash
 cd web
 pnpm install --frozen-lockfile
-pnpm test
-pnpm build
-pnpm dev
+pnpm test && pnpm build && pnpm dev
 ```
 
-The build validates all committed study datasets. Python separately re-audits every trajectory, resolves
-the recorded source commit, recomputes all downloadable-artifact digests, and checks configuration,
-run, sample-count, timing, and summary identities.
+Static benchmark, dynamic simulation, sensitivity, timing, and dataset-generation protocols are
+documented in the CLI help and [methodology](docs/methodology.md).
 
-## Experiment contracts
+## Reproducibility and validation
 
-- Graph planners spend `expanded-nodes`; RRT* spends `sample-attempts`. These units are never treated
-  as interchangeable.
-- An optional wall-clock limit is a protective termination condition, not an equivalent algorithmic
-  budget across machines.
-- Every record stores the work limit and usage, termination reason, setup/search timing, semantic
-  problem fingerprint, stable run ID, raw-path audit, and separate post-processing outcome.
-- Descriptive summaries first aggregate by semantic problem fingerprint, then weight physical
-  problems equally even if display IDs differ. Continuous metrics use the median of problem-level
-  medians; success uses the mean of problem-level success proportions.
-- IQR uses linear Type-7 quantiles. The 95% percentile interval uses 10,000 fixed-seed scene-clustered
-  bootstrap resamples.
-- Dynamic planners receive identical event schedules, simulation clocks, snapshot geometry,
-  resolutions, and work limits. Frames within one mission are not independent observations.
-- Dynamic and predictive replay records omit wall-clock planner time. Expanded spatial nodes,
-  D* Lite queue pops, and expanded space-time states are algorithm-specific work indicators and are
-  never presented as equivalent units.
-- Predictive contrasts use the scenario fingerprint as the independent unit. Frames, waits, and
-  replanning epochs are not counted as samples.
-- The v0.5 predictive cohort and protocol differ from v0.4, so their runs are not pooled. All eight
-  scenarios are accepted before any planner outcome is observed.
-- The reactive conditions use 26-connected snapshot graphs, a 1 s execution clock, periodic
-  replanning, and a per-replan work cap. Space-Time A* uses a six-connected 0.5 s lattice, plans once
-  from the complete schedule, and has a per-mission expansion cap. Their comparison describes the
-  full information-and-control protocols; it does not isolate a causal forecast effect or impose an
-  equal computational budget.
-
-## Safety and validation model
-
-- AABB intersection uses a continuous slab test.
-- Finite vertical cylinders use an exact parameter-interval test in `xy` and `z`.
-- Every 26-neighbor grid edge is checked continuously, so diagonal corner cutting is rejected.
-- Start and goal remain exact virtual endpoints connected to all visible vertices in a local `3 x 3 x 3` stencil.
-- Scene contracts require distinct start and goal points so path-excess metrics have a nonzero lower bound.
-- Fixed-work RRT* uses `random.Random(seed)` and records incumbent quality at requested checkpoints.
-- The shared post-processor first takes deterministic farthest-visible shortcuts, proposes a sampled cubic B-spline blend, validates every resulting segment, and falls back to the certified shortcut if needed.
-- An independent audit rechecks endpoints, collision status, path length, waypoint count, and sampled clearance before export.
-- Temporary restrictions use half-open active intervals. Moving-sphere collision uses exact relative
-  motion on every keyframe segment; touching an inflated dynamic obstacle is collision.
-- The dynamic simulator audits each executed segment in space and time. An unsafe proposal may
-  trigger one immediate replan and can become a hold only when remaining stationary is safe.
-- Space-Time A* audits every movement, explicit wait, and exact endpoint connector against the same
-  continuous space-time predicates used by the independent release validator.
-- Predictive corner rounding is a common downstream geometric operation. Wait timestamps and
-  mission endpoints are preserved, radius candidates fall back deterministically, and every dense
-  linear space-time segment is re-audited. The result does not certify attitude, acceleration,
-  curvature continuity, or jerk.
-
-See [Methodology](docs/methodology.md) for definitions, assumptions, statistical estimands, and
-comparison limits.
-
-## Reproducing checks
+Every exported record carries its semantic problem fingerprint, source commit, work limit and
+usage, termination reason, raw-path audit, post-processing outcome, and stable run ID. Release
+validation resolves the recorded source revision, recomputes downloadable-artifact digests, and
+checks configuration, timing, sample-count, summary, and geometry identities.
 
 ```bash
 python -m pip install -e '.[dev]'
-ruff check .
-ruff format --check .
+ruff check . && ruff format --check .
 mypy src
 pytest --cov=uav3d --cov-report=term-missing
-python -m build
-
 python scripts/export_scenarios.py --check
 python scripts/validate_committed_data.py
 cd web && pnpm validate:data && pnpm test && pnpm typecheck && pnpm build
 ```
 
-The Python package has no runtime dependencies. CI tests supported Python versions, builds and
-installs a wheel, smoke-tests the CLI, re-audits committed study data, and builds all four Pages
-views.
+The geometry audit uses continuous segment tests for axis-aligned boxes and finite vertical
+cylinders. Dynamic validation adds exact relative-motion checks for moving spheres, scheduled
+restrictions, endpoint connectors, explicit waits, and every dense linear space–time segment.
 
-## Repository layout
+## Project guide
 
-```text
-src/uav3d/             static/dynamic/predictive planning, simulation, reports, and CLI
-scenarios/             four committed curated scene JSON files and schema
-tests/                 contracts, collision, planning, smoothing, CLI
-web/                   four recorded academic study views and their validators
-docs/                  methodology, schemas, and roadmap
-.github/workflows/     CI and GitHub Pages deployment
-```
+| Resource | Contents |
+| --- | --- |
+| [Methodology](docs/methodology.md) | Assumptions, experiment contracts, estimands, collision model, and comparison limits |
+| [Data schema](docs/data-schema.md) | Static, dynamic, and predictive record formats |
+| [v0.5 study plan](docs/v0.5-demo-plan.md) | Scenario contracts, smoothing policy, and release acceptance criteria |
+| [Roadmap](docs/roadmap.md) | Planned research extensions and explicit non-goals |
+| [Changelog](CHANGELOG.md) | Version-by-version changes |
+| [Citation metadata](CITATION.cff) | Repository citation information |
+
+Core code lives in `src/uav3d/`; committed scenes and schemas live in `scenarios/`; validation and
+behavioral tests live in `tests/`; the four recorded study views live in `web/`.
 
 ## Current limits
 
-Version `0.5.0` supports deterministic complete-schedule prediction on a finite 4D lattice while
-retaining a spherical vehicle and geometric motion bounded by the declared cruise speed. Its
-eight-scenario, 32-run complex-city bundle is non-confirmatory. The certified rounded trajectory is
-still a dense piecewise-linear path; the project does not model attitude, acceleration, wind,
-sensing or forecast uncertainty, energy, minimum-snap trajectories, PX4/MAVLink export, or
-regulatory compliance.
-
-Planned extensions are listed in the [roadmap](docs/roadmap.md). Kinodynamic trajectory generation,
-uncertain prediction, and flight-stack integration remain separate experiments so they do not blur
-the deterministic predictive baseline.
+- The vehicle is spherical and follows a speed-limited dense piecewise-linear geometric path.
+- The model does not certify attitude, acceleration, turn rate, continuous curvature, jerk,
+  minimum-snap dynamics, wind, energy use, sensing uncertainty, or forecast uncertainty.
+- Predictive experiments use a known deterministic schedule; the Pages application is recorded
+  continuous-time playback, not a real-time planner.
+- The v0.5 cohort is diagnostic and non-confirmatory. Its protocol differs from v0.4, so results
+  should not be pooled across those versions.
+- The project is a planning research benchmark, not a flight controller, regulatory-compliance
+  tool, or operational safety system.
 
 ## References
 
@@ -303,4 +162,5 @@ the deterministic predictive baseline.
 
 ## Citation and license
 
-Citation metadata is provided in [CITATION.cff](CITATION.cff). The source is released under the [MIT License](LICENSE).
+Citation metadata is provided in [CITATION.cff](CITATION.cff). Source code is released under the
+[MIT License](LICENSE).
