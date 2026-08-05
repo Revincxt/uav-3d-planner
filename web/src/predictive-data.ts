@@ -4,7 +4,7 @@ import type {
   MovingSphereDefinition,
   MovingSphereKeyframe,
   MovingSphereState,
-  PredictiveBundleV1,
+  PredictiveBundleV2,
   PredictiveEvent,
   PredictiveFrame,
   PredictivePlanner,
@@ -12,6 +12,7 @@ import type {
   PredictiveRun,
   PredictiveRunMetrics,
   PredictiveScenario,
+  PredictiveSmoothing,
   StaticNoFlyZone,
   TemporaryNoFlyZone,
   TimedWaypoint,
@@ -163,6 +164,10 @@ function protocol(value: unknown): PredictiveProtocol {
       item.predictiveMaxExpandedStatesPerMission,
       "protocol.predictiveMaxExpandedStatesPerMission",
     ),
+    trajectoryPostprocessor: text(
+      item.trajectoryPostprocessor,
+      "protocol.trajectoryPostprocessor",
+    ),
   };
   if (parsed.timeResolutionS > parsed.planningHorizonS) {
     fail("protocol.timeResolutionS cannot exceed planningHorizonS");
@@ -274,14 +279,6 @@ function movingPosition(definition: MovingSphereDefinition, timeS: number): Vec3
   return last.position;
 }
 
-function path(value: unknown, label: string, sceneBounds: Bounds3): Vec3[] {
-  return array(value, label).map((point, index) => {
-    const parsed = vec3(point, `${label}[${index}]`);
-    if (!pointInBounds(parsed, sceneBounds)) fail(`${label}[${index}] is outside scenario bounds`);
-    return parsed;
-  });
-}
-
 function timedPath(value: unknown, label: string, sceneBounds: Bounds3): TimedWaypoint[] {
   const parsed = array(value, label).map((entry, index) => {
     const item = record(entry, `${label}[${index}]`);
@@ -303,6 +300,17 @@ function timedPath(value: unknown, label: string, sceneBounds: Bounds3): TimedWa
     }
   }
   return parsed;
+}
+
+function sameTimedPath(left: TimedWaypoint[], right: TimedWaypoint[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (waypoint, index) =>
+        sameNumber(waypoint.timeS, right[index]!.timeS) &&
+        samePoint(waypoint.position, right[index]!.position),
+    )
+  );
 }
 
 function timedPosition(waypoints: TimedWaypoint[], timeS: number): Vec3 {
@@ -422,23 +430,12 @@ function frame(
   >,
 ): PredictiveFrame {
   const item = record(value, label);
+  if ("path" in item || "executedPath" in item) {
+    fail(`${label} must not duplicate O(N) path geometry`);
+  }
   const timeS = nonNegative(item.timeS, `${label}.timeS`);
   const vehicle = vec3(item.vehicle, `${label}.vehicle`);
   if (!pointInBounds(vehicle, scenario.bounds)) fail(`${label}.vehicle is outside scenario bounds`);
-  const plannedPath = path(item.path, `${label}.path`, scenario.bounds);
-  const executedPath = path(item.executedPath, `${label}.executedPath`, scenario.bounds);
-  if (executedPath.length === 0 || !samePoint(executedPath[0]!, scenario.start)) {
-    fail(`${label}.executedPath must start at the scenario start`);
-  }
-  if (!samePoint(executedPath.at(-1)!, vehicle)) {
-    fail(`${label}.executedPath must end at the vehicle position`);
-  }
-  if (
-    plannedPath.length > 0 &&
-    (!samePoint(plannedPath[0]!, vehicle) || !samePoint(plannedPath.at(-1)!, scenario.goal))
-  ) {
-    fail(`${label}.path endpoints must be the vehicle and goal`);
-  }
 
   const temporaryIds = new Set(scenario.temporaryNoFlyZones.map((zone) => zone.id));
   const activeTemporaryZoneIds = array(
@@ -482,8 +479,6 @@ function frame(
   return {
     timeS,
     vehicle,
-    path: plannedPath,
-    executedPath,
     activeTemporaryZoneIds,
     movingSpheres,
     event,
@@ -523,6 +518,71 @@ function metrics(value: unknown, label: string): PredictiveRunMetrics {
   };
 }
 
+function turnAngle(value: unknown, label: string): number | null {
+  if (value === null) return null;
+  const parsed = nonNegative(value, label);
+  if (parsed > 180 + TOLERANCE) fail(`${label} cannot exceed 180 degrees`);
+  return parsed;
+}
+
+function smoothing(value: unknown, label: string): PredictiveSmoothing {
+  const item = record(value, label);
+  const parsed: PredictiveSmoothing = {
+    method: text(item.method, `${label}.method`),
+    applied: boolean(item.applied, `${label}.applied`),
+    certified: boolean(item.certified, `${label}.certified`),
+    rawWaypointCount: positiveInteger(item.rawWaypointCount, `${label}.rawWaypointCount`),
+    outputWaypointCount: positiveInteger(
+      item.outputWaypointCount,
+      `${label}.outputWaypointCount`,
+    ),
+    roundedCornerCount: nonNegativeInteger(
+      item.roundedCornerCount,
+      `${label}.roundedCornerCount`,
+    ),
+    requestedTurnRadiusM: positive(
+      item.requestedTurnRadiusM,
+      `${label}.requestedTurnRadiusM`,
+    ),
+    appliedTurnRadiusM:
+      item.appliedTurnRadiusM === null
+        ? null
+        : positive(item.appliedTurnRadiusM, `${label}.appliedTurnRadiusM`),
+    sampleSpacingM: positive(item.sampleSpacingM, `${label}.sampleSpacingM`),
+    maxTurnAngleBeforeDeg: turnAngle(
+      item.maxTurnAngleBeforeDeg,
+      `${label}.maxTurnAngleBeforeDeg`,
+    ),
+    maxTurnAngleAfterDeg: turnAngle(
+      item.maxTurnAngleAfterDeg,
+      `${label}.maxTurnAngleAfterDeg`,
+    ),
+  };
+  if (parsed.applied && !parsed.certified) {
+    fail(`${label} applied output must be certified`);
+  }
+  if (parsed.applied !== (parsed.appliedTurnRadiusM !== null)) {
+    fail(`${label}.appliedTurnRadiusM must be present exactly when smoothing is applied`);
+  }
+  if (
+    parsed.appliedTurnRadiusM !== null &&
+    parsed.appliedTurnRadiusM > parsed.requestedTurnRadiusM + TOLERANCE
+  ) {
+    fail(`${label}.appliedTurnRadiusM cannot exceed the requested radius`);
+  }
+  if (!parsed.applied && parsed.roundedCornerCount !== 0) {
+    fail(`${label}.roundedCornerCount must be zero when smoothing is not applied`);
+  }
+  if (
+    parsed.maxTurnAngleBeforeDeg !== null &&
+    parsed.maxTurnAngleAfterDeg !== null &&
+    parsed.maxTurnAngleAfterDeg > parsed.maxTurnAngleBeforeDeg + 1e-5
+  ) {
+    fail(`${label} cannot increase the maximum turn angle`);
+  }
+  return parsed;
+}
+
 function run(
   value: unknown,
   label: string,
@@ -551,9 +611,27 @@ function run(
   }
   if (Object.keys(parameters).length === 0) fail(`${label}.parameters cannot be empty`);
 
+  const parsedRawTimedPath = timedPath(
+    item.rawTimedPath,
+    `${label}.rawTimedPath`,
+    scenario.bounds,
+  );
   const parsedTimedPath = timedPath(item.timedPath, `${label}.timedPath`, scenario.bounds);
-  if (!samePoint(parsedTimedPath[0]!.position, scenario.start)) {
-    fail(`${label}.timedPath must start at the scenario start`);
+  if (
+    !samePoint(parsedRawTimedPath[0]!.position, scenario.start) ||
+    !samePoint(parsedTimedPath[0]!.position, scenario.start)
+  ) {
+    fail(`${label} paths must start at the scenario start`);
+  }
+  const parsedSmoothing = smoothing(item.smoothing, `${label}.smoothing`);
+  if (
+    parsedSmoothing.rawWaypointCount !== parsedRawTimedPath.length ||
+    parsedSmoothing.outputWaypointCount !== parsedTimedPath.length
+  ) {
+    fail(`${label}.smoothing waypoint counts disagree with the exported paths`);
+  }
+  if (!parsedSmoothing.applied && !sameTimedPath(parsedRawTimedPath, parsedTimedPath)) {
+    fail(`${label} unapplied smoothing must preserve the raw timed path exactly`);
   }
   const parsedWaits = waitIntervals(
     item.waitIntervals,
@@ -573,14 +651,6 @@ function run(
       const previous = parsedFrames[index - 1]!;
       if (current.timeS <= previous.timeS) {
         fail(`${label}.frames must be strictly increasing in time`);
-      }
-      if (
-        previous.executedPath.length > current.executedPath.length ||
-        previous.executedPath.some((point, pointIndex) =>
-          !samePoint(point, current.executedPath[pointIndex]!),
-        )
-      ) {
-        fail(`${label}.executedPath must grow monotonically across frames`);
       }
     }
     if (!samePoint(current.vehicle, timedPosition(parsedTimedPath, current.timeS))) {
@@ -616,10 +686,12 @@ function run(
   }
   if (succeeded) {
     if (
+      !parsedSmoothing.certified ||
       parsedMetrics.arrivalTimeS === null ||
       parsedMetrics.travelTimeS === null ||
       parsedMetrics.pathExcessPct === null ||
       !samePoint(finalWaypoint.position, scenario.goal) ||
+      !samePoint(parsedRawTimedPath.at(-1)!.position, scenario.goal) ||
       !samePoint(lastFrame.vehicle, scenario.goal) ||
       lastFrame.event?.kind !== "goal-reached"
     ) {
@@ -681,7 +753,9 @@ function run(
     status: item.status as PredictiveRun["status"],
     failureReason,
     parameters,
+    rawTimedPath: parsedRawTimedPath,
     timedPath: parsedTimedPath,
+    smoothing: parsedSmoothing,
     waitIntervals: parsedWaits,
     metrics: parsedMetrics,
     frames: parsedFrames,
@@ -740,6 +814,30 @@ function scenario(
   const movingSpheres = uniqueIdObjects(item.movingSpheres, `${label}.movingSpheres`).map(
     (entry, index) => movingSphere(entry, `${label}.movingSpheres[${index}]`, sceneBounds),
   );
+  const environmentItem = record(item.environment, `${label}.environment`);
+  const environment = {
+    district: text(environmentItem.district, `${label}.environment.district`),
+    streetPattern: text(
+      environmentItem.streetPattern,
+      `${label}.environment.streetPattern`,
+    ),
+    buildingCount: nonNegativeInteger(
+      environmentItem.buildingCount,
+      `${label}.environment.buildingCount`,
+    ),
+    hazardCount: nonNegativeInteger(
+      environmentItem.hazardCount,
+      `${label}.environment.hazardCount`,
+    ),
+  };
+  const expectedHazards =
+    staticNoFlyZones.length + temporaryNoFlyZones.length + movingSpheres.length;
+  if (
+    environment.buildingCount !== buildings.length ||
+    environment.hazardCount !== expectedHazards
+  ) {
+    fail(`${label}.environment counts disagree with declared geometry`);
+  }
   const obstacleIds = [
     ...buildings,
     ...staticNoFlyZones,
@@ -763,6 +861,7 @@ function scenario(
     start,
     goal,
     constraints,
+    environment,
     buildings,
     staticNoFlyZones,
     temporaryNoFlyZones,
@@ -790,9 +889,9 @@ function scenario(
   return parsed;
 }
 
-export function validatePredictiveBundle(value: unknown): PredictiveBundleV1 {
+export function validatePredictiveBundle(value: unknown): PredictiveBundleV2 {
   const item = record(value, "root");
-  if (item.schemaVersion !== 1) fail("schemaVersion must be 1");
+  if (item.schemaVersion !== 2) fail("schemaVersion must be 2");
   if (item.verificationStatus !== "PREDICTIVE_DEMO_NON_CONFIRMATORY") {
     fail("verificationStatus must be PREDICTIVE_DEMO_NON_CONFIRMATORY");
   }
@@ -848,7 +947,7 @@ export function validatePredictiveBundle(value: unknown): PredictiveBundleV1 {
   );
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt,
     sourceCommit,
     verificationStatus: "PREDICTIVE_DEMO_NON_CONFIRMATORY",
@@ -864,7 +963,7 @@ export function validatePredictiveBundle(value: unknown): PredictiveBundleV1 {
 
 export async function loadPredictiveBundle(
   fetcher: typeof fetch = fetch,
-): Promise<PredictiveBundleV1> {
+): Promise<PredictiveBundleV2> {
   const response = await fetcher(`${import.meta.env.BASE_URL}predictive-data.json`);
   if (!response.ok) throw new Error(`Could not load predictive data (${response.status})`);
   return validatePredictiveBundle(await response.json());
@@ -879,13 +978,16 @@ export interface PredictiveComparisonRow {
   waitTimeS: number;
   executedPathLengthM: number;
   minimumSeparationM: number | null;
+  smoothingApplied: boolean;
+  smoothingCertified: boolean;
+  maxTurnAngleAfterDeg: number | null;
   safetyViolations: number;
   expandedStates: number;
   workUnit: PredictiveRunMetrics["workUnit"];
 }
 
 export function buildPredictiveComparisonRows(
-  bundle: PredictiveBundleV1,
+  bundle: PredictiveBundleV2,
   scenario: PredictiveScenario,
 ): PredictiveComparisonRow[] {
   const runs = new Map(scenario.runs.map((runRecord) => [runRecord.plannerId, runRecord]));
@@ -901,6 +1003,9 @@ export function buildPredictiveComparisonRows(
       waitTimeS: runRecord.metrics.waitTimeS,
       executedPathLengthM: runRecord.metrics.executedPathLengthM,
       minimumSeparationM: runRecord.metrics.minimumSeparationM,
+      smoothingApplied: runRecord.smoothing.applied,
+      smoothingCertified: runRecord.smoothing.certified,
+      maxTurnAngleAfterDeg: runRecord.smoothing.maxTurnAngleAfterDeg,
       safetyViolations: runRecord.metrics.safetyViolations,
       expandedStates: runRecord.metrics.expandedStates,
       workUnit: runRecord.metrics.workUnit,

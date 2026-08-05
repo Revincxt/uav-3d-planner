@@ -99,7 +99,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="uav3d",
         description=(
-            "Reproducible static, dynamic, and predictive benchmark for 3D UAV path planning."
+            "Reproducible static, dynamic, and v0.5 complex-city predictive benchmark for 3D "
+            "UAV path planning with collision-certified trajectory smoothing."
         ),
     )
     parser.add_argument("--version", action="version", version=f"uav3d {__version__}")
@@ -219,12 +220,18 @@ def build_parser() -> argparse.ArgumentParser:
     dynamic_export_parser.add_argument("--source-commit", required=True)
 
     predictive_parser = commands.add_parser(
-        "predictive", help="Inspect or run deterministic predictive space-time studies."
+        "predictive",
+        help="Inspect or run the v0.5 complex-city predictive space-time study.",
+        description=(
+            "Inspect or run the fixed v0.5 complex-city study. Every safe raw trajectory passes "
+            "through the common wait-preserving, collision-certified smoothing stage."
+        ),
     )
     predictive_commands = predictive_parser.add_subparsers(dest="predictive_command", required=True)
-    predictive_commands.add_parser("list", help="List built-in predictive scenarios.")
+    predictive_commands.add_parser("list", help="List the eight v0.5 complex-city scenarios.")
     predictive_plan_parser = predictive_commands.add_parser(
-        "plan", help="Run one reactive or predictive planner on a fixed forecast."
+        "plan",
+        help="Run one planner and export its raw and certified-smoothed timed paths.",
     )
     predictive_plan_parser.add_argument(
         "--scenario", choices=list_predictive_scenarios(), required=True
@@ -233,7 +240,12 @@ def build_parser() -> argparse.ArgumentParser:
     predictive_plan_parser.add_argument("--output", type=Path, required=True)
 
     predictive_export_parser = commands.add_parser(
-        "export-predictive", help="Run and export the fixed v0.4 predictive web protocol."
+        "export-predictive",
+        help="Export the v0.5 complex-city protocol with certified trajectory smoothing.",
+        description=(
+            "Run all eight v0.5 complex-city scenarios with four planners and export raw paths, "
+            "collision-certified smoothed paths, metrics, and compact replay frames."
+        ),
     )
     predictive_export_parser.add_argument("--output-dir", type=Path, required=True)
     predictive_export_parser.add_argument("--source-commit", required=True)

@@ -175,14 +175,15 @@ usage. Re-running the same source revision and protocol must reproduce the non-t
 
 ## Predictive space-time protocol
 
-Version 0.4 keeps the dynamic geometry and exact execution predicates but introduces an independent
-complete-forecast experiment. A `TimedPath` carries a strictly increasing timestamp at every exact
-endpoint, grid waypoint, and stationary interval. Equal-position segments must be explicit `wait`
-actions; moving segments must use the declared cruise speed.
+Version 0.5 retains the independent complete-forecast experiment introduced in v0.4, but replaces
+the small maps with a larger complex-city cohort and adds a shared certified trajectory
+post-processor. A `TimedPath` carries a strictly increasing timestamp at every exact endpoint, grid
+waypoint, and stationary interval. Equal-position segments must be explicit `wait` actions; raw
+moving segments use the declared cruise speed and certified rounded segments do not exceed it.
 
 The predictive baseline searches states `(v, k)`, where `v` is a free spatial voxel and `k` is a
 discrete time layer. The frozen public configuration uses a `4 m` spatial lattice, `0.5 s` time
-layers, `8 m/s` cruise speed, a `60 s` horizon, six axis-aligned movement actions, and a one-layer
+layers, `8 m/s` cruise speed, a `90 s` horizon, six axis-aligned movement actions, and a one-layer
 wait action. Every candidate transition calls the same continuous space-time predicate as the
 release audit. Exact start and goal points remain virtual endpoints connected at fixed speed; if a
 connector arrives between layers, the vehicle must safely wait until the next layer before entering
@@ -207,18 +208,36 @@ one-shot versus periodic planning, safety-gate behavior, and budget scope. It th
 two complete information-and-control protocols rather than a pure causal estimate of forecast
 value.
 
-The six predictive scenarios are accepted by construction and metadata validation before any
-planner is invoked. One calibration, one visualization, and four curated diagnostic labels are
-identified by semantic fingerprints. They were not preregistered in an earlier immutable revision,
-so the public page treats all 24 runs as non-confirmatory examples rather than held-out evidence.
+The eight predictive scenarios are accepted by construction and metadata validation before any
+planner is invoked. One calibration, three demonstration, and four curated diagnostic labels are
+identified by semantic fingerprints. The seven non-calibration scenes each contain 14–16
+unequal-height buildings, at least one static no-fly volume, and at least two time-dependent
+hazards. The cases were not preregistered in an earlier immutable revision, so the public page
+treats all 32 runs as non-confirmatory examples rather than held-out evidence. Because the cohort,
+horizon, work cap, and post-processing contract changed, v0.5 results are not pooled with v0.4.
 
 Predictive outcomes include success, failure reason, arrival time, movement time, total stationary
 time, executed length, path excess, replans, algorithm-specific work, and safety violations. Total
 stationary time contains both forecast-aware waiting and short connector-to-layer alignment waits;
 the interval records distinguish those reasons. Expanded spatial nodes, D* Lite queue pops, and
-expanded space-time states are not interchangeable measures of equal effort. The 120,000 cap applies
+expanded space-time states are not interchangeable measures of equal effort. The 240,000 cap applies
 to each reactive replanning call but to the complete Space-Time A* mission search, so cumulative
 reactive work may exceed that number.
+
+### Certified predictive trajectory post-processing
+
+The v0.5 exporter preserves the planner/simulator output as `rawTimedPath`. It then divides that
+path at every wait, proposes sampled three-dimensional circular fillets for eligible movement
+corners, and deterministically tries turn-radius scales of `1.0`, `0.75`, `0.5`, and `0.25` from a
+requested `6 m`. Samples are spaced no farther than `0.5 m`; each movement block keeps its original
+departure and arrival times, with intermediate timestamps assigned by cumulative chord length.
+
+A candidate is published as `timedPath` only if its speed remains at or below `8 m/s` and every
+dense linear segment passes the same continuous space-time predicate used for execution. Otherwise
+the exporter records an explicit certified raw fallback. This is a common downstream geometric
+operation, so its shorter or smoother-looking line is not attributed to the planner. Certification
+applies only to the dense piecewise-linear path; it is not a claim of continuous curvature,
+aircraft attitude feasibility, acceleration bounds, minimum snap, or bounded jerk.
 
 Python independently re-executes every public timed path against the declared dynamic schedule and
 checks JSON, CSV, scenario-manifest identities, run IDs, source ancestry, required generator files,

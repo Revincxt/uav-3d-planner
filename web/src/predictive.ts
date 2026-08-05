@@ -1,20 +1,29 @@
 import "./predictive.css";
 
-import {
-  buildPredictiveComparisonRows,
-  loadPredictiveBundle,
-} from "./predictive-data";
+import { buildPredictiveComparisonRows, loadPredictiveBundle } from "./predictive-data";
 import type {
-  PredictiveBundleV1,
+  PredictiveBundleV2,
+  PredictiveEvent,
   PredictiveFrame,
+  PredictivePathMode,
   PredictiveRun,
   PredictiveScenario,
   TimedWaypoint,
   Vec3,
 } from "./predictive-schema";
-import { PredictiveViewer } from "./predictive-viewer";
+import {
+  PredictiveViewer,
+  type ViewPreset,
+  type ViewerLayer,
+} from "./predictive-viewer";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+const EPSILON = 1e-8;
+
+interface TurnSample {
+  timeS: number;
+  angleDeg: number;
+}
 
 function element<T extends HTMLElement>(selector: string): T {
   const match = document.querySelector<T>(selector);
@@ -31,8 +40,12 @@ function svgElement<K extends keyof SVGElementTagNameMap>(
   return node;
 }
 
-function sameNumber(left: number, right: number): boolean {
-  return Math.abs(left - right) <= 1e-6 * Math.max(1, Math.abs(left), Math.abs(right));
+function samePoint(left: Vec3, right: Vec3): boolean {
+  return left.every(
+    (coordinate, index) =>
+      Math.abs(coordinate - right[index]!) <=
+      1e-7 * Math.max(1, Math.abs(coordinate), Math.abs(right[index]!)),
+  );
 }
 
 function timedPosition(waypoints: TimedWaypoint[], timeS: number): Vec3 {
@@ -53,6 +66,10 @@ function timedPosition(waypoints: TimedWaypoint[], timeS: number): Vec3 {
   return last.position;
 }
 
+function selectedPath(run: PredictiveRun, mode: PredictivePathMode): TimedWaypoint[] {
+  return mode === "raw" ? run.rawTimedPath : run.timedPath;
+}
+
 function formatNumber(value: number | null, digits = 1): string {
   return value === null ? "—" : value.toFixed(digits);
 }
@@ -63,29 +80,94 @@ function formatWorkUnit(unit: PredictiveRun["metrics"]["workUnit"]): string {
   return "space–time states";
 }
 
-function renderEventAxis(run: PredictiveRun, frameIndex: number): void {
-  const host = element<HTMLDivElement>("#event-axis");
-  const width = Math.max(280, Math.round(host.clientWidth || 760));
-  const height = 58;
-  const margin = 12;
-  const axisY = 20;
-  const duration = Math.max(1, run.frames.at(-1)!.timeS);
-  const x = (timeS: number): number => margin + (timeS / duration) * (width - margin * 2);
-  const events = run.frames
+function formatPosition(point: Vec3): string {
+  return `${point[0].toFixed(1)}, ${point[1].toFixed(1)}, ${point[2].toFixed(1)} m`;
+}
+
+function setDefinitionRows(host: HTMLElement, rows: Array<[string, string]>): void {
+  host.replaceChildren(
+    ...rows.map(([term, description]) => {
+      const row = document.createElement("div");
+      const dt = document.createElement("dt");
+      dt.textContent = term;
+      const dd = document.createElement("dd");
+      dd.textContent = description;
+      row.append(dt, dd);
+      return row;
+    }),
+  );
+}
+
+function visibleEvents(run: PredictiveRun): Array<{ frame: PredictiveFrame; index: number }> {
+  return run.frames
     .map((frame, index) => ({ frame, index }))
     .filter(({ frame }) => frame.event !== null && frame.event.kind !== "none");
-  const currentEvent = [...events].reverse().find((event) => event.index <= frameIndex) ?? null;
+}
+
+function mostRecentEvent(run: PredictiveRun, timeS: number): PredictiveFrame | null {
+  return (
+    [...visibleEvents(run)]
+      .reverse()
+      .find(({ frame }) => frame.timeS <= timeS + EPSILON)?.frame ?? null
+  );
+}
+
+function turnSamples(waypoints: TimedWaypoint[]): TurnSample[] {
+  const samples: TurnSample[] = [{ timeS: waypoints[0]!.timeS, angleDeg: 0 }];
+  for (let index = 1; index < waypoints.length - 1; index += 1) {
+    const previous = waypoints[index - 1]!;
+    const current = waypoints[index]!;
+    const next = waypoints[index + 1]!;
+    const incoming = current.position.map(
+      (coordinate, axis) => coordinate - previous.position[axis]!,
+    ) as Vec3;
+    const outgoing = next.position.map(
+      (coordinate, axis) => coordinate - current.position[axis]!,
+    ) as Vec3;
+    const incomingLength = Math.hypot(...incoming);
+    const outgoingLength = Math.hypot(...outgoing);
+    if (incomingLength <= EPSILON || outgoingLength <= EPSILON) continue;
+    const cosine = Math.max(
+      -1,
+      Math.min(
+        1,
+        incoming.reduce((total, coordinate, axis) => total + coordinate * outgoing[axis]!, 0) /
+          (incomingLength * outgoingLength),
+      ),
+    );
+    samples.push({ timeS: current.timeS, angleDeg: (Math.acos(cosine) * 180) / Math.PI });
+  }
+  samples.push({ timeS: waypoints.at(-1)!.timeS, angleDeg: 0 });
+  return samples;
+}
+
+function sampledValue(samples: TurnSample[], timeS: number): number {
+  if (samples.length === 0) return 0;
+  const nearest = samples.reduce((best, sample) =>
+    Math.abs(sample.timeS - timeS) < Math.abs(best.timeS - timeS) ? sample : best,
+  );
+  return nearest.angleDeg;
+}
+
+function renderEventAxis(run: PredictiveRun, duration: number, timeS: number): void {
+  const host = element<HTMLDivElement>("#event-axis");
+  const width = Math.max(300, Math.round(host.clientWidth || 760));
+  const height = 42;
+  const margin = 10;
+  const axisY = 14;
+  const x = (value: number): number => margin + (value / Math.max(duration, 1)) * (width - margin * 2);
+  const events = visibleEvents(run).filter(({ frame }) => frame.timeS <= duration + EPSILON);
 
   const svg = svgElement("svg", {
     viewBox: `0 0 ${width} ${height}`,
     role: "img",
-    "aria-label": `${events.length} recorded events from 0 to ${duration.toFixed(1)} seconds`,
+    "aria-label": `${events.length} recorded events over ${duration.toFixed(1)} seconds`,
   });
   const title = svgElement("title");
-  title.textContent = "Event positions on the recorded trace";
+  title.textContent = "Recorded event positions";
   const desc = svgElement("desc");
   desc.textContent =
-    "Vertical marks locate planner, restriction, waiting, prediction, and arrival events. The heavier mark is the most recent event at the selected frame.";
+    "Marks locate planning, restriction, waiting, prediction, failure, and arrival events. The blue rule is continuous replay time.";
   svg.append(title, desc);
   svg.append(
     svgElement("line", {
@@ -97,81 +179,81 @@ function renderEventAxis(run: PredictiveRun, frameIndex: number): void {
     }),
   );
 
-  for (const event of events) {
+  for (const { frame } of events) {
     const tick = svgElement("line", {
-      x1: String(x(event.frame.timeS)),
-      x2: String(x(event.frame.timeS)),
-      y1: "8",
-      y2: "30",
-      class: `event-tick${event === currentEvent ? " is-current" : ""}`,
+      x1: String(x(frame.timeS)),
+      x2: String(x(frame.timeS)),
+      y1: "5",
+      y2: "23",
+      class: "event-tick",
+      "data-event-time": String(frame.timeS),
     });
     const tickTitle = svgElement("title");
-    tickTitle.textContent = `${event.frame.timeS.toFixed(1)} s — ${event.frame.event!.label}`;
+    tickTitle.textContent = `${frame.timeS.toFixed(1)} s — ${frame.event!.label}`;
     tick.append(tickTitle);
     svg.append(tick);
   }
 
-  const startLabel = svgElement("text", { x: String(margin), y: "50" });
+  svg.append(
+    svgElement("line", {
+      x1: String(x(timeS)),
+      x2: String(x(timeS)),
+      y1: "2",
+      y2: "27",
+      class: "event-tick is-current replay-time-rule",
+    }),
+  );
+  const startLabel = svgElement("text", { x: String(margin), y: "39" });
   startLabel.textContent = "0 s";
   const endLabel = svgElement("text", {
     x: String(width - margin),
-    y: "50",
+    y: "39",
     "text-anchor": "end",
   });
   endLabel.textContent = `${duration.toFixed(1)} s`;
   svg.append(startLabel, endLabel);
-
-  if (currentEvent) {
-    const eventX = x(currentEvent.frame.timeS);
-    const anchor = eventX < width * 0.3 ? "start" : eventX > width * 0.7 ? "end" : "middle";
-    const label = svgElement("text", {
-      x: String(eventX),
-      y: "50",
-      "text-anchor": anchor,
-      class: "current-event-label",
-    });
-    label.textContent = `${currentEvent.frame.timeS.toFixed(1)} s · ${currentEvent.frame.event!.label}`;
-    if (eventX < margin + 48 || eventX > width - margin - 48) {
-      if (eventX < width / 2) startLabel.remove();
-      else endLabel.remove();
-    }
-    svg.append(label);
-  }
   host.replaceChildren(svg);
+  host.dataset.duration = String(duration);
+  host.dataset.width = String(width);
+  host.dataset.margin = String(margin);
+  updateEventAxis(timeS);
 }
 
-function renderAltitudeChart(
-  scenario: PredictiveScenario,
-  run: PredictiveRun,
-  frame: PredictiveFrame,
+function updateEventAxis(timeS: number): void {
+  const host = element<HTMLDivElement>("#event-axis");
+  const duration = Number(host.dataset.duration ?? 1);
+  const width = Number(host.dataset.width ?? 300);
+  const margin = Number(host.dataset.margin ?? 10);
+  const x = margin + (Math.max(0, Math.min(timeS, duration)) / Math.max(duration, 1)) * (width - margin * 2);
+  host.querySelector<SVGLineElement>(".replay-time-rule")?.setAttribute("x1", String(x));
+  host.querySelector<SVGLineElement>(".replay-time-rule")?.setAttribute("x2", String(x));
+}
+
+function renderLineChart(
+  host: HTMLElement,
+  active: Array<{ timeS: number; value: number }>,
+  raw: Array<{ timeS: number; value: number }> | null,
+  duration: number,
+  yMin: number,
+  yMax: number,
+  yLabel: string,
+  waits: PredictiveRun["waitIntervals"],
 ): void {
-  const host = element<HTMLDivElement>("#altitude-chart");
-  const width = Math.max(300, Math.round(host.clientWidth || 900));
-  const height = 230;
-  const margin = { top: 18, right: 18, bottom: 40, left: 56 };
+  const width = Math.max(320, Math.round(host.clientWidth || 620));
+  const height = 220;
+  const margin = { top: 15, right: 16, bottom: 36, left: 49 };
   const plotWidth = width - margin.left - margin.right;
   const plotHeight = height - margin.top - margin.bottom;
-  const duration = Math.max(1, run.timedPath.at(-1)!.timeS);
-  const zMin = scenario.bounds.min[2];
-  const zMax = scenario.bounds.max[2];
-  const x = (timeS: number): number => margin.left + (timeS / duration) * plotWidth;
-  const y = (altitudeM: number): number =>
-    margin.top + ((zMax - altitudeM) / (zMax - zMin)) * plotHeight;
-
+  const domainSpan = Math.max(EPSILON, yMax - yMin);
+  const x = (timeS: number): number => margin.left + (timeS / Math.max(duration, 1)) * plotWidth;
+  const y = (value: number): number => margin.top + ((yMax - value) / domainSpan) * plotHeight;
   const svg = svgElement("svg", {
     viewBox: `0 0 ${width} ${height}`,
     role: "img",
-    "aria-label": `Altitude over time for ${run.plannerId}`,
+    "aria-label": `${yLabel} over ${duration.toFixed(1)} seconds`,
   });
-  const title = svgElement("title");
-  title.textContent = "Recorded time–height trajectory";
-  const desc = svgElement("desc");
-  desc.textContent =
-    `Altitude ranges from ${zMin.toFixed(1)} to ${zMax.toFixed(1)} metres over ` +
-    `${duration.toFixed(1)} seconds. ${run.waitIntervals.length} stationary intervals are shaded.`;
-  svg.append(title, desc);
 
-  for (const interval of run.waitIntervals) {
+  for (const interval of waits) {
     svg.append(
       svgElement("rect", {
         x: String(x(interval.startTimeS)),
@@ -182,10 +264,9 @@ function renderAltitudeChart(
       }),
     );
   }
-
-  const tickCount = width < 520 ? 3 : 5;
-  for (let index = 0; index <= tickCount; index += 1) {
-    const fraction = index / tickCount;
+  const xTicks = width < 470 ? 3 : 5;
+  for (let index = 0; index <= xTicks; index += 1) {
+    const fraction = index / xTicks;
     const tickX = margin.left + fraction * plotWidth;
     svg.append(
       svgElement("line", {
@@ -198,7 +279,7 @@ function renderAltitudeChart(
     );
     const label = svgElement("text", {
       x: String(tickX),
-      y: String(height - 20),
+      y: String(height - 16),
       "text-anchor": "middle",
     });
     label.textContent = (duration * fraction).toFixed(0);
@@ -217,14 +298,13 @@ function renderAltitudeChart(
       }),
     );
     const label = svgElement("text", {
-      x: String(margin.left - 9),
+      x: String(margin.left - 8),
       y: String(tickY + 4),
       "text-anchor": "end",
     });
-    label.textContent = (zMax - fraction * (zMax - zMin)).toFixed(0);
+    label.textContent = (yMax - fraction * domainSpan).toFixed(0);
     svg.append(label);
   }
-
   svg.append(
     svgElement("line", {
       x1: String(margin.left),
@@ -241,118 +321,155 @@ function renderAltitudeChart(
       class: "axis-line",
     }),
   );
-
-  const points = run.timedPath
-    .map((waypoint) => `${x(waypoint.timeS)},${y(waypoint.position[2])}`)
-    .join(" ");
-  svg.append(svgElement("polyline", { points, class: "height-line" }));
-  for (const waypoint of run.timedPath) {
-    const marker = svgElement("circle", {
-      cx: String(x(waypoint.timeS)),
-      cy: String(y(waypoint.position[2])),
-      r: "2.6",
-      class: "waypoint",
-    });
-    const markerTitle = svgElement("title");
-    markerTitle.textContent = `${waypoint.timeS.toFixed(1)} s, ${waypoint.position[2].toFixed(1)} m`;
-    marker.append(markerTitle);
-    svg.append(marker);
+  if (raw) {
+    svg.append(
+      svgElement("polyline", {
+        points: raw.map((point) => `${x(point.timeS)},${y(point.value)}`).join(" "),
+        class: "raw-line",
+      }),
+    );
   }
-
-  const currentTime = Math.min(frame.timeS, duration);
-  const currentPosition = timedPosition(run.timedPath, currentTime);
-  const currentX = x(currentTime);
-  const currentY = y(currentPosition[2]);
+  svg.append(
+    svgElement("polyline", {
+      points: active.map((point) => `${x(point.timeS)},${y(point.value)}`).join(" "),
+      class: "data-line",
+    }),
+  );
+  for (const point of active) {
+    if (active.length > 50 && point !== active[0] && point !== active.at(-1)) continue;
+    svg.append(
+      svgElement("circle", {
+        cx: String(x(point.timeS)),
+        cy: String(y(point.value)),
+        r: "2.2",
+        class: "waypoint",
+      }),
+    );
+  }
   svg.append(
     svgElement("line", {
-      x1: String(currentX),
-      x2: String(currentX),
+      x1: String(x(0)),
+      x2: String(x(0)),
       y1: String(margin.top),
       y2: String(margin.top + plotHeight),
       class: "current-rule",
     }),
     svgElement("circle", {
-      cx: String(currentX),
-      cy: String(currentY),
-      r: "4",
+      cx: String(x(0)),
+      cy: String(y(active[0]!.value)),
+      r: "3.7",
       class: "current-point",
     }),
   );
-  const currentAnchor = currentX > width * 0.72 ? "end" : "start";
   const currentLabel = svgElement("text", {
-    x: String(currentX + (currentAnchor === "start" ? 7 : -7)),
-    y: String(Math.max(margin.top + 12, currentY - 8)),
-    "text-anchor": currentAnchor,
+    x: String(x(0) + 7),
+    y: String(Math.max(margin.top + 12, y(active[0]!.value) - 7)),
     class: "current-label",
   });
-  currentLabel.textContent = `${currentTime.toFixed(1)} s · ${currentPosition[2].toFixed(1)} m`;
+  currentLabel.textContent = `0.0 s · ${active[0]!.value.toFixed(1)}`;
   svg.append(currentLabel);
-
   const xLabel = svgElement("text", {
     x: String(margin.left + plotWidth / 2),
-    y: String(height - 4),
+    y: String(height - 2),
     "text-anchor": "middle",
   });
   xLabel.textContent = "Time (s)";
-  const yLabel = svgElement("text", {
-    x: "14",
+  const verticalLabel = svgElement("text", {
+    x: "12",
     y: String(margin.top + plotHeight / 2),
-    transform: `rotate(-90 14 ${margin.top + plotHeight / 2})`,
+    transform: `rotate(-90 12 ${margin.top + plotHeight / 2})`,
     "text-anchor": "middle",
   });
-  yLabel.textContent = "Altitude (m)";
-  svg.append(xLabel, yLabel);
+  verticalLabel.textContent = yLabel;
+  svg.append(xLabel, verticalLabel);
   host.replaceChildren(svg);
+  Object.assign(host.dataset, {
+    duration: String(duration),
+    yMin: String(yMin),
+    yMax: String(yMax),
+    width: String(width),
+    marginLeft: String(margin.left),
+    marginRight: String(margin.right),
+    marginTop: String(margin.top),
+    plotHeight: String(plotHeight),
+  });
+}
+
+function updateChartCursor(host: HTMLElement, timeS: number, value: number, suffix: string): void {
+  const duration = Number(host.dataset.duration ?? 1);
+  const yMin = Number(host.dataset.yMin ?? 0);
+  const yMax = Number(host.dataset.yMax ?? 1);
+  const width = Number(host.dataset.width ?? 320);
+  const marginLeft = Number(host.dataset.marginLeft ?? 49);
+  const marginRight = Number(host.dataset.marginRight ?? 16);
+  const marginTop = Number(host.dataset.marginTop ?? 15);
+  const plotHeight = Number(host.dataset.plotHeight ?? 169);
+  const plotWidth = width - marginLeft - marginRight;
+  const x = marginLeft + (Math.max(0, Math.min(timeS, duration)) / Math.max(duration, 1)) * plotWidth;
+  const y = marginTop + ((yMax - value) / Math.max(EPSILON, yMax - yMin)) * plotHeight;
+  const rule = host.querySelector<SVGLineElement>(".current-rule");
+  rule?.setAttribute("x1", String(x));
+  rule?.setAttribute("x2", String(x));
+  const point = host.querySelector<SVGCircleElement>(".current-point");
+  point?.setAttribute("cx", String(x));
+  point?.setAttribute("cy", String(y));
+  const label = host.querySelector<SVGTextElement>(".current-label");
+  if (label) {
+    const end = x > width * 0.72;
+    label.setAttribute("x", String(x + (end ? -7 : 7)));
+    label.setAttribute("y", String(Math.max(marginTop + 12, y - 7)));
+    label.setAttribute("text-anchor", end ? "end" : "start");
+    label.textContent = `${timeS.toFixed(1)} s · ${value.toFixed(1)} ${suffix}`;
+  }
 }
 
 function renderComparison(
-  bundle: PredictiveBundleV1,
+  bundle: PredictiveBundleV2,
   scenario: PredictiveScenario,
   selectedPlannerId: string,
+  onSelect: (plannerId: string) => void,
 ): void {
   const body = element<HTMLTableSectionElement>("#comparison-body");
   body.replaceChildren();
   for (const row of buildPredictiveComparisonRows(bundle, scenario)) {
     const tableRow = document.createElement("tr");
+    tableRow.tabIndex = 0;
     tableRow.setAttribute("aria-current", String(row.plannerId === selectedPlannerId));
+    tableRow.setAttribute("aria-label", `Inspect ${row.plannerLabel}`);
     const planner = document.createElement("th");
     planner.scope = "row";
     planner.textContent = row.plannerLabel;
     const values = [
-      row.predictive ? "Yes" : "No",
+      row.predictive ? "Complete schedule" : "Current snapshot",
       row.status,
       formatNumber(row.arrivalTimeS),
       formatNumber(row.waitTimeS),
       formatNumber(row.executedPathLengthM),
-      formatNumber(row.minimumSeparationM),
-      row.safetyViolations.toLocaleString(),
+      row.smoothingCertified
+        ? row.smoothingApplied
+          ? "Certified rounded"
+          : "Certified fallback"
+        : "Not certified",
+      row.maxTurnAngleAfterDeg === null ? "—" : `${row.maxTurnAngleAfterDeg.toFixed(1)}°`,
+      `${row.safetyViolations.toLocaleString()} violations`,
       `${row.expandedStates.toLocaleString()} ${formatWorkUnit(row.workUnit)}`,
     ];
     tableRow.append(planner);
     values.forEach((value, index) => {
       const cell = document.createElement("td");
       cell.textContent = value;
-      if (index === 1) {
-        cell.className = row.status === "success" ? "status-success" : "status-failed";
-      }
+      if (index === 1) cell.className = row.status === "success" ? "status-success" : "status-failed";
       tableRow.append(cell);
+    });
+    const activate = (): void => onSelect(row.plannerId);
+    tableRow.addEventListener("click", activate);
+    tableRow.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      activate();
     });
     body.append(tableRow);
   }
-}
-
-function renderFrameSummary(run: PredictiveRun, frame: PredictiveFrame, index: number): void {
-  const plannerKind = run.predictive ? "predictive" : "reactive";
-  const event = frame.event && frame.event.kind !== "none" ? frame.event.label : "no event";
-  const wait = run.waitIntervals.find(
-    (interval) =>
-      interval.startTimeS <= frame.timeS &&
-      frame.timeS < interval.endTimeS,
-  );
-  element("#frame-summary").textContent =
-    `Frame ${index + 1}/${run.frames.length} · ${frame.timeS.toFixed(1)} s · ` +
-    `${frame.vehicle[2].toFixed(1)} m altitude · ${plannerKind} · ${event}` +
-    (wait ? ` · stationary: ${wait.reason}` : "");
 }
 
 async function start(): Promise<void> {
@@ -365,26 +482,48 @@ async function start(): Promise<void> {
   const next = element<HTMLButtonElement>("#next-frame");
   const playPause = element<HTMLButtonElement>("#play-pause");
   const viewerHost = element<HTMLDivElement>("#predictive-viewer");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let viewer: PredictiveViewer | null = null;
   try {
     viewer = new PredictiveViewer(viewerHost);
   } catch (error) {
     viewerHost.classList.add("viewer-error");
-    viewerHost.textContent = "WebGL is unavailable; the recorded charts and tables remain accessible.";
+    viewerHost.textContent = "WebGL is unavailable; recorded charts and tables remain accessible.";
     console.warn(error);
   }
 
-  let currentScenario = bundle.scenarios[0]!;
-  let currentRun = currentScenario.runs[0]!;
-  let frameIndex = 0;
+  const query = new URLSearchParams(window.location.search);
+  const preferredScenario = bundle.scenarios.find((scenario) => scenario.id === query.get("scenario"));
+  let currentScenario =
+    preferredScenario ??
+    bundle.scenarios.find(
+      (scenario) =>
+        scenario.cohort === "demo" &&
+        scenario.environment.buildingCount >= 14 &&
+        scenario.runs.some((run) => run.predictive && run.smoothing.applied),
+    ) ??
+    bundle.scenarios.find((scenario) => scenario.cohort === "demo") ??
+    bundle.scenarios[0]!;
+  const preferredPlanner = bundle.planners.find((planner) => planner.id === query.get("planner"));
+  let currentRun =
+    currentScenario.runs.find((run) => run.plannerId === preferredPlanner?.id) ??
+    currentScenario.runs.find((run) => bundle.planners.find((planner) => planner.id === run.plannerId)?.predictive) ??
+    currentScenario.runs[0]!;
+  let pathMode: PredictivePathMode = query.get("path") === "raw" ? "raw" : "certified";
+  const requestedInitialTimeS = Math.max(0, Number(query.get("time")) || 0);
+  let currentTimeS = requestedInitialTimeS;
+  let playbackSpeed = 1;
   let animationFrame: number | null = null;
-  let playbackWallStart = 0;
-  let playbackTraceStart = 0;
+  let lastWallTime = 0;
+  let lastUrlWrite = 0;
+  let altitudeResizeObserver: ResizeObserver | null = null;
 
   for (const scenario of bundle.scenarios) {
     const option = document.createElement("option");
     option.value = scenario.id;
-    option.textContent = scenario.label;
+    option.textContent =
+      `${scenario.label} · ${scenario.environment.buildingCount} buildings · ` +
+      `${scenario.environment.hazardCount} hazards`;
     scenarioSelect.append(option);
   }
 
@@ -392,18 +531,105 @@ async function start(): Promise<void> {
     element("#live-region").textContent = message;
   };
 
-  const renderFrame = (index: number, shouldAnnounce = false): void => {
-    frameIndex = Math.max(0, Math.min(index, currentRun.frames.length - 1));
-    const frame = currentRun.frames[frameIndex]!;
-    timeline.value = String(frameIndex);
-    timelineValue.value = `${frame.timeS.toFixed(1)} s`;
-    previous.disabled = frameIndex === 0;
-    next.disabled = frameIndex === currentRun.frames.length - 1;
-    viewer?.setFrame(frame);
-    renderEventAxis(currentRun, frameIndex);
-    renderAltitudeChart(currentScenario, currentRun, frame);
-    renderFrameSummary(currentRun, frame, frameIndex);
-    if (shouldAnnounce) announce(`Showing ${frame.timeS.toFixed(1)} seconds`);
+  const updateUrl = (force = false): void => {
+    const now = performance.now();
+    if (!force && now - lastUrlWrite < 250) return;
+    lastUrlWrite = now;
+    const parameters = new URLSearchParams();
+    parameters.set("scenario", currentScenario.id);
+    parameters.set("planner", currentRun.plannerId);
+    parameters.set("path", pathMode);
+    parameters.set("time", currentTimeS.toFixed(2));
+    window.history.replaceState(null, "", `${window.location.pathname}?${parameters}${window.location.hash}`);
+  };
+
+  const currentPath = (): TimedWaypoint[] => selectedPath(currentRun, pathMode);
+  const duration = (): number => currentPath().at(-1)!.timeS;
+
+  const renderCharts = (): void => {
+    const path = currentPath();
+    const raw = currentRun.rawTimedPath;
+    const total = duration();
+    const altitudeHost = element<HTMLDivElement>("#altitude-chart");
+    const turnHost = element<HTMLDivElement>("#turn-chart");
+    const altitudeData = path.map((waypoint) => ({ timeS: waypoint.timeS, value: waypoint.position[2] }));
+    const rawAltitude =
+      pathMode === "certified" && currentRun.smoothing.applied
+        ? raw.map((waypoint) => ({ timeS: waypoint.timeS, value: waypoint.position[2] }))
+        : null;
+    renderLineChart(
+      altitudeHost,
+      altitudeData,
+      rawAltitude,
+      total,
+      currentScenario.bounds.min[2],
+      currentScenario.bounds.max[2],
+      "Altitude (m)",
+      currentRun.waitIntervals,
+    );
+    const activeTurns = turnSamples(path);
+    const rawTurns = pathMode === "certified" && currentRun.smoothing.applied ? turnSamples(raw) : null;
+    const maximumTurn = Math.max(
+      30,
+      ...activeTurns.map((sample) => sample.angleDeg),
+      ...(rawTurns?.map((sample) => sample.angleDeg) ?? []),
+    );
+    const turnCeiling = Math.min(180, Math.ceil(maximumTurn / 15) * 15);
+    renderLineChart(
+      turnHost,
+      activeTurns.map((sample) => ({ timeS: sample.timeS, value: sample.angleDeg })),
+      rawTurns?.map((sample) => ({ timeS: sample.timeS, value: sample.angleDeg })) ?? null,
+      total,
+      0,
+      turnCeiling,
+      "Turn angle (°)",
+      [],
+    );
+  };
+
+  const renderTime = (timeS: number, shouldAnnounce = false): void => {
+    const total = duration();
+    currentTimeS = Math.max(0, Math.min(timeS, total));
+    const path = currentPath();
+    const position = timedPosition(path, currentTimeS);
+    const events = visibleEvents(currentRun).filter(({ frame }) => frame.timeS <= total + EPSILON);
+    const event = mostRecentEvent(currentRun, currentTimeS);
+    const activeZones = currentScenario.temporaryNoFlyZones.filter(
+      (zone) => zone.activeFromS <= currentTimeS && currentTimeS < zone.activeUntilS,
+    );
+
+    timeline.value = String(currentTimeS);
+    timelineValue.value = `${currentTimeS.toFixed(1)} s`;
+    viewer?.setTime(currentTimeS);
+    updateEventAxis(currentTimeS);
+    updateChartCursor(element("#altitude-chart"), currentTimeS, position[2], "m");
+    updateChartCursor(
+      element("#turn-chart"),
+      currentTimeS,
+      sampledValue(turnSamples(path), currentTimeS),
+      "°",
+    );
+    setDefinitionRows(element("#current-meta"), [
+      ["Mission time", `${currentTimeS.toFixed(2)} s`],
+      ["ENU position", formatPosition(position)],
+      ["Altitude", `${position[2].toFixed(1)} m`],
+      ["Active restrictions", activeZones.length.toLocaleString()],
+      ["Moving hazards", currentScenario.movingSpheres.length.toLocaleString()],
+    ]);
+    element("#current-event").textContent = event?.event
+      ? `Most recent event · ${event.timeS.toFixed(1)} s — ${event.event.label}`
+      : "No recorded event has occurred yet.";
+    element("#frame-summary").textContent =
+      `${currentTimeS.toFixed(1)} s of ${total.toFixed(1)} s · ` +
+      `${position[2].toFixed(1)} m altitude · ${pathMode === "raw" ? "raw planner geometry" : "certified execution"}`;
+    element("#canvas-summary").textContent =
+      `${currentScenario.label}. At ${currentTimeS.toFixed(1)} seconds the vehicle is at ` +
+      `${formatPosition(position)}. ${activeZones.length} temporary restrictions are active and ` +
+      `${currentScenario.movingSpheres.length} moving hazards are shown.`;
+    previous.disabled = !events.some(({ frame }) => frame.timeS < currentTimeS - EPSILON);
+    next.disabled = !events.some(({ frame }) => frame.timeS > currentTimeS + EPSILON);
+    if (shouldAnnounce) announce(`Showing ${currentTimeS.toFixed(1)} seconds`);
+    updateUrl();
   };
 
   const setPlaying = (playing: boolean): void => {
@@ -416,16 +642,11 @@ async function start(): Promise<void> {
   };
 
   const playbackTick = (now: number): void => {
-    const targetTraceTime = playbackTraceStart + (now - playbackWallStart) / 1000;
-    let targetIndex = frameIndex;
-    while (
-      targetIndex + 1 < currentRun.frames.length &&
-      currentRun.frames[targetIndex + 1]!.timeS <= targetTraceTime
-    ) {
-      targetIndex += 1;
-    }
-    if (targetIndex !== frameIndex) renderFrame(targetIndex);
-    if (frameIndex >= currentRun.frames.length - 1) {
+    if (lastWallTime === 0) lastWallTime = now;
+    const elapsed = Math.min(0.12, Math.max(0, (now - lastWallTime) / 1000));
+    lastWallTime = now;
+    renderTime(currentTimeS + elapsed * playbackSpeed);
+    if (currentTimeS >= duration() - EPSILON) {
       setPlaying(false);
       announce("Playback complete");
       return;
@@ -434,11 +655,48 @@ async function start(): Promise<void> {
   };
 
   const beginPlayback = (): void => {
-    if (frameIndex === currentRun.frames.length - 1) renderFrame(0);
-    playbackWallStart = performance.now();
-    playbackTraceStart = currentRun.frames[frameIndex]!.timeS;
+    if (currentTimeS >= duration() - EPSILON) renderTime(0);
+    lastWallTime = 0;
     setPlaying(true);
     animationFrame = requestAnimationFrame(playbackTick);
+  };
+
+  const syncPathControls = (): void => {
+    document.querySelectorAll<HTMLButtonElement>("[data-path-mode]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.pathMode === pathMode));
+      button.disabled =
+        button.dataset.pathMode === "certified" && !currentRun.smoothing.certified;
+    });
+    const rawLayer = element<HTMLInputElement>("[data-layer='raw']");
+    rawLayer.disabled = pathMode === "raw" || !currentRun.smoothing.applied;
+    if (rawLayer.disabled) {
+      rawLayer.checked = false;
+      viewer?.setLayerVisibility("raw", false);
+    }
+  };
+
+  const renderRunEvidence = (): void => {
+    const smoothing = currentRun.smoothing;
+    const status = element("#run-status");
+    status.textContent = currentRun.status;
+    status.className = `run-status ${currentRun.status === "success" ? "is-success" : "is-failed"}`;
+    setDefinitionRows(element("#smoothing-meta"), [
+      ["Method", smoothing.method],
+      ["Certificate", smoothing.certified ? "Passed" : "Unavailable"],
+      ["Waypoints", `${smoothing.rawWaypointCount} → ${smoothing.outputWaypointCount}`],
+      ["Rounded corners", smoothing.roundedCornerCount.toLocaleString()],
+      [
+        "Turn radius",
+        smoothing.appliedTurnRadiusM === null ? "Fallback" : `${smoothing.appliedTurnRadiusM.toFixed(1)} m`,
+      ],
+      [
+        "Peak turn",
+        `${formatNumber(smoothing.maxTurnAngleBeforeDeg)}° → ${formatNumber(smoothing.maxTurnAngleAfterDeg)}°`,
+      ],
+    ]);
+    element("#smoothing-note").textContent = smoothing.applied
+      ? "The selected execution polyline was rounded and independently certified against the full space–time schedule before export."
+      : "No rounded candidate passed the declared contract, or no corner required rounding; the certified fallback is shown.";
   };
 
   const updateRun = (plannerId: string, shouldAnnounce = true): void => {
@@ -446,56 +704,95 @@ async function start(): Promise<void> {
     const run = currentScenario.runs.find((candidate) => candidate.plannerId === plannerId);
     if (!run) throw new Error(`Missing ${plannerId} run in ${currentScenario.id}`);
     currentRun = run;
-    timeline.max = String(run.frames.length - 1);
+    plannerSelect.value = plannerId;
+    if (pathMode === "certified" && !currentRun.smoothing.certified) pathMode = "raw";
+    currentTimeS = Math.min(currentTimeS, duration());
+    timeline.max = String(duration());
     viewer?.setRun(run);
-    renderComparison(bundle, currentScenario, plannerId);
-    renderFrame(0);
+    viewer?.setPathMode(pathMode);
+    syncPathControls();
+    renderRunEvidence();
+    renderComparison(bundle, currentScenario, plannerId, (selectedPlannerId) => {
+      updateRun(selectedPlannerId);
+    });
+    renderEventAxis(currentRun, duration(), currentTimeS);
+    renderCharts();
+    renderTime(currentTimeS);
+    updateUrl(true);
     const planner = bundle.planners.find((candidate) => candidate.id === plannerId);
     if (shouldAnnounce) announce(`${planner?.label ?? plannerId} trace loaded`);
   };
 
-  const updateScenario = (): void => {
+  const updateScenario = (scenarioId: string, shouldAnnounce = true): void => {
     setPlaying(false);
-    const scenario = bundle.scenarios.find((candidate) => candidate.id === scenarioSelect.value);
-    if (!scenario) throw new Error(`Unknown scenario: ${scenarioSelect.value}`);
+    const scenario = bundle.scenarios.find((candidate) => candidate.id === scenarioId);
+    if (!scenario) throw new Error(`Unknown scenario: ${scenarioId}`);
     currentScenario = scenario;
+    scenarioSelect.value = scenario.id;
     viewer?.setScenario(scenario);
-    const previousPlanner = plannerSelect.value;
+    const previousPlanner = currentRun?.plannerId;
     plannerSelect.replaceChildren();
     for (const planner of bundle.planners) {
       const option = document.createElement("option");
       option.value = planner.id;
-      option.textContent = `${planner.label}${planner.predictive ? " · predictive" : " · reactive"}`;
-      option.selected = planner.id === previousPlanner;
+      option.textContent = `${planner.label} · ${planner.predictive ? "complete forecast" : "reactive"}`;
       plannerSelect.append(option);
     }
-    if (!plannerSelect.value) plannerSelect.value = bundle.planners[0]!.id;
-    updateRun(plannerSelect.value, false);
+    const nextRun =
+      scenario.runs.find((run) => run.plannerId === previousPlanner) ??
+      scenario.runs.find(
+        (run) => bundle.planners.find((planner) => planner.id === run.plannerId)?.predictive,
+      ) ??
+      scenario.runs[0]!;
+    currentTimeS = 0;
+    element("#scenario-description").textContent = scenario.description;
+    setDefinitionRows(element("#scenario-meta"), [
+      ["District", scenario.environment.district],
+      ["Street pattern", scenario.environment.streetPattern],
+      ["Buildings", scenario.environment.buildingCount.toLocaleString()],
+      ["Hazards", scenario.environment.hazardCount.toLocaleString()],
+      [
+        "Bounds",
+        `${(scenario.bounds.max[0] - scenario.bounds.min[0]).toFixed(0)} × ` +
+          `${(scenario.bounds.max[1] - scenario.bounds.min[1]).toFixed(0)} × ` +
+          `${(scenario.bounds.max[2] - scenario.bounds.min[2]).toFixed(0)} m`,
+      ],
+    ]);
     element("#scene-caption").textContent =
-      `${scenario.description} ENU coordinates; distances in metres and trace time in seconds.`;
+      `${scenario.environment.district}; ${scenario.environment.streetPattern}. ` +
+      `Distances use ENU metres and recorded mission time.`;
     viewerHost.setAttribute(
       "aria-label",
-      `${scenario.label}: ${scenario.buildings.length} buildings, ` +
-        `${scenario.staticNoFlyZones.length} static zones, ` +
-        `${scenario.temporaryNoFlyZones.length} temporary zones, and ` +
-        `${scenario.movingSpheres.length} moving obstacles.`,
+      `${scenario.label}: ${scenario.environment.buildingCount} buildings, ` +
+        `${scenario.staticNoFlyZones.length} static restrictions, ` +
+        `${scenario.temporaryNoFlyZones.length} temporary restrictions, and ` +
+        `${scenario.movingSpheres.length} moving hazards.`,
     );
-    announce(`${scenario.label} loaded`);
+    updateRun(nextRun.plannerId, false);
+    updateUrl(true);
+    if (shouldAnnounce) announce(`${scenario.label} loaded`);
   };
 
-  scenarioSelect.addEventListener("change", updateScenario);
+  scenarioSelect.addEventListener("change", () => updateScenario(scenarioSelect.value));
   plannerSelect.addEventListener("change", () => updateRun(plannerSelect.value));
   timeline.addEventListener("input", () => {
     setPlaying(false);
-    renderFrame(Number(timeline.value), true);
+    renderTime(Number(timeline.value), true);
+    updateUrl(true);
   });
   previous.addEventListener("click", () => {
     setPlaying(false);
-    renderFrame(frameIndex - 1, true);
+    const target = [...visibleEvents(currentRun)]
+      .reverse()
+      .find(({ frame }) => frame.timeS < currentTimeS - EPSILON);
+    if (target) renderTime(target.frame.timeS, true);
   });
   next.addEventListener("click", () => {
     setPlaying(false);
-    renderFrame(frameIndex + 1, true);
+    const target = visibleEvents(currentRun).find(
+      ({ frame }) => frame.timeS > currentTimeS + EPSILON,
+    );
+    if (target) renderTime(target.frame.timeS, true);
   });
   playPause.addEventListener("click", () => {
     if (animationFrame === null) beginPlayback();
@@ -504,11 +801,81 @@ async function start(): Promise<void> {
       announce("Playback paused");
     }
   });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-path-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.pathMode;
+      if (mode !== "raw" && mode !== "certified") return;
+      if (mode === "certified" && !currentRun.smoothing.certified) return;
+      setPlaying(false);
+      pathMode = mode;
+      viewer?.setPathMode(pathMode);
+      currentTimeS = Math.min(currentTimeS, duration());
+      timeline.max = String(duration());
+      syncPathControls();
+      renderEventAxis(currentRun, duration(), currentTimeS);
+      renderCharts();
+      renderTime(currentTimeS, true);
+      updateUrl(true);
+    });
+  });
+
   document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
-      const view = button.dataset.view;
-      if (view === "isometric" || view === "top" || view === "reset") viewer?.setView(view);
+      const view = button.dataset.view as ViewPreset | undefined;
+      if (!view || !["isometric", "xy", "xz", "yz", "fit"].includes(view)) return;
+      viewer?.setView(view);
+      const activeView = view === "fit" ? "isometric" : view;
+      document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((candidate) => {
+        if (candidate.dataset.view === "fit") return;
+        candidate.setAttribute("aria-pressed", String(candidate.dataset.view === activeView));
+      });
     });
+  });
+
+  document.querySelectorAll<HTMLInputElement>("[data-layer]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const layer = input.dataset.layer as ViewerLayer | undefined;
+      if (!layer || !["buildings", "zones", "dynamic", "raw"].includes(layer)) return;
+      viewer?.setLayerVisibility(layer, input.checked);
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-speed]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const speed = Number(button.dataset.speed);
+      if (![0.5, 1, 2].includes(speed)) return;
+      playbackSpeed = speed;
+      document.querySelectorAll<HTMLButtonElement>("[data-speed]").forEach((candidate) => {
+        candidate.setAttribute("aria-pressed", String(candidate === button));
+      });
+      announce(`Playback speed ${speed} times`);
+    });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLSelectElement ||
+      target instanceof HTMLButtonElement ||
+      target instanceof HTMLTextAreaElement
+    ) {
+      return;
+    }
+    if (event.key === " ") {
+      event.preventDefault();
+      if (animationFrame === null) beginPlayback();
+      else setPlaying(false);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      setPlaying(false);
+      renderTime(currentTimeS + (event.key === "ArrowLeft" ? -0.25 : 0.25), true);
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      setPlaying(false);
+      renderTime(event.key === "Home" ? 0 : duration(), true);
+    }
   });
 
   const commitUrl = `https://github.com/Revincxt/uav-3d-planner-lab/commit/${bundle.sourceCommit}`;
@@ -519,24 +886,20 @@ async function start(): Promise<void> {
   const generated = document.createElement("p");
   generated.append(
     document.createTextNode(
-      `Generated ${bundle.generatedAt}; ${bundle.verificationStatus}; source commit `,
+      `Schema v${bundle.schemaVersion}; generated ${bundle.generatedAt}; ${bundle.verificationStatus}; source commit `,
     ),
     sourceLink,
     document.createTextNode("."),
   );
   const method = document.createElement("p");
   method.textContent =
-    "Traces are deterministic simulator records. Geometry, restriction intervals, and moving-obstacle keyframes are shared across planners within each scenario. Total stationary time includes both time-lattice endpoint alignment and forecast-aware waiting actions, distinguished by each interval reason; it is not solely a policy-wait measure. Arrival, separation, and safety values are descriptive outcomes, not statistical evidence. Planning-work units retain algorithm-specific semantics and must not be compared as a common operation count.";
+    "Raw planner paths remain available beside the exported execution trajectory. The browser draws only exported polyline samples; trajectory rounding and continuous space–time certification occur in Python. Frames store event evidence, while vehicle and moving-hazard positions are interpolated continuously from the declared timed paths and keyframes.";
   const protocol = document.createElement("p");
   protocol.textContent =
-    `Protocol ${bundle.protocol.id}: ${bundle.protocol.timeStepS} s replay step, ` +
-    `${bundle.protocol.timeResolutionS} s space–time discretization, ` +
-    `${bundle.protocol.cruiseSpeedMps} m/s cruise speed, ${bundle.protocol.resolutionM} m grid, ` +
-    `${bundle.protocol.planningHorizonS} s planning horizon, ` +
-    `${bundle.protocol.predictionHorizonS} s prediction horizon and ${bundle.protocol.maxTimeS} s maximum time. ` +
-    `Reactive conditions allow ${bundle.protocol.reactiveMaxWorkPerReplan.toLocaleString()} ` +
-    `algorithm-specific work events per replan; Space–Time A* allows ` +
-    `${bundle.protocol.predictiveMaxExpandedStatesPerMission.toLocaleString()} expanded states per mission.`;
+    `Protocol ${bundle.protocol.id}: ${bundle.protocol.timeResolutionS} s search-time resolution, ` +
+    `${bundle.protocol.resolutionM} m spatial grid, ${bundle.protocol.cruiseSpeedMps} m/s cruise speed, ` +
+    `${bundle.protocol.planningHorizonS} s planning horizon, and trajectory post-processor ` +
+    `${bundle.protocol.trajectoryPostprocessor}. Work budgets retain planner-specific units.`;
   const downloads = document.createElement("p");
   downloads.append(document.createTextNode("Download: "));
   const recordsLink = document.createElement("a");
@@ -557,26 +920,36 @@ async function start(): Promise<void> {
   );
   provenance.replaceChildren(generated, method, protocol, downloads);
 
-  scenarioSelect.value = bundle.scenarios[0]!.id;
-  currentScenario = bundle.scenarios[0]!;
-  currentRun = currentScenario.runs[0]!;
-  updateScenario();
+  scenarioSelect.value = currentScenario.id;
+  updateScenario(currentScenario.id, false);
+  if (preferredPlanner && currentScenario.runs.some((run) => run.plannerId === preferredPlanner.id)) {
+    updateRun(preferredPlanner.id, false);
+  }
+  currentTimeS = Math.min(requestedInitialTimeS, duration());
+  renderTime(currentTimeS);
+  updateUrl(true);
   element("#load-state").remove();
 
-  const chartResizeObserver = new ResizeObserver(() => {
-    const frame = currentRun.frames[frameIndex];
-    if (!frame) return;
-    renderEventAxis(currentRun, frameIndex);
-    renderAltitudeChart(currentScenario, currentRun, frame);
+  altitudeResizeObserver = new ResizeObserver(() => {
+    renderEventAxis(currentRun, duration(), currentTimeS);
+    renderCharts();
+    renderTime(currentTimeS);
   });
-  chartResizeObserver.observe(element("#event-axis"));
-  chartResizeObserver.observe(element("#altitude-chart"));
+  altitudeResizeObserver.observe(element("#event-axis"));
+  altitudeResizeObserver.observe(element("#altitude-chart"));
+  altitudeResizeObserver.observe(element("#turn-chart"));
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) setPlaying(false);
+  });
+  reducedMotion.addEventListener("change", () => {
+    if (reducedMotion.matches) setPlaying(false);
+  });
   window.addEventListener(
     "pagehide",
     () => {
       setPlaying(false);
-      chartResizeObserver.disconnect();
+      altitudeResizeObserver?.disconnect();
       viewer?.dispose();
     },
     { once: true },

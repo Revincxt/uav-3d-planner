@@ -1,4 +1,4 @@
-"""Fixed v0.4 protocol for deterministic predictive space-time planning."""
+"""Fixed v0.5 protocol for complex-city predictive planning demonstrations."""
 
 from __future__ import annotations
 
@@ -18,21 +18,28 @@ from uav3d.geometry import Point3, almost_equal, distance, polyline_length
 from uav3d.planners.space_time_astar import SpaceTimeAStar3D, SpaceTimeAStarConfig
 from uav3d.predictive import TimedPath, TimedWaypoint
 from uav3d.predictive_scenarios import build_predictive_cohort, load_predictive_scenario
+from uav3d.predictive_smoothing import (
+    PredictiveSmoothingResult,
+    smooth_predictive_timed_path,
+)
 from uav3d.replanning import DynamicFrame, DynamicRun, simulate_replanning
 
-PROTOCOL_ID = "predictive-space-time-v1"
+PROTOCOL_ID = "predictive-space-time-v2"
 VERIFICATION_STATUS = "PREDICTIVE_DEMO_NON_CONFIRMATORY"
 SERIALIZATION_DECIMAL_PLACES = 12
 
 TIME_STEP_S = 1.0
 REPLAN_INTERVAL_S = 4.0
 CRUISE_SPEED_MPS = 8.0
-MAX_TIME_S = 60.0
+MAX_TIME_S = 90.0
 RESOLUTION_M = 4.0
 TIME_RESOLUTION_S = 0.5
-PLANNING_HORIZON_S = 60.0
-PREDICTION_HORIZON_S = 60.0
-MAX_EXPANDED_STATES = 120_000
+PLANNING_HORIZON_S = 90.0
+PREDICTION_HORIZON_S = 90.0
+MAX_EXPANDED_STATES = 240_000
+SMOOTHING_TURN_RADIUS_M = 6.0
+SMOOTHING_SAMPLE_SPACING_M = 0.5
+TRAJECTORY_POSTPROCESSOR = "wait-preserving-certified-sampled-circular-fillet-v1"
 
 PREDICTIVE_ALGORITHMS = (
     "repeated-astar-3d",
@@ -85,7 +92,15 @@ RECORD_FIELDS = (
     "expanded_states",
     "work_unit",
     "safety_violations",
+    "raw_waypoint_count",
     "waypoint_count",
+    "smoothing_method",
+    "smoothing_applied",
+    "smoothing_certified",
+    "rounded_corner_count",
+    "applied_turn_radius_m",
+    "max_turn_before_deg",
+    "max_turn_after_deg",
     "parameters_json",
 )
 
@@ -131,18 +146,22 @@ class PredictiveEpisode:
     planner_id: str
     predictive: bool
     parameters: dict[str, float | int]
+    raw_timed_path: TimedPath
     timed_path: TimedPath
+    smoothing: PredictiveSmoothingResult
     metrics: PredictiveEpisodeMetrics
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "schema_version": "predictive-run-v1",
+            "schema_version": "predictive-run-v2",
             "scenario_id": self.scenario_id,
             "scenario_fingerprint": self.scenario_fingerprint,
             "planner_id": self.planner_id,
             "predictive": self.predictive,
             "parameters": self.parameters,
+            "raw_timed_path": self.raw_timed_path.to_dict(),
             "timed_path": self.timed_path.to_dict(),
+            "smoothing": self.smoothing.to_dict(),
             "metrics": self.metrics.to_dict(),
         }
 
@@ -174,6 +193,7 @@ def _protocol() -> dict[str, object]:
         "reactiveMaxWorkPerReplan": MAX_EXPANDED_STATES,
         "predictiveMaxExpandedStatesPerMission": MAX_EXPANDED_STATES,
         "reactiveReplanIntervalS": REPLAN_INTERVAL_S,
+        "trajectoryPostprocessor": TRAJECTORY_POSTPROCESSOR,
         "informationModel": "reactive snapshots and deterministic complete-schedule conditions",
         "analysisBoundary": "scenario-level descriptive contrasts; no pooled effect estimator",
         "independenceUnit": "scenario",
@@ -196,7 +216,7 @@ def predictive_run_id(
     }
     payload = json.dumps(
         {
-            "schema": "uav3d-predictive-run-v1",
+            "schema": "uav3d-predictive-run-v2",
             "scenario_fingerprint": scenario_fingerprint,
             "planner_id": planner_id,
             "protocol": protocol,
@@ -262,6 +282,38 @@ def _reactive_timed_path(run: DynamicRun) -> TimedPath:
     return TimedPath(tuple(waypoints))
 
 
+def _postprocess_trajectory(
+    scenario: DynamicScenario,
+    raw_timed_path: TimedPath,
+    *,
+    raw_safe: bool,
+) -> PredictiveSmoothingResult:
+    """Return a certified common post-processing result or an explicit unsafe fallback."""
+
+    if raw_safe:
+        return smooth_predictive_timed_path(
+            scenario,
+            raw_timed_path,
+            requested_radius_m=SMOOTHING_TURN_RADIUS_M,
+            sample_spacing_m=SMOOTHING_SAMPLE_SPACING_M,
+            max_speed_mps=CRUISE_SPEED_MPS,
+        )
+    return PredictiveSmoothingResult(
+        timed_path=raw_timed_path,
+        method="not-run-uncertified-raw-path",
+        applied=False,
+        certified=False,
+        raw_waypoint_count=len(raw_timed_path.waypoints),
+        output_waypoint_count=len(raw_timed_path.waypoints),
+        rounded_corners=0,
+        requested_radius_m=SMOOTHING_TURN_RADIUS_M,
+        applied_radius_m=None,
+        sample_spacing_m=SMOOTHING_SAMPLE_SPACING_M,
+        max_turn_before_deg=0.0,
+        max_turn_after_deg=0.0,
+    )
+
+
 def _reactive_episode(
     scenario: DynamicScenario,
     planner_id: str,
@@ -280,8 +332,11 @@ def _reactive_episode(
         max_expansions=MAX_EXPANDED_STATES,
         reuse_search_state=reuse_search_state,
     )
-    timed_path = _reactive_timed_path(run)
-    safe = timed_path.is_safe(scenario)
+    raw_timed_path = _reactive_timed_path(run)
+    raw_safe = raw_timed_path.is_safe(scenario)
+    smoothing = _postprocess_trajectory(scenario, raw_timed_path, raw_safe=raw_safe)
+    timed_path = smoothing.timed_path
+    safe = smoothing.certified and timed_path.is_safe(scenario)
     direct = distance(scenario.static_scene.start, scenario.static_scene.goal)
     length = polyline_length(timed_path.positions)
     success = run.metrics.success and safe
@@ -311,6 +366,9 @@ def _reactive_episode(
         "resolutionM": RESOLUTION_M,
         "maxWorkPerReplan": MAX_EXPANDED_STATES,
         "reuseSearchState": int(reuse_search_state),
+        "trajectorySmoothing": 1,
+        "smoothingTurnRadiusM": SMOOTHING_TURN_RADIUS_M,
+        "smoothingSampleSpacingM": SMOOTHING_SAMPLE_SPACING_M,
     }
     return PredictiveEpisode(
         scenario.scenario_id,
@@ -318,7 +376,9 @@ def _reactive_episode(
         planner_id,
         False,
         parameters,
+        raw_timed_path,
         timed_path,
+        smoothing,
         metrics,
     )
 
@@ -332,10 +392,13 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
         max_expansions=MAX_EXPANDED_STATES,
     )
     result = SpaceTimeAStar3D(config).plan(scenario)
-    timed_path = result.timed_path or TimedPath(
+    raw_timed_path = result.timed_path or TimedPath(
         (TimedWaypoint(0.0, scenario.static_scene.start, "start"),)
     )
-    trajectory_safe = timed_path.is_safe(scenario)
+    raw_safe = raw_timed_path.is_safe(scenario)
+    smoothing = _postprocess_trajectory(scenario, raw_timed_path, raw_safe=raw_safe)
+    timed_path = smoothing.timed_path
+    trajectory_safe = smoothing.certified and timed_path.is_safe(scenario)
     direct = distance(scenario.static_scene.start, scenario.static_scene.goal)
     length = polyline_length(timed_path.positions)
     success = result.success and trajectory_safe
@@ -363,6 +426,9 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
         "planningHorizonS": PLANNING_HORIZON_S,
         "predictionHorizonS": PREDICTION_HORIZON_S,
         "maxExpandedStatesPerMission": MAX_EXPANDED_STATES,
+        "trajectorySmoothing": 1,
+        "smoothingTurnRadiusM": SMOOTHING_TURN_RADIUS_M,
+        "smoothingSampleSpacingM": SMOOTHING_SAMPLE_SPACING_M,
     }
     return PredictiveEpisode(
         scenario.scenario_id,
@@ -370,7 +436,9 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
         result.algorithm,
         True,
         parameters,
+        raw_timed_path,
         timed_path,
+        smoothing,
         metrics,
     )
 
@@ -501,6 +569,8 @@ def _frame_event(
 def _export_frames(
     scenario: DynamicScenario, episode: PredictiveEpisode
 ) -> list[dict[str, object]]:
+    """Export semantic event anchors without duplicating dense trajectory samples."""
+
     waypoints = episode.timed_path.waypoints
     previous_active: tuple[str, ...] = ()
     frames: list[dict[str, object]] = []
@@ -508,27 +578,24 @@ def _export_frames(
         active = tuple(
             zone.zone_id for zone in scenario.temporary_cylinders if zone.is_active(waypoint.time_s)
         )
-        path = (
-            [list(item.position) for item in waypoints[index:]] if episode.metrics.success else []
-        )
-        frames.append(
-            {
-                "timeS": waypoint.time_s,
-                "vehicle": list(waypoint.position),
-                "path": path,
-                "executedPath": [list(item.position) for item in waypoints[: index + 1]],
-                "activeTemporaryZoneIds": list(active),
-                "movingSpheres": [
-                    {
-                        "id": sphere.sphere_id,
-                        "position": list(sphere.position_at(waypoint.time_s)),
-                        "radiusM": sphere.radius,
-                    }
-                    for sphere in scenario.moving_spheres
-                ],
-                "event": _frame_event(episode, index, active, previous_active),
-            }
-        )
+        event = _frame_event(episode, index, active, previous_active)
+        if event["kind"] != "none":
+            frames.append(
+                {
+                    "timeS": waypoint.time_s,
+                    "vehicle": list(waypoint.position),
+                    "activeTemporaryZoneIds": list(active),
+                    "movingSpheres": [
+                        {
+                            "id": sphere.sphere_id,
+                            "position": list(sphere.position_at(waypoint.time_s)),
+                            "radiusM": sphere.radius,
+                        }
+                        for sphere in scenario.moving_spheres
+                    ],
+                    "event": event,
+                }
+            )
         previous_active = active
     return frames
 
@@ -566,6 +633,7 @@ def _export_metrics(episode: PredictiveEpisode) -> dict[str, object]:
 
 def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[str, object]:
     protocol = _protocol()
+    smoothing = episode.smoothing
     return {
         "runId": predictive_run_id(
             episode.scenario_fingerprint,
@@ -578,10 +646,27 @@ def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[s
         "status": _run_status(episode),
         "failureReason": episode.metrics.failure_reason,
         "parameters": episode.parameters,
+        "rawTimedPath": [
+            {"timeS": waypoint.time_s, "position": list(waypoint.position)}
+            for waypoint in episode.raw_timed_path.waypoints
+        ],
         "timedPath": [
             {"timeS": waypoint.time_s, "position": list(waypoint.position)}
             for waypoint in episode.timed_path.waypoints
         ],
+        "smoothing": {
+            "method": smoothing.method,
+            "applied": smoothing.applied,
+            "certified": smoothing.certified,
+            "rawWaypointCount": smoothing.raw_waypoint_count,
+            "outputWaypointCount": smoothing.output_waypoint_count,
+            "roundedCornerCount": smoothing.rounded_corners,
+            "requestedTurnRadiusM": smoothing.requested_radius_m,
+            "appliedTurnRadiusM": smoothing.applied_radius_m,
+            "sampleSpacingM": smoothing.sample_spacing_m,
+            "maxTurnAngleBeforeDeg": smoothing.max_turn_before_deg,
+            "maxTurnAngleAfterDeg": smoothing.max_turn_after_deg,
+        },
         "waitIntervals": _wait_intervals(episode),
         "metrics": _export_metrics(episode),
         "frames": _export_frames(scenario, episode),
@@ -608,6 +693,18 @@ def _export_scenario(
         "constraints": {
             "vehicleRadiusM": scene.drone_radius,
             "safetyMarginM": scene.safety_margin,
+        },
+        "environment": {
+            "district": str(scenario.metadata.get("district", "unspecified urban district")),
+            "streetPattern": str(
+                scenario.metadata.get("street_pattern", "unspecified street pattern")
+            ),
+            "buildingCount": len(scene.buildings),
+            "hazardCount": (
+                len(scene.no_fly_zones)
+                + len(scenario.temporary_cylinders)
+                + len(scenario.moving_spheres)
+            ),
         },
         "buildings": [
             {
@@ -662,8 +759,8 @@ def _scenario_manifest(
 ) -> dict[str, object]:
     _, cohort_manifest = build_predictive_cohort()
     return {
-        "schemaVersion": 1,
-        "datasetId": "predictive-controlled-v0.4",
+        "schemaVersion": 2,
+        "datasetId": "predictive-complex-city-v0.5",
         "sourceCommit": source_commit,
         "generatedAt": generated_at,
         "protocolId": PROTOCOL_ID,
@@ -700,7 +797,7 @@ def build_predictive_bundle(
     _validate_generated_at(timestamp)
     study = run_predictive_study()
     bundle: dict[str, object] = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "generatedAt": timestamp,
         "sourceCommit": source_commit,
         "verificationStatus": VERIFICATION_STATUS,
@@ -745,10 +842,17 @@ def predictive_record_rows(bundle: dict[str, object]) -> list[dict[str, str]]:
             if not isinstance(run, dict):
                 raise TypeError("predictive runs must be objects")
             metrics = run.get("metrics")
+            raw_timed_path = run.get("rawTimedPath")
             timed_path = run.get("timedPath")
+            smoothing = run.get("smoothing")
             parameters = run.get("parameters")
-            if not isinstance(metrics, dict) or not isinstance(timed_path, list):
-                raise TypeError("predictive run metrics and timedPath have invalid types")
+            if (
+                not isinstance(metrics, dict)
+                or not isinstance(raw_timed_path, list)
+                or not isinstance(timed_path, list)
+                or not isinstance(smoothing, dict)
+            ):
+                raise TypeError("predictive run metrics, paths, or smoothing have invalid types")
             if not isinstance(parameters, dict):
                 raise TypeError("predictive run parameters must be an object")
             rows.append(
@@ -777,7 +881,15 @@ def predictive_record_rows(bundle: dict[str, object]) -> list[dict[str, str]]:
                     "expanded_states": str(metrics["expandedStates"]),
                     "work_unit": str(metrics["workUnit"]),
                     "safety_violations": str(metrics["safetyViolations"]),
+                    "raw_waypoint_count": str(len(raw_timed_path)),
                     "waypoint_count": str(len(timed_path)),
+                    "smoothing_method": str(smoothing["method"]),
+                    "smoothing_applied": str(smoothing["applied"]).lower(),
+                    "smoothing_certified": str(smoothing["certified"]).lower(),
+                    "rounded_corner_count": str(smoothing["roundedCornerCount"]),
+                    "applied_turn_radius_m": _csv_scalar(smoothing["appliedTurnRadiusM"]),
+                    "max_turn_before_deg": _csv_scalar(smoothing["maxTurnAngleBeforeDeg"]),
+                    "max_turn_after_deg": _csv_scalar(smoothing["maxTurnAngleAfterDeg"]),
                     "parameters_json": json.dumps(
                         parameters, sort_keys=True, separators=(",", ":")
                     ),
@@ -787,8 +899,10 @@ def predictive_record_rows(bundle: dict[str, object]) -> list[dict[str, str]]:
 
 
 def _write_json(path: Path, value: object) -> None:
+    # The browser bundle is machine-readable evidence. Compact encoding keeps GitHub Pages transfer
+    # small; stable key ordering and the trailing newline preserve deterministic byte identities.
     path.write_text(
-        json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n",
         encoding="utf-8",
     )
 
@@ -809,7 +923,7 @@ def artifact_reference(path: Path) -> dict[str, str | int]:
 
 
 def export_predictive_study(output_dir: Path, *, source_commit: str) -> dict[str, object]:
-    """Execute the v0.4 protocol and write its self-describing public data bundle."""
+    """Execute the v0.5 protocol and write its self-describing public data bundle."""
 
     bundle, manifest = build_predictive_bundle(source_commit=source_commit)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -843,8 +957,11 @@ __all__ = [
     "REPLAN_INTERVAL_S",
     "RESOLUTION_M",
     "SERIALIZATION_DECIMAL_PLACES",
+    "SMOOTHING_SAMPLE_SPACING_M",
+    "SMOOTHING_TURN_RADIUS_M",
     "TIME_RESOLUTION_S",
     "TIME_STEP_S",
+    "TRAJECTORY_POSTPROCESSOR",
     "VERIFICATION_STATUS",
     "WORK_UNITS",
     "PredictiveEpisode",
