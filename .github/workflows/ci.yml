@@ -76,12 +76,14 @@ jobs:
           uav3d --version
           uav3d scene list
           uav3d dynamic list
+          uav3d predictive list
           uav3d plan --scene vertical-gate --algorithm astar-3d --output /tmp/result.json
           uav3d dynamic simulate --scenario pop-up-nfz --algorithm dstar-lite-3d --output /tmp/dynamic.json
+          uav3d predictive plan --scenario wait-then-straight --algorithm space-time-astar-4d --output /tmp/predictive.json
           uav3d sweep resolution --scenes vertical-gate --resolutions 4,6 --output /tmp/sweep.json
 
   web:
-    name: Static and dynamic Web studies
+    name: Static, dynamic, and predictive Web studies
     runs-on: ubuntu-latest
     defaults:
       run:

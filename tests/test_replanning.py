@@ -131,6 +131,25 @@ def test_simulation_rejects_unknown_algorithm_and_invalid_clock() -> None:
         simulate_replanning(scenario, "repeated-astar-3d", time_step=0.0)
 
 
+def test_dstar_lite_can_run_as_a_reset_state_ablation() -> None:
+    scenario = load_builtin_dynamic_scenario("crossing-traffic")
+
+    reused = simulate_replanning(scenario, "dstar-lite-3d")
+    reset = simulate_replanning(
+        scenario,
+        "dstar-lite-3d",
+        reuse_search_state=False,
+    )
+
+    assert reused.metrics.success
+    assert reset.metrics.success
+    assert reused.metrics.collision_count == reset.metrics.collision_count == 0
+    assert "reuse_search_state" not in reused.parameters
+    assert reset.parameters == {**reused.parameters, "reuse_search_state": 0}
+    assert reused.metrics.total_changed_edges > 0
+    assert reset.metrics.total_changed_edges == 0
+
+
 def test_timeout_frame_records_the_post_movement_terminal_state() -> None:
     scenario = load_builtin_dynamic_scenario("pop-up-nfz")
     run = simulate_replanning(scenario, "repeated-astar-3d", max_time=0.5)

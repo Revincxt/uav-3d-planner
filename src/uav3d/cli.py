@@ -30,6 +30,12 @@ from uav3d.dataset import generate_dataset_manifest
 from uav3d.demo import build_demo_bundle
 from uav3d.dynamic import list_builtin_dynamic_scenarios, load_builtin_dynamic_scenario
 from uav3d.dynamic_study import export_dynamic_study
+from uav3d.predictive_scenarios import list_predictive_scenarios, load_predictive_scenario
+from uav3d.predictive_study import (
+    PREDICTIVE_ALGORITHMS,
+    export_predictive_study,
+    run_predictive_episode,
+)
 from uav3d.replanning import REPLANNING_ALGORITHMS, simulate_replanning
 from uav3d.reporting import write_report_bundle
 from uav3d.scene import (
@@ -92,7 +98,9 @@ def _add_budget_arguments(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="uav3d",
-        description="Reproducible static and dynamic-city benchmark for 3D UAV path planning.",
+        description=(
+            "Reproducible static, dynamic, and predictive benchmark for 3D UAV path planning."
+        ),
     )
     parser.add_argument("--version", action="version", version=f"uav3d {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -209,6 +217,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dynamic_export_parser.add_argument("--output-dir", type=Path, required=True)
     dynamic_export_parser.add_argument("--source-commit", required=True)
+
+    predictive_parser = commands.add_parser(
+        "predictive", help="Inspect or run deterministic predictive space-time studies."
+    )
+    predictive_commands = predictive_parser.add_subparsers(dest="predictive_command", required=True)
+    predictive_commands.add_parser("list", help="List built-in predictive scenarios.")
+    predictive_plan_parser = predictive_commands.add_parser(
+        "plan", help="Run one reactive or predictive planner on a fixed forecast."
+    )
+    predictive_plan_parser.add_argument(
+        "--scenario", choices=list_predictive_scenarios(), required=True
+    )
+    predictive_plan_parser.add_argument("--algorithm", choices=PREDICTIVE_ALGORITHMS, required=True)
+    predictive_plan_parser.add_argument("--output", type=Path, required=True)
+
+    predictive_export_parser = commands.add_parser(
+        "export-predictive", help="Run and export the fixed v0.4 predictive web protocol."
+    )
+    predictive_export_parser.add_argument("--output-dir", type=Path, required=True)
+    predictive_export_parser.add_argument("--source-commit", required=True)
     return parser
 
 
@@ -416,6 +444,36 @@ def _handle_export_dynamic(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_predictive(args: argparse.Namespace) -> int:
+    if args.predictive_command == "list":
+        for scenario_id in list_predictive_scenarios():
+            scenario = load_predictive_scenario(scenario_id)
+            cohort = scenario.metadata.get("cohort", "unspecified")
+            print(f"{scenario.scenario_id}\t{scenario.name}\t{cohort}")
+        return 0
+    if args.predictive_command == "plan":
+        scenario = load_predictive_scenario(args.scenario)
+        episode = run_predictive_episode(scenario, args.algorithm)
+        _write_json(args.output, episode.to_dict())
+        print(
+            f"saved {episode.planner_id} predictive-study run for "
+            f"{episode.scenario_id} to {args.output}"
+        )
+        return 0 if episode.metrics.success else 1
+    raise AssertionError("unreachable predictive command")
+
+
+def _handle_export_predictive(args: argparse.Namespace) -> int:
+    bundle = export_predictive_study(args.output_dir, source_commit=args.source_commit)
+    scenarios = cast(list[dict[str, object]], bundle["scenarios"])
+    run_count = sum(len(cast(list[object], scenario["runs"])) for scenario in scenarios)
+    print(
+        f"saved {len(scenarios)} predictive scenarios and {run_count} planner runs "
+        f"to {args.output_dir}"
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -440,6 +498,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _handle_dynamic(args)
         if args.command == "export-dynamic":
             return _handle_export_dynamic(args)
+        if args.command == "predictive":
+            return _handle_predictive(args)
+        if args.command == "export-predictive":
+            return _handle_export_predictive(args)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

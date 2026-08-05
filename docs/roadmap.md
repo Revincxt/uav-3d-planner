@@ -37,13 +37,30 @@ The v0.3 comparison is deliberately a deterministic, small-n diagnostic study. P
 timing is excluded from the replay records because it varies by machine; the records compare
 algorithm-specific work and mission outcomes under one event stream.
 
+## v0.4 — predictive space-time planning (released)
+
+- explicit timestamped paths with fixed-speed movement and wait actions;
+- finite-horizon Space-Time A* over `(voxel, time-step)` states;
+- exact continuous space-time checks for every planned move, wait, and endpoint connector;
+- reset and state-reusing D* Lite conditions for a controlled incremental-state ablation;
+- six outcome-independent predictive scenarios across calibration, demo, and curated diagnostic
+  cohorts;
+- a fixed four-condition protocol with stable run IDs, CSV/manifest provenance, Python replay
+  audits, and independent Web structural validation;
+- a restrained predictive study page with synchronized 3D and time-height views.
+
+The v0.4 public bundle is a 24-run non-confirmatory diagnostic. It assumes a complete deterministic
+forecast and reports Space-Time A* as earliest-arrival only on the declared spatial/time lattice.
+Total stationary time includes separately labelled endpoint time-lattice alignment waits.
+
 ## Later, deliberately separate
 
 - kinodynamic planning and vehicle attitude constraints;
 - minimum-snap trajectory generation;
 - wind and energy models;
 - perception uncertainty;
-- predictive space-time planning and uncertain obstacle forecasts;
+- uncertain obstacle forecasts and forecast calibration;
+- larger generated predictive cohorts and temporal-resolution sensitivity;
 - PX4/MAVLink export and simulator integration.
 
 These features should not be added to the static comparison retroactively because they change the

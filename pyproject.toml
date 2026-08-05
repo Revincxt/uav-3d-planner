@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "uav-3d-planner-lab"
 dynamic = ["version"]
-description = "A reproducible benchmark for static 3D UAV planning and dynamic replanning."
+description = "A reproducible benchmark for static, reactive, and predictive 3D UAV planning."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -15,6 +15,7 @@ keywords = [
   "uav",
   "path-planning",
   "replanning",
+  "space-time-planning",
   "a-star",
   "d-star-lite",
   "theta-star",

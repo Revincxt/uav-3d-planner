@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from uav3d.benchmark import _configuration_id, _run_id, problem_fingerprint
-from uav3d.dynamic import load_builtin_dynamic_scenario
-from uav3d.dynamic_collision import spacetime_segment_is_free
+from uav3d.dynamic import dynamic_scenario_fingerprint, load_builtin_dynamic_scenario
+from uav3d.dynamic_collision import point_is_free_at_time, spacetime_segment_is_free
 from uav3d.dynamic_study import (
     DOWNLOAD_ARTIFACTS as DYNAMIC_DOWNLOADS,
 )
@@ -31,6 +31,22 @@ from uav3d.dynamic_study import (
 )
 from uav3d.geometry import Point3, as_point, distance, polyline_length
 from uav3d.planners.base import PlanningBudget
+from uav3d.predictive_scenarios import load_predictive_scenario
+from uav3d.predictive_study import (
+    DOWNLOAD_ARTIFACTS as PREDICTIVE_DOWNLOADS,
+)
+from uav3d.predictive_study import (
+    PREDICTIVE_FLAGS,
+    build_predictive_bundle,
+    predictive_record_rows,
+    predictive_run_id,
+)
+from uav3d.predictive_study import (
+    RECORD_FIELDS as PREDICTIVE_RECORD_FIELDS,
+)
+from uav3d.predictive_study import (
+    WORK_UNITS as PREDICTIVE_WORK_UNITS,
+)
 from uav3d.scene import load_builtin_scene
 from uav3d.validation import audit_path
 
@@ -84,6 +100,18 @@ def _package_version_at(source_commit: str) -> str:
     if match is None:
         raise ValueError("could not resolve package version at benchmark sourceCommit")
     return match.group(1)
+
+
+def _require_paths_at_commit(source_commit: str, paths: tuple[str, ...], *, label: str) -> None:
+    for path in paths:
+        result = subprocess.run(
+            ["git", "cat-file", "-e", f"{source_commit}:{path}"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise ValueError(f"{label} sourceCommit does not contain required generator {path}")
 
 
 def _audit_demo() -> int:
@@ -537,13 +565,202 @@ def _audit_dynamic() -> int:
     return audited
 
 
+def _audit_predictive_execution(scenario_id: str, run: dict[str, Any]) -> None:
+    scenario = load_predictive_scenario(scenario_id)
+    raw_path = run.get("timedPath")
+    metrics = run.get("metrics")
+    if not isinstance(raw_path, list) or not raw_path or not isinstance(metrics, dict):
+        raise ValueError(f"predictive run has no timed path or metrics: {scenario_id}")
+    timed_path: list[tuple[float, Point3]] = []
+    for index, item in enumerate(raw_path):
+        if not isinstance(item, dict):
+            raise ValueError(f"predictive timed waypoint is not an object: {scenario_id}")
+        time_s = float(item["timeS"])
+        position = as_point(item["position"])
+        if index == 0:
+            if not math.isclose(time_s, 0.0, abs_tol=1e-12) or not _same_point(
+                position, scenario.static_scene.start
+            ):
+                raise ValueError(f"predictive path has an invalid origin: {scenario_id}")
+            if not point_is_free_at_time(scenario, position, time_s):
+                raise ValueError(f"predictive path begins in collision: {scenario_id}")
+        elif time_s <= timed_path[-1][0]:
+            raise ValueError(f"predictive path times are not strictly increasing: {scenario_id}")
+        timed_path.append((time_s, position))
+
+    for (start_time, start), (end_time, end) in pairwise(timed_path):
+        if not spacetime_segment_is_free(scenario, start, end, start_time, end_time):
+            raise ValueError(
+                "predictive trajectory failed collision audit: "
+                f"{scenario_id}/{run.get('plannerId')}"
+            )
+
+    positions = tuple(point for _, point in timed_path)
+    observed_length = polyline_length(positions)
+    observed_wait = math.fsum(
+        end_time - start_time
+        for (start_time, start), (end_time, end) in pairwise(timed_path)
+        if _same_point(start, end)
+    )
+    if not math.isclose(
+        observed_length,
+        float(metrics["executedPathLengthM"]),
+        rel_tol=1e-10,
+        abs_tol=1e-8,
+    ):
+        raise ValueError(f"predictive executed length mismatch: {scenario_id}")
+    if not math.isclose(
+        observed_wait,
+        float(metrics["waitTimeS"]),
+        rel_tol=1e-10,
+        abs_tol=1e-8,
+    ):
+        raise ValueError(f"predictive stationary-time mismatch: {scenario_id}")
+    success = bool(metrics["success"])
+    if success:
+        if not _same_point(positions[-1], scenario.static_scene.goal):
+            raise ValueError(f"successful predictive path does not end at the goal: {scenario_id}")
+        arrival = metrics.get("arrivalTimeS")
+        travel = metrics.get("travelTimeS")
+        if arrival is None or travel is None:
+            raise ValueError(f"successful predictive run lacks arrival metrics: {scenario_id}")
+        if not math.isclose(float(arrival), timed_path[-1][0], rel_tol=1e-10, abs_tol=1e-8):
+            raise ValueError(f"predictive arrival time mismatch: {scenario_id}")
+        if not math.isclose(
+            float(travel),
+            timed_path[-1][0] - timed_path[0][0] - observed_wait,
+            rel_tol=1e-10,
+            abs_tol=1e-8,
+        ):
+            raise ValueError(f"predictive movement-time mismatch: {scenario_id}")
+    elif metrics.get("arrivalTimeS") is not None or metrics.get("travelTimeS") is not None:
+        raise ValueError(f"failed predictive run fabricates arrival metrics: {scenario_id}")
+    if int(metrics["safetyViolations"]) != 0:
+        raise ValueError(f"predictive record contains a safety violation: {scenario_id}")
+
+
+def _without_predictive_provenance(bundle: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in bundle.items()
+        if key not in {"generatedAt", "sourceCommit", "downloads"}
+    }
+
+
+def _audit_predictive() -> int:
+    bundle = _load_json(PUBLIC / "predictive-data.json")
+    source_commit = str(bundle.get("sourceCommit", ""))
+    _validate_source_ancestor(source_commit, label="predictive")
+    _require_paths_at_commit(
+        source_commit,
+        (
+            "src/uav3d/predictive.py",
+            "src/uav3d/predictive_scenarios.py",
+            "src/uav3d/predictive_study.py",
+            "src/uav3d/planners/space_time_astar.py",
+        ),
+        label="predictive",
+    )
+    if _package_version_at(source_commit) != "0.4.0":
+        raise ValueError("predictive sourceCommit must identify the v0.4.0 implementation")
+
+    downloads = bundle.get("downloads")
+    if not isinstance(downloads, dict) or set(downloads) != set(PREDICTIVE_DOWNLOADS):
+        raise ValueError("predictive downloads must list exactly recordsCsv and scenarioManifest")
+    for key, filename in PREDICTIVE_DOWNLOADS.items():
+        reference = downloads.get(key)
+        artifact = PUBLIC / filename
+        if not isinstance(reference, dict) or reference.get("path") != filename:
+            raise ValueError(f"invalid predictive download reference: {key}")
+        if (
+            reference.get("sha256") != _artifact_digest(artifact)
+            or reference.get("bytes") != artifact.stat().st_size
+        ):
+            raise ValueError(f"predictive download provenance mismatch: {filename}")
+
+    expected, expected_manifest = build_predictive_bundle(
+        source_commit=source_commit,
+        generated_at=str(bundle.get("generatedAt", "ignored")),
+    )
+    difference = _first_difference(
+        _without_predictive_provenance(bundle),
+        _without_predictive_provenance(expected),
+    )
+    if difference is not None:
+        raise ValueError(
+            "committed predictive bundle differs from 24 deterministic reruns: " + difference
+        )
+
+    manifest = _load_json(PUBLIC / PREDICTIVE_DOWNLOADS["scenarioManifest"])
+    if manifest != expected_manifest:
+        raise ValueError("predictive scenario manifest differs from the fixed protocol selection")
+
+    with (PUBLIC / PREDICTIVE_DOWNLOADS["recordsCsv"]).open(encoding="utf-8", newline="") as stream:
+        reader = csv.DictReader(stream)
+        rows = list(reader)
+        if tuple(reader.fieldnames or ()) != PREDICTIVE_RECORD_FIELDS:
+            raise ValueError("predictive records CSV columns differ from the declared schema")
+    if rows != predictive_record_rows(expected):
+        raise ValueError("predictive records CSV differs from predictive-data.json")
+
+    protocol = bundle.get("protocol")
+    scenarios = bundle.get("scenarios")
+    if not isinstance(protocol, dict) or not isinstance(scenarios, list):
+        raise ValueError("predictive protocol and scenarios must be structured objects")
+    run_ids: set[str] = set()
+    audited = 0
+    for raw_scenario in scenarios:
+        if not isinstance(raw_scenario, dict):
+            raise ValueError("predictive scenario must be an object")
+        scenario_id = str(raw_scenario["id"])
+        scenario = load_predictive_scenario(scenario_id)
+        fingerprint = str(raw_scenario["fingerprint"])
+        if fingerprint != dynamic_scenario_fingerprint(scenario):
+            raise ValueError(f"predictive scenario fingerprint mismatch: {scenario_id}")
+        runs = raw_scenario.get("runs")
+        if not isinstance(runs, list) or len(runs) != len(PREDICTIVE_WORK_UNITS):
+            raise ValueError(f"predictive scenario has an incomplete planner matrix: {scenario_id}")
+        for run in runs:
+            if not isinstance(run, dict) or not isinstance(run.get("parameters"), dict):
+                raise ValueError(f"predictive run must be a structured object: {scenario_id}")
+            planner_id = str(run["plannerId"])
+            parameters = run["parameters"]
+            run_id = str(run["runId"])
+            expected_id = predictive_run_id(
+                fingerprint,
+                planner_id,
+                protocol,
+                parameters,  # type: ignore[arg-type]
+            )
+            if run_id != expected_id or run_id in run_ids:
+                raise ValueError(
+                    f"stale or duplicate predictive run ID: {scenario_id}/{planner_id}"
+                )
+            run_ids.add(run_id)
+            metrics = run.get("metrics")
+            if (
+                not isinstance(metrics, dict)
+                or metrics.get("workUnit") != PREDICTIVE_WORK_UNITS.get(planner_id)
+                or run.get("predictive") is not PREDICTIVE_FLAGS.get(planner_id)
+            ):
+                raise ValueError(
+                    f"predictive planner contract mismatch: {scenario_id}/{planner_id}"
+                )
+            _audit_predictive_execution(scenario_id, run)
+            audited += 1
+    if len(scenarios) != 6 or audited != 24:
+        raise ValueError("predictive bundle must contain exactly six scenarios by four planners")
+    return audited
+
+
 def main() -> int:
     trajectories = _audit_demo()
     records = _audit_benchmark()
     dynamic_runs = _audit_dynamic()
+    predictive_runs = _audit_predictive()
     print(
         f"audited {trajectories} demo trajectories, {records} benchmark records, "
-        f"and {dynamic_runs} dynamic runs"
+        f"{dynamic_runs} dynamic runs, and {predictive_runs} predictive runs"
     )
     return 0
 

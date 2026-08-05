@@ -173,6 +173,59 @@ Every committed Web episode stores all frames needed to reconstruct the vehicle 
 plan, executed prefix, active temporary zones, moving-sphere positions, replanning reason, and work
 usage. Re-running the same source revision and protocol must reproduce the non-timing records exactly.
 
+## Predictive space-time protocol
+
+Version 0.4 keeps the dynamic geometry and exact execution predicates but introduces an independent
+complete-forecast experiment. A `TimedPath` carries a strictly increasing timestamp at every exact
+endpoint, grid waypoint, and stationary interval. Equal-position segments must be explicit `wait`
+actions; moving segments must use the declared cruise speed.
+
+The predictive baseline searches states `(v, k)`, where `v` is a free spatial voxel and `k` is a
+discrete time layer. The frozen public configuration uses a `4 m` spatial lattice, `0.5 s` time
+layers, `8 m/s` cruise speed, a `60 s` horizon, six axis-aligned movement actions, and a one-layer
+wait action. Every candidate transition calls the same continuous space-time predicate as the
+release audit. Exact start and goal points remain virtual endpoints connected at fixed speed; if a
+connector arrives between layers, the vehicle must safely wait until the next layer before entering
+the voxel-time graph.
+
+Space-Time A* uses deterministic tie breaking and an admissible Euclidean travel-time heuristic.
+Its result is earliest-arrival on the declared finite lattice. Temporal and spatial discretization
+mean it is not a claim of globally earliest arrival in continuous state-time space. A finite horizon
+failure likewise does not prove that no continuous trajectory exists.
+
+### Predictive comparison conditions
+
+- **Repeated 3D A\*** sees only the current conservative snapshot and replans from scratch.
+- **D\* Lite reset** sees the same snapshot and constructs a fresh D* Lite planner at every epoch.
+- **D\* Lite reuse** keeps `g`, `rhs`, and queue state across compatible snapshots.
+- **4D Space-Time A\*** sees the complete deterministic schedule at mission start.
+
+Reset and reuse D* Lite share one graph, endpoint, heuristic, clock, work cap, and execution
+contract, so they form a controlled search-state ablation. The broader Space-Time A* contrast also
+changes the information model, 6- versus 26-connected graph, 0.5 versus 1 s temporal discretization,
+one-shot versus periodic planning, safety-gate behavior, and budget scope. It therefore describes
+two complete information-and-control protocols rather than a pure causal estimate of forecast
+value.
+
+The six predictive scenarios are accepted by construction and metadata validation before any
+planner is invoked. One calibration, one visualization, and four curated diagnostic labels are
+identified by semantic fingerprints. They were not preregistered in an earlier immutable revision,
+so the public page treats all 24 runs as non-confirmatory examples rather than held-out evidence.
+
+Predictive outcomes include success, failure reason, arrival time, movement time, total stationary
+time, executed length, path excess, replans, algorithm-specific work, and safety violations. Total
+stationary time contains both forecast-aware waiting and short connector-to-layer alignment waits;
+the interval records distinguish those reasons. Expanded spatial nodes, D* Lite queue pops, and
+expanded space-time states are not interchangeable measures of equal effort. The 120,000 cap applies
+to each reactive replanning call but to the complete Space-Time A* mission search, so cumulative
+reactive work may exceed that number.
+
+Python independently re-executes every public timed path against the declared dynamic schedule and
+checks JSON, CSV, scenario-manifest identities, run IDs, source ancestry, required generator files,
+byte sizes, and SHA-256 digests. The Web build independently validates structural, numeric, temporal,
+and digest invariants; it does not reimplement collision geometry. Public floats are rounded to 12
+decimal places only at the serialization boundary.
+
 ## Experiment identity
 
 `problem_fingerprint` is a versioned SHA-256 digest of planning semantics: bounds, exact endpoints,

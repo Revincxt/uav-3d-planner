@@ -128,8 +128,10 @@ def _planner(
         return LazyThetaStar(
             LazyThetaStarConfig(resolution=resolution, max_expansions=max_expansions)
         )
-    if algorithm == "dstar-lite-3d" and incremental is not None:
-        return incremental
+    if algorithm == "dstar-lite-3d":
+        return incremental or DStarLite3D(
+            DStarLiteConfig(resolution=resolution, max_queue_pops=max_expansions)
+        )
     choices = ", ".join(REPLANNING_ALGORITHMS)
     raise ValueError(f"unknown replanning algorithm {algorithm!r}; choose one of: {choices}")
 
@@ -207,6 +209,7 @@ def simulate_replanning(
     max_time: float = 180.0,
     resolution: float = 4.0,
     max_expansions: int = 120_000,
+    reuse_search_state: bool = True,
 ) -> DynamicRun:
     """Execute a deterministic online replanning run with an exact dynamic safety gate."""
 
@@ -221,7 +224,7 @@ def simulate_replanning(
 
     incremental = (
         DStarLite3D(DStarLiteConfig(resolution=resolution, max_queue_pops=max_expansions))
-        if algorithm == "dstar-lite-3d"
+        if algorithm == "dstar-lite-3d" and reuse_search_state
         else None
     )
     parameters: dict[str, float | int] = {
@@ -232,6 +235,10 @@ def simulate_replanning(
         "resolution": resolution,
         "max_expansions": max_expansions,
     }
+    # Preserve the byte-for-byte v0.3 default contract while making the new reset ablation
+    # self-describing when callers explicitly disable incremental-state reuse.
+    if algorithm == "dstar-lite-3d" and not reuse_search_state:
+        parameters["reuse_search_state"] = 0
     frames: list[DynamicFrame] = []
     executed: list[Point3] = [scenario.static_scene.start]
     position = scenario.static_scene.start
