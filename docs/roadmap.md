@@ -1,0 +1,38 @@
+# Roadmap
+
+## v0.1 — static baseline
+
+- static axis-aligned buildings and finite cylindrical no-fly zones;
+- 3D A*, Lazy Theta*, and seeded RRT*;
+- shared obstacle model and exact segment checks;
+- collision-certified common smoothing;
+- four curated and seeded random city scenes;
+- CLI benchmark records and static Three.js comparison page.
+
+## v0.2 — stronger experiments
+
+- explicit wall-clock and algorithmic budget contracts;
+- voxel-resolution sweeps;
+- repeated timing harness in isolated processes;
+- random-scene dataset manifests and rejection logs;
+- per-scene RRT* quality–budget curves;
+- median, interquartile range, and scene-clustered bootstrap intervals;
+- CSV and publication-ready plot export.
+
+## v0.3 — dynamic replanning
+
+- time-indexed temporary no-fly volumes and moving obstacles;
+- receding-horizon replanning baselines;
+- D* Lite or an equivalent incremental graph-search baseline;
+- latency and path-disruption metrics.
+
+## Later, deliberately separate
+
+- kinodynamic planning and vehicle attitude constraints;
+- minimum-snap trajectory generation;
+- wind and energy models;
+- perception uncertainty;
+- PX4/MAVLink export and simulator integration.
+
+These features should not be added to the v0.1 comparison retroactively because they change the research question and planner interface.
+

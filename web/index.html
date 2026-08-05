@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Recorded comparison of 3D A*, Lazy Theta*, and RRT* in static urban UAV scenes."
+    />
+    <title>UAV 3D Planner Lab</title>
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">Reproducible planning study</p>
+          <h1>UAV 3D Planner Lab</h1>
+          <p class="scope">
+            Collision-aware path planning through static city buildings and fixed no-fly zones.
+          </p>
+        </div>
+        <p class="record-status">Recorded demonstration · non-confirmatory</p>
+      </header>
+
+      <section class="controls" aria-label="Figure controls">
+        <label>
+          <span>Scene</span>
+          <select id="scene-select"></select>
+        </label>
+
+        <fieldset>
+          <legend>Trajectory</legend>
+          <label><input type="radio" name="path-mode" value="raw" /> Raw</label>
+          <label><input type="radio" name="path-mode" value="smoothed" checked /> Smoothed</label>
+        </fieldset>
+
+        <fieldset id="planner-controls">
+          <legend>Planner</legend>
+        </fieldset>
+
+        <div class="view-controls" aria-label="Camera view">
+          <span>View</span>
+          <button type="button" data-view="isometric">Isometric</button>
+          <button type="button" data-view="top">Top</button>
+          <button type="button" data-view="reset">Reset</button>
+        </div>
+      </section>
+
+      <figure>
+        <div
+          id="scene-viewer"
+          class="scene-viewer"
+          role="img"
+          aria-label="Three-dimensional urban path-planning scene"
+        ></div>
+        <figcaption>
+          <div id="legend" class="legend" aria-label="Figure legend"></div>
+          <p id="scene-caption"></p>
+        </figcaption>
+      </figure>
+
+      <section class="results" aria-labelledby="results-heading">
+        <h2 id="results-heading">Recorded result</h2>
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">
+              Recorded planning results for the selected static scene
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Planner</th>
+                <th scope="col">Status</th>
+                <th scope="col">Time (ms)</th>
+                <th scope="col">Raw length (m)</th>
+                <th scope="col">Smoothed (m)</th>
+                <th scope="col">Min. clearance (m)</th>
+                <th scope="col">Search effort</th>
+                <th scope="col">Seed</th>
+              </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <details>
+        <summary>Method and provenance</summary>
+        <div id="provenance"></div>
+      </details>
+      <p id="live-region" class="sr-only" aria-live="polite"></p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+

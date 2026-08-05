@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Revincxt/uav-3d-planner-lab/blob/main/scenarios/schema.json",
+  "title": "UAV 3D Planner Lab scene",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "name",
+    "bounds",
+    "start",
+    "goal",
+    "drone_radius",
+    "safety_margin",
+    "buildings",
+    "no_fly_zones"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "bounds": {
+      "type": "object",
+      "required": ["minimum", "maximum"],
+      "properties": {
+        "minimum": { "$ref": "#/$defs/vec3" },
+        "maximum": { "$ref": "#/$defs/vec3" }
+      },
+      "additionalProperties": false
+    },
+    "start": { "$ref": "#/$defs/vec3" },
+    "goal": { "$ref": "#/$defs/vec3" },
+    "drone_radius": { "type": "number", "minimum": 0 },
+    "safety_margin": { "type": "number", "minimum": 0 },
+    "buildings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "minimum", "maximum"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "minimum": { "$ref": "#/$defs/vec3" },
+          "maximum": { "$ref": "#/$defs/vec3" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "no_fly_zones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "center", "radius", "z_min", "z_max"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "center": {
+            "type": "array",
+            "prefixItems": [{ "type": "number" }, { "type": "number" }],
+            "items": false
+          },
+          "radius": { "type": "number", "exclusiveMinimum": 0 },
+          "z_min": { "type": "number" },
+          "z_max": { "type": "number" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vec3": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "items": false
+    }
+  }
+}
+

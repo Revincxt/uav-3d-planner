@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software in academic work, please cite it as below."
+title: "UAV 3D Planner Lab"
+type: software
+version: 0.1.0
+date-released: 2026-08-05
+authors:
+  - name: Revincxt
+repository-code: "https://github.com/Revincxt/uav-3d-planner-lab"
+url: "https://revincxt.github.io/uav-3d-planner-lab/"
+license: MIT
+keywords:
+  - UAV
+  - path planning
+  - A-star
+  - Lazy Theta-star
+  - RRT-star
+

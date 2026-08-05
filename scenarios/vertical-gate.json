@@ -1,0 +1,125 @@
+{
+  "schema_version": "1.0",
+  "id": "vertical-gate",
+  "name": "Vertical gate",
+  "bounds": {
+    "minimum": [
+      0,
+      0,
+      0
+    ],
+    "maximum": [
+      100,
+      100,
+      60
+    ]
+  },
+  "start": [
+    7,
+    50,
+    7
+  ],
+  "goal": [
+    93,
+    50,
+    7
+  ],
+  "drone_radius": 1.0,
+  "safety_margin": 1.0,
+  "buildings": [
+    {
+      "id": "wall-low",
+      "minimum": [
+        40,
+        0,
+        0.0
+      ],
+      "maximum": [
+        60,
+        43,
+        22
+      ]
+    },
+    {
+      "id": "wall-high",
+      "minimum": [
+        40,
+        57,
+        0.0
+      ],
+      "maximum": [
+        60,
+        100,
+        48
+      ]
+    },
+    {
+      "id": "left-a",
+      "minimum": [
+        12,
+        20,
+        0.0
+      ],
+      "maximum": [
+        28,
+        39,
+        28
+      ]
+    },
+    {
+      "id": "left-b",
+      "minimum": [
+        12,
+        57,
+        0.0
+      ],
+      "maximum": [
+        28,
+        79,
+        35
+      ]
+    },
+    {
+      "id": "right-a",
+      "minimum": [
+        72,
+        18,
+        0.0
+      ],
+      "maximum": [
+        88,
+        40,
+        38
+      ]
+    },
+    {
+      "id": "right-b",
+      "minimum": [
+        72,
+        58,
+        0.0
+      ],
+      "maximum": [
+        88,
+        78,
+        27
+      ]
+    }
+  ],
+  "no_fly_zones": [
+    {
+      "id": "nfz-gate",
+      "center": [
+        50,
+        50
+      ],
+      "radius": 9,
+      "z_min": 0,
+      "z_max": 31
+    }
+  ],
+  "metadata": {
+    "family": "curated",
+    "description": "A low restricted gate rewards altitude."
+  }
+}

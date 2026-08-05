@@ -1,0 +1,140 @@
+{
+  "schema_version": "1.0",
+  "id": "open-blocks",
+  "name": "Open blocks",
+  "bounds": {
+    "minimum": [
+      0,
+      0,
+      0
+    ],
+    "maximum": [
+      100,
+      100,
+      55
+    ]
+  },
+  "start": [
+    6,
+    7,
+    6
+  ],
+  "goal": [
+    94,
+    92,
+    8
+  ],
+  "drone_radius": 1.0,
+  "safety_margin": 1.0,
+  "buildings": [
+    {
+      "id": "b01",
+      "minimum": [
+        18,
+        12,
+        0.0
+      ],
+      "maximum": [
+        32,
+        30,
+        20
+      ]
+    },
+    {
+      "id": "b02",
+      "minimum": [
+        18,
+        42,
+        0.0
+      ],
+      "maximum": [
+        32,
+        59,
+        32
+      ]
+    },
+    {
+      "id": "b03",
+      "minimum": [
+        18,
+        72,
+        0.0
+      ],
+      "maximum": [
+        32,
+        88,
+        25
+      ]
+    },
+    {
+      "id": "b04",
+      "minimum": [
+        44,
+        18,
+        0.0
+      ],
+      "maximum": [
+        59,
+        35,
+        35
+      ]
+    },
+    {
+      "id": "b05",
+      "minimum": [
+        44,
+        50,
+        0.0
+      ],
+      "maximum": [
+        59,
+        68,
+        22
+      ]
+    },
+    {
+      "id": "b06",
+      "minimum": [
+        70,
+        10,
+        0.0
+      ],
+      "maximum": [
+        86,
+        30,
+        28
+      ]
+    },
+    {
+      "id": "b07",
+      "minimum": [
+        70,
+        43,
+        0.0
+      ],
+      "maximum": [
+        86,
+        59,
+        38
+      ]
+    },
+    {
+      "id": "b08",
+      "minimum": [
+        70,
+        72,
+        0.0
+      ],
+      "maximum": [
+        86,
+        89,
+        24
+      ]
+    }
+  ],
+  "no_fly_zones": [],
+  "metadata": {
+    "family": "curated",
+    "description": "Irregular open city blocks."
+  }
+}

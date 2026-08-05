@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0",
+  "id": "urban-canyon",
+  "name": "Urban canyon",
+  "bounds": {
+    "minimum": [
+      0,
+      0,
+      0
+    ],
+    "maximum": [
+      100,
+      100,
+      60
+    ]
+  },
+  "start": [
+    7,
+    8,
+    7
+  ],
+  "goal": [
+    93,
+    92,
+    7
+  ],
+  "drone_radius": 1.0,
+  "safety_margin": 1.0,
+  "buildings": [
+    {
+      "id": "west-1",
+      "minimum": [
+        16,
+        0,
+        0.0
+      ],
+      "maximum": [
+        32,
+        62,
+        42
+      ]
+    },
+    {
+      "id": "west-2",
+      "minimum": [
+        16,
+        75,
+        0.0
+      ],
+      "maximum": [
+        32,
+        100,
+        30
+      ]
+    },
+    {
+      "id": "mid-1",
+      "minimum": [
+        42,
+        0,
+        0.0
+      ],
+      "maximum": [
+        59,
+        25,
+        30
+      ]
+    },
+    {
+      "id": "mid-2",
+      "minimum": [
+        42,
+        39,
+        0.0
+      ],
+      "maximum": [
+        59,
+        100,
+        44
+      ]
+    },
+    {
+      "id": "east-1",
+      "minimum": [
+        69,
+        0,
+        0.0
+      ],
+      "maximum": [
+        85,
+        62,
+        37
+      ]
+    },
+    {
+      "id": "east-2",
+      "minimum": [
+        69,
+        76,
+        0.0
+      ],
+      "maximum": [
+        85,
+        100,
+        46
+      ]
+    }
+  ],
+  "no_fly_zones": [],
+  "metadata": {
+    "family": "curated",
+    "description": "Alternating canyon gates."
+  }
+}
