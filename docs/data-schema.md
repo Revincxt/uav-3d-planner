@@ -170,4 +170,5 @@ and SHA-256. Python reruns all 32 deterministic missions, independently collisio
 and certified timestamped paths, and cross-checks the JSON/CSV/manifest identities. JavaScript
 independently validates structural geometry bounds, temporal order, endpoints, waits, smoothing,
 frames, metrics, digests, and run-count invariants; it does not repeat the continuous collision
-calculation.
+calculation. Predictive public floats are rounded to eleven decimal places at the serialization
+boundary so platform-level `libm` drift cannot change deterministic evidence bytes.

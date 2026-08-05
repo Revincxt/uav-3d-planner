@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
+import uav3d.predictive_study as predictive_study_module
 from uav3d.cli import main
 from uav3d.dynamic import DynamicScenario, TemporaryCylinder
 from uav3d.predictive_scenarios import load_predictive_scenario
@@ -16,6 +17,7 @@ from uav3d.predictive_study import (
     DOWNLOAD_ARTIFACTS,
     PREDICTIVE_ALGORITHMS,
     RECORD_FIELDS,
+    SERIALIZATION_DECIMAL_PLACES,
     VERIFICATION_STATUS,
     PredictiveEpisode,
     build_predictive_bundle,
@@ -29,6 +31,14 @@ from uav3d.scene import Bounds3D, Scene
 
 SOURCE_COMMIT = "a" * 40
 GENERATED_AT = "2026-08-05T12:00:00+00:00"
+
+
+def test_predictive_serialization_absorbs_platform_float_drift() -> None:
+    assert SERIALIZATION_DECIMAL_PLACES == 11
+    normalized = predictive_study_module._normalize_record_numbers(
+        {"times": [16.605801291068, 16.605801291067]}
+    )
+    assert normalized == {"times": [16.60580129107, 16.60580129107]}
 
 
 @pytest.fixture(scope="module")

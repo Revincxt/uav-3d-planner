@@ -26,7 +26,9 @@ from uav3d.replanning import DynamicFrame, DynamicRun, simulate_replanning
 
 PROTOCOL_ID = "predictive-space-time-v2"
 VERIFICATION_STATUS = "PREDICTIVE_DEMO_NON_CONFIRMATORY"
-SERIALIZATION_DECIMAL_PLACES = 12
+# Eleven decimal places remain far below the spatial and temporal resolution of the
+# protocol while absorbing platform-level libm drift observed in the twelfth place.
+SERIALIZATION_DECIMAL_PLACES = 11
 
 TIME_STEP_S = 1.0
 REPLAN_INTERVAL_S = 4.0

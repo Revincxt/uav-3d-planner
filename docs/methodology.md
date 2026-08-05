@@ -242,7 +242,7 @@ aircraft attitude feasibility, acceleration bounds, minimum snap, or bounded jer
 Python independently re-executes every public timed path against the declared dynamic schedule and
 checks JSON, CSV, scenario-manifest identities, run IDs, source ancestry, required generator files,
 byte sizes, and SHA-256 digests. The Web build independently validates structural, numeric, temporal,
-and digest invariants; it does not reimplement collision geometry. Public floats are rounded to 12
+and digest invariants; it does not reimplement collision geometry. Public floats are rounded to 11
 decimal places only at the serialization boundary.
 
 ## Experiment identity
