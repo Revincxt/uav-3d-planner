@@ -617,7 +617,18 @@ function validateBundle(value) {
     label: text(planner.label, `planners[${index}].label`),
     predictive: bool(planner.predictive, `planners[${index}].predictive`),
   }));
-  if (plannerEntries.length < 2) fail("at least two planners are required");
+  const expectedPlannerIds = [
+    "repeated-astar-3d",
+    "dstar-lite-reset-3d",
+    "dstar-lite-reuse-3d",
+    "space-time-astar-4d",
+  ];
+  if (
+    plannerEntries.length !== expectedPlannerIds.length ||
+    expectedPlannerIds.some((id) => !plannerEntries.some((planner) => planner.id === id))
+  ) {
+    fail("the public protocol requires exactly four declared planner conditions");
+  }
   if (!plannerEntries.some((planner) => planner.predictive) || plannerEntries.every((planner) => planner.predictive)) {
     fail("planners must include predictive and non-predictive baselines");
   }
@@ -625,12 +636,26 @@ function validateBundle(value) {
   const scenarios = list(root.scenarios, "scenarios").map((entry, index) =>
     scenario(entry, `scenarios[${index}]`, planners),
   );
-  if (scenarios.length === 0) fail("at least one scenario is required");
+  const expectedScenarioIds = [
+    "wait-then-straight",
+    "closing-window",
+    "periodic-traffic",
+    "chained-restrictions",
+    "multi-obstacle",
+    "vertical-time-window",
+  ];
+  if (
+    scenarios.length !== expectedScenarioIds.length ||
+    expectedScenarioIds.some((id) => !scenarios.some((entry) => entry.id === id))
+  ) {
+    fail("the public protocol requires exactly six registered scenarios");
+  }
   if (new Set(scenarios.map((entry) => entry.id)).size !== scenarios.length) fail("scenario IDs must be unique");
   if (new Set(scenarios.map((entry) => entry.fingerprint)).size !== scenarios.length) {
     fail("scenario fingerprints must be unique");
   }
   const runIds = scenarios.flatMap((entry) => entry.runs.map((record) => record.runId));
+  if (runIds.length !== 24) fail("the public protocol requires exactly 24 planner runs");
   if (new Set(runIds).size !== runIds.length) fail("runId values must be unique across the bundle");
 
   const downloads = object(root.downloads, "downloads");
