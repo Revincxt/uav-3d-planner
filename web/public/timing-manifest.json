@@ -22,26 +22,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 0,
       "planner_seed": 17,
-      "pid": 88217,
+      "pid": 33790,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 1057.2237079031765,
+      "process_wall_time_ms": 1027.825083117932,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-657802432d932f9d52be",
+        "run_id": "run-c48084a270bb045c98b7",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 980.970999924466,
+        "planning_time_ms": 969.4750420749187,
         "timing": {
-          "planning_ms": 980.970999924466,
-          "setup_ms": 0.026250025257468224,
-          "search_ms": 980.9447498992085,
-          "smoothing_ms": 1.0650840122252703,
-          "validation_ms": 3.052624873816967
+          "planning_ms": 969.4750420749187,
+          "setup_ms": 0.027625123038887978,
+          "search_ms": 969.4474169518799,
+          "smoothing_ms": 1.0612080805003643,
+          "validation_ms": 3.0856661032885313
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -50,7 +53,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 980.970999924466,
+          "wall_time_used_ms": 969.4750420749187,
           "termination": "sample-budget-completed"
         }
       }
@@ -62,26 +65,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 2,
       "planner_seed": null,
-      "pid": 88236,
+      "pid": 33791,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 144.63566686026752,
+      "process_wall_time_ms": 140.0798331014812,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-bed9c6c163377610a678",
+        "run_id": "run-d5d998f23716d425de06",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 88.13983295112848,
+        "planning_time_ms": 87.44616690091789,
         "timing": {
-          "planning_ms": 88.13983295112848,
-          "setup_ms": 0.5671670660376549,
-          "search_ms": 87.57266588509083,
-          "smoothing_ms": 1.1349159758538008,
-          "validation_ms": 2.1363748237490654
+          "planning_ms": 87.44616690091789,
+          "setup_ms": 0.5633330438286066,
+          "search_ms": 86.88283385708928,
+          "smoothing_ms": 1.1118340771645308,
+          "validation_ms": 2.078541787341237
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -90,7 +96,7 @@
         },
         "budget_usage": {
           "work_used": 497,
-          "wall_time_used_ms": 88.13983295112848,
+          "wall_time_used_ms": 87.44616690091789,
           "termination": "goal-reached"
         }
       }
@@ -102,26 +108,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 2,
       "planner_seed": 17,
-      "pid": 88237,
+      "pid": 33792,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 867.8496659267694,
+      "process_wall_time_ms": 868.5557080898434,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-b08671a095b0aa8c8cd7",
+        "run_id": "run-be8d82da67c648fe1d7a",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 812.9626251757145,
+        "planning_time_ms": 816.0461669322103,
         "timing": {
-          "planning_ms": 812.9626251757145,
-          "setup_ms": 0.02695806324481964,
-          "search_ms": 812.9356671124697,
-          "smoothing_ms": 1.3339999131858349,
-          "validation_ms": 2.3153338115662336
+          "planning_ms": 816.0461669322103,
+          "setup_ms": 0.02670893445611,
+          "search_ms": 816.0194579977542,
+          "smoothing_ms": 1.3619170058518648,
+          "validation_ms": 2.3310838732868433
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -130,7 +139,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 812.9626251757145,
+          "wall_time_used_ms": 816.0461669322103,
           "termination": "sample-budget-completed"
         }
       }
@@ -142,26 +151,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 2,
       "planner_seed": 17,
-      "pid": 88240,
+      "pid": 33793,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 911.020124796778,
+      "process_wall_time_ms": 907.2364580351859,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-5320f00db493f556f9a5",
+        "run_id": "run-bbd94e2b183c87ec6f05",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 857.7097500674427,
+        "planning_time_ms": 854.3744168709964,
         "timing": {
-          "planning_ms": 857.7097500674427,
-          "setup_ms": 0.028791138902306557,
-          "search_ms": 857.6809589285403,
-          "smoothing_ms": 0.806041993200779,
-          "validation_ms": 1.7698330339044333
+          "planning_ms": 854.3744168709964,
+          "setup_ms": 0.026957830414175987,
+          "search_ms": 854.3474590405822,
+          "smoothing_ms": 0.8065828587859869,
+          "validation_ms": 1.7472910694777966
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -170,7 +182,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 857.7097500674427,
+          "wall_time_used_ms": 854.3744168709964,
           "termination": "sample-budget-completed"
         }
       }
@@ -182,26 +194,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 0,
       "planner_seed": null,
-      "pid": 88241,
+      "pid": 33794,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 356.8817500490695,
+      "process_wall_time_ms": 353.3068341203034,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-2ebef24c80eb6f1ec9e5",
+        "run_id": "run-cd1c7bb6e67b10948da1",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 300.9548750706017,
+        "planning_time_ms": 299.1529998835176,
         "timing": {
-          "planning_ms": 300.9548750706017,
-          "setup_ms": 0.501084141433239,
-          "search_ms": 300.45379092916846,
-          "smoothing_ms": 0.9823751170188189,
-          "validation_ms": 2.838167129084468
+          "planning_ms": 299.1529998835176,
+          "setup_ms": 0.5089170299470425,
+          "search_ms": 298.6440828535706,
+          "smoothing_ms": 0.9702078532427549,
+          "validation_ms": 2.799751004204154
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -210,7 +225,7 @@
         },
         "budget_usage": {
           "work_used": 1241,
-          "wall_time_used_ms": 300.9548750706017,
+          "wall_time_used_ms": 299.1529998835176,
           "termination": "goal-reached"
         }
       }
@@ -222,26 +237,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 2,
       "planner_seed": null,
-      "pid": 88242,
+      "pid": 33795,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 399.4644160848111,
+      "process_wall_time_ms": 396.0384589154273,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-7ab3f9f0e563eac06126",
+        "run_id": "run-583a16131bbcece04994",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 344.33604194782674,
+        "planning_time_ms": 343.4869581833482,
         "timing": {
-          "planning_ms": 344.33604194782674,
-          "setup_ms": 0.5525418091565371,
-          "search_ms": 343.7835001386702,
-          "smoothing_ms": 0.9976669680327177,
-          "validation_ms": 2.0760418847203255
+          "planning_ms": 343.4869581833482,
+          "setup_ms": 0.5632920656353235,
+          "search_ms": 342.92366611771286,
+          "smoothing_ms": 0.9968748781830072,
+          "validation_ms": 2.0371240098029375
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -250,7 +268,7 @@
         },
         "budget_usage": {
           "work_used": 1798,
-          "wall_time_used_ms": 344.33604194782674,
+          "wall_time_used_ms": 343.4869581833482,
           "termination": "goal-reached"
         }
       }
@@ -262,26 +280,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 0,
       "planner_seed": null,
-      "pid": 88243,
+      "pid": 33796,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 429.36070798896253,
+      "process_wall_time_ms": 427.33308393508196,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-1c0ce77d9d9d677ac51a",
+        "run_id": "run-a22fd54316c7faf2ceb2",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 374.50625002384186,
+        "planning_time_ms": 374.35337505303323,
         "timing": {
-          "planning_ms": 374.50625002384186,
-          "setup_ms": 0.5063330754637718,
-          "search_ms": 373.9999169483781,
-          "smoothing_ms": 0.8875001221895218,
-          "validation_ms": 2.5130831636488438
+          "planning_ms": 374.35337505303323,
+          "setup_ms": 0.5030408501625061,
+          "search_ms": 373.8503342028707,
+          "smoothing_ms": 0.905750086531043,
+          "validation_ms": 2.594748977571726
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -290,7 +311,7 @@
         },
         "budget_usage": {
           "work_used": 2247,
-          "wall_time_used_ms": 374.50625002384186,
+          "wall_time_used_ms": 374.35337505303323,
           "termination": "goal-reached"
         }
       }
@@ -302,26 +323,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 1,
       "planner_seed": null,
-      "pid": 88244,
+      "pid": 33798,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 373.32437513396144,
+      "process_wall_time_ms": 365.0349169038236,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-bbacb3c2963e9e909718",
+        "run_id": "run-46635034d60cf6a2a6e2",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 318.11879109591246,
+        "planning_time_ms": 312.5600419007242,
         "timing": {
-          "planning_ms": 318.11879109591246,
-          "setup_ms": 0.5124160088598728,
-          "search_ms": 317.6063750870526,
-          "smoothing_ms": 0.7492499426007271,
-          "validation_ms": 2.27516726590693
+          "planning_ms": 312.5600419007242,
+          "setup_ms": 0.5071249324828386,
+          "search_ms": 312.05291696824133,
+          "smoothing_ms": 0.7426661904901266,
+          "validation_ms": 2.287750132381916
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -330,7 +354,7 @@
         },
         "budget_usage": {
           "work_used": 1645,
-          "wall_time_used_ms": 318.11879109591246,
+          "wall_time_used_ms": 312.5600419007242,
           "termination": "goal-reached"
         }
       }
@@ -342,26 +366,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 1,
       "planner_seed": 17,
-      "pid": 88245,
+      "pid": 33799,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 917.5228329841048,
+      "process_wall_time_ms": 905.2172501105815,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-bc95dbc8a2a34e18d35c",
+        "run_id": "run-8e173d64c0dae100597e",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 863.2701248861849,
+        "planning_time_ms": 853.5124168265611,
         "timing": {
-          "planning_ms": 863.2701248861849,
-          "setup_ms": 0.028499867767095566,
-          "search_ms": 863.2416250184178,
-          "smoothing_ms": 0.9113331325352192,
-          "validation_ms": 1.7672078683972359
+          "planning_ms": 853.5124168265611,
+          "setup_ms": 0.026791822165250778,
+          "search_ms": 853.4856250043958,
+          "smoothing_ms": 0.7937918417155743,
+          "validation_ms": 1.756042242050171
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -370,7 +397,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 863.2701248861849,
+          "wall_time_used_ms": 853.5124168265611,
           "termination": "sample-budget-completed"
         }
       }
@@ -382,26 +409,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 0,
       "planner_seed": 17,
-      "pid": 88246,
+      "pid": 33801,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 728.8015407975763,
+      "process_wall_time_ms": 722.5609170272946,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-9d6dd57f0f3bb78918da",
+        "run_id": "run-f8bccf8cd0c293f84616",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 673.9150420762599,
+        "planning_time_ms": 669.5567080751061,
         "timing": {
-          "planning_ms": 673.9150420762599,
-          "setup_ms": 0.027542002499103546,
-          "search_ms": 673.8875000737607,
-          "smoothing_ms": 0.8344158995896578,
-          "validation_ms": 2.631582785397768
+          "planning_ms": 669.5567080751061,
+          "setup_ms": 0.02554105594754219,
+          "search_ms": 669.5311670191586,
+          "smoothing_ms": 0.8309578988701105,
+          "validation_ms": 2.628499176353216
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -410,7 +440,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 673.9150420762599,
+          "wall_time_used_ms": 669.5567080751061,
           "termination": "sample-budget-completed"
         }
       }
@@ -422,26 +452,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 2,
       "planner_seed": null,
-      "pid": 88247,
+      "pid": 33802,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 303.41220810078084,
+      "process_wall_time_ms": 299.39449997618794,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-a694f2751aabd6e48e7f",
+        "run_id": "run-02b2e2f7061e25c48a55",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 250.07599988020957,
+        "planning_time_ms": 247.06729198805988,
         "timing": {
-          "planning_ms": 250.07599988020957,
-          "setup_ms": 0.5700828041881323,
-          "search_ms": 249.50591707602143,
-          "smoothing_ms": 0.8672920521348715,
-          "validation_ms": 1.8667508848011494
+          "planning_ms": 247.06729198805988,
+          "setup_ms": 0.5617919377982616,
+          "search_ms": 246.50550005026162,
+          "smoothing_ms": 0.8603748865425587,
+          "validation_ms": 1.8994577694684267
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -450,7 +483,7 @@
         },
         "budget_usage": {
           "work_used": 1104,
-          "wall_time_used_ms": 250.07599988020957,
+          "wall_time_used_ms": 247.06729198805988,
           "termination": "goal-reached"
         }
       }
@@ -462,26 +495,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 0,
       "planner_seed": null,
-      "pid": 88249,
+      "pid": 33803,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 305.27295800857246,
+      "process_wall_time_ms": 301.61783401854336,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-154bc95c136cece4bd0f",
+        "run_id": "run-2f10cd5df7f6ae26ebd5",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 249.8409589752555,
+        "planning_time_ms": 250.5473329219967,
         "timing": {
-          "planning_ms": 249.8409589752555,
-          "setup_ms": 0.5822500679641962,
-          "search_ms": 249.2587089072913,
-          "smoothing_ms": 0.8782499935477972,
-          "validation_ms": 1.8809579778462648
+          "planning_ms": 250.5473329219967,
+          "setup_ms": 0.5625409539788961,
+          "search_ms": 249.98479196801782,
+          "smoothing_ms": 0.8671667892485857,
+          "validation_ms": 1.8786252476274967
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -490,7 +526,7 @@
         },
         "budget_usage": {
           "work_used": 1104,
-          "wall_time_used_ms": 249.8409589752555,
+          "wall_time_used_ms": 250.5473329219967,
           "termination": "goal-reached"
         }
       }
@@ -502,26 +538,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 1,
       "planner_seed": 17,
-      "pid": 88251,
+      "pid": 33804,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 868.9384157769382,
+      "process_wall_time_ms": 865.5781669076532,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-31291c86cfcc5ee5b97d",
+        "run_id": "run-de38e1bf0b4ab52cd476",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 813.8951251748949,
+        "planning_time_ms": 812.3297079000622,
         "timing": {
-          "planning_ms": 813.8951251748949,
-          "setup_ms": 0.030875205993652344,
-          "search_ms": 813.8642499689013,
-          "smoothing_ms": 1.3041668571531773,
-          "validation_ms": 2.2953751031309366
+          "planning_ms": 812.3297079000622,
+          "setup_ms": 0.02637505531311035,
+          "search_ms": 812.3033328447491,
+          "smoothing_ms": 1.3077498879283667,
+          "validation_ms": 2.3555010557174683
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -530,7 +569,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 813.8951251748949,
+          "wall_time_used_ms": 812.3297079000622,
           "termination": "sample-budget-completed"
         }
       }
@@ -542,26 +581,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 1,
       "planner_seed": 17,
-      "pid": 88252,
+      "pid": 33805,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 1038.218708941713,
+      "process_wall_time_ms": 1022.9851249605417,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-302be70be68b29decf63",
+        "run_id": "run-c34dc609028ccdb51ba1",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 981.6152919083834,
+        "planning_time_ms": 968.6892500612885,
         "timing": {
-          "planning_ms": 981.6152919083834,
-          "setup_ms": 0.03200001083314419,
-          "search_ms": 981.5832918975502,
-          "smoothing_ms": 1.0950409341603518,
-          "validation_ms": 3.0921250581741333
+          "planning_ms": 968.6892500612885,
+          "setup_ms": 0.025582965463399887,
+          "search_ms": 968.6636670958251,
+          "smoothing_ms": 1.0556669440120459,
+          "validation_ms": 3.130833152681589
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -570,7 +612,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 981.6152919083834,
+          "wall_time_used_ms": 968.6892500612885,
           "termination": "sample-budget-completed"
         }
       }
@@ -582,26 +624,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 1,
       "planner_seed": 17,
-      "pid": 88253,
+      "pid": 33806,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 723.4760830178857,
+      "process_wall_time_ms": 718.7681249342859,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-4f3c649726230a1a043f",
+        "run_id": "run-2187e268c8502b87f3b7",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 668.1097079999745,
+        "planning_time_ms": 665.9592089708894,
         "timing": {
-          "planning_ms": 668.1097079999745,
-          "setup_ms": 0.027165981009602547,
-          "search_ms": 668.0825420189649,
-          "smoothing_ms": 0.8473340421915054,
-          "validation_ms": 2.736541908234358
+          "planning_ms": 665.9592089708894,
+          "setup_ms": 0.024583889171481133,
+          "search_ms": 665.934625081718,
+          "smoothing_ms": 0.8282079361379147,
+          "validation_ms": 2.6637078262865543
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -610,7 +655,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 668.1097079999745,
+          "wall_time_used_ms": 665.9592089708894,
           "termination": "sample-budget-completed"
         }
       }
@@ -622,26 +667,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 1,
       "planner_seed": null,
-      "pid": 88254,
+      "pid": 33808,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 357.2475831024349,
+      "process_wall_time_ms": 353.50208287127316,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-b3ada0cc4b0bdd53951f",
+        "run_id": "run-9ec827b82b3eb96a2b12",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 300.9979580529034,
+        "planning_time_ms": 299.6069169603288,
         "timing": {
-          "planning_ms": 300.9979580529034,
-          "setup_ms": 0.5145000759512186,
-          "search_ms": 300.4834579769522,
-          "smoothing_ms": 0.9679589420557022,
-          "validation_ms": 2.8186659328639507
+          "planning_ms": 299.6069169603288,
+          "setup_ms": 0.5048338789492846,
+          "search_ms": 299.10208308137953,
+          "smoothing_ms": 0.9648751001805067,
+          "validation_ms": 2.78291804715991
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -650,7 +698,7 @@
         },
         "budget_usage": {
           "work_used": 1241,
-          "wall_time_used_ms": 300.9979580529034,
+          "wall_time_used_ms": 299.6069169603288,
           "termination": "goal-reached"
         }
       }
@@ -662,26 +710,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 2,
       "planner_seed": 17,
-      "pid": 88255,
+      "pid": 33810,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 731.4896250609308,
+      "process_wall_time_ms": 718.8961659558117,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-4cd1c408fdee04816dd0",
+        "run_id": "run-b4f600e25d2f96a3d5b2",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 676.3331659603864,
+        "planning_time_ms": 666.3587498478591,
         "timing": {
-          "planning_ms": 676.3331659603864,
-          "setup_ms": 0.024165958166122437,
-          "search_ms": 676.3090000022203,
-          "smoothing_ms": 0.8251250255852938,
-          "validation_ms": 2.6629590429365635
+          "planning_ms": 666.3587498478591,
+          "setup_ms": 0.02529192715883255,
+          "search_ms": 666.3334579207003,
+          "smoothing_ms": 0.8400001097470522,
+          "validation_ms": 2.6563736610114574
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -690,7 +741,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 676.3331659603864,
+          "wall_time_used_ms": 666.3587498478591,
           "termination": "sample-budget-completed"
         }
       }
@@ -702,26 +753,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 0,
       "planner_seed": 17,
-      "pid": 88256,
+      "pid": 33811,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 912.3725830577314,
+      "process_wall_time_ms": 906.0719578992575,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-83aa774c0550853e762e",
+        "run_id": "run-d0ea44dd1ed4f0ead809",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 858.4259999915957,
+        "planning_time_ms": 853.5644579678774,
         "timing": {
-          "planning_ms": 858.4259999915957,
-          "setup_ms": 0.028999987989664078,
-          "search_ms": 858.3970000036061,
-          "smoothing_ms": 0.7927080150693655,
-          "validation_ms": 1.7369159031659365
+          "planning_ms": 853.5644579678774,
+          "setup_ms": 0.026207882910966873,
+          "search_ms": 853.5382500849664,
+          "smoothing_ms": 0.7954169996082783,
+          "validation_ms": 1.7665829509496689
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -730,7 +784,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 858.4259999915957,
+          "wall_time_used_ms": 853.5644579678774,
           "termination": "sample-budget-completed"
         }
       }
@@ -742,26 +796,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 0,
       "planner_seed": null,
-      "pid": 88258,
+      "pid": 33812,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 444.4712500553578,
+      "process_wall_time_ms": 438.14624985679984,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-b08423d4bbdc8302f3f5",
+        "run_id": "run-ad8f64fbb283105cd75a",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 387.5196671579033,
+        "planning_time_ms": 384.2155421152711,
         "timing": {
-          "planning_ms": 387.5196671579033,
-          "setup_ms": 0.5050001200288534,
-          "search_ms": 387.01466703787446,
-          "smoothing_ms": 1.1349169071763754,
-          "validation_ms": 3.1317498069256544
+          "planning_ms": 384.2155421152711,
+          "setup_ms": 0.501709058880806,
+          "search_ms": 383.7138330563903,
+          "smoothing_ms": 1.1035841889679432,
+          "validation_ms": 3.184458240866661
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -770,7 +827,7 @@
         },
         "budget_usage": {
           "work_used": 1921,
-          "wall_time_used_ms": 387.5196671579033,
+          "wall_time_used_ms": 384.2155421152711,
           "termination": "goal-reached"
         }
       }
@@ -782,26 +839,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 1,
       "planner_seed": null,
-      "pid": 88260,
+      "pid": 33813,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 443.4324998874217,
+      "process_wall_time_ms": 436.27304094843566,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-63c49ab5ef1b49e58ad4",
+        "run_id": "run-8a253c2197d73482f229",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 387.24395795725286,
+        "planning_time_ms": 382.05145788379014,
         "timing": {
-          "planning_ms": 387.24395795725286,
-          "setup_ms": 0.5196668207645416,
-          "search_ms": 386.7242911364883,
-          "smoothing_ms": 1.1225410271435976,
-          "validation_ms": 3.120498964563012
+          "planning_ms": 382.05145788379014,
+          "setup_ms": 0.5069999024271965,
+          "search_ms": 381.54445798136294,
+          "smoothing_ms": 1.1141251306980848,
+          "validation_ms": 3.16883297637105
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -810,7 +870,7 @@
         },
         "budget_usage": {
           "work_used": 1921,
-          "wall_time_used_ms": 387.24395795725286,
+          "wall_time_used_ms": 382.05145788379014,
           "termination": "goal-reached"
         }
       }
@@ -822,26 +882,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 0,
       "planner_seed": null,
-      "pid": 88261,
+      "pid": 33814,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 375.8581660222262,
+      "process_wall_time_ms": 367.42941685952246,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-848e4bab464b1b7ae702",
+        "run_id": "run-f5ecd01f091c5a5726a4",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 320.59066696092486,
+        "planning_time_ms": 315.09566702879965,
         "timing": {
-          "planning_ms": 320.59066696092486,
-          "setup_ms": 0.5217080470174551,
-          "search_ms": 320.0689589139074,
-          "smoothing_ms": 0.8262500632554293,
-          "validation_ms": 2.4707510601729155
+          "planning_ms": 315.09566702879965,
+          "setup_ms": 0.5175420083105564,
+          "search_ms": 314.5781250204891,
+          "smoothing_ms": 0.7472920697182417,
+          "validation_ms": 2.2707502357661724
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -850,7 +913,7 @@
         },
         "budget_usage": {
           "work_used": 1645,
-          "wall_time_used_ms": 320.59066696092486,
+          "wall_time_used_ms": 315.09566702879965,
           "termination": "goal-reached"
         }
       }
@@ -862,26 +925,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 1,
       "planner_seed": null,
-      "pid": 88262,
+      "pid": 33815,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 401.5207909978926,
+      "process_wall_time_ms": 395.54024999961257,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-02c561152e1d8b2854b5",
+        "run_id": "run-ae3e6037d43d08f002e3",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 346.95570915937424,
+        "planning_time_ms": 342.474167002365,
         "timing": {
-          "planning_ms": 346.95570915937424,
-          "setup_ms": 0.56983414106071,
-          "search_ms": 346.3858750183135,
-          "smoothing_ms": 0.9930829983204603,
-          "validation_ms": 2.0880827214568853
+          "planning_ms": 342.474167002365,
+          "setup_ms": 0.5554580129683018,
+          "search_ms": 341.9187089893967,
+          "smoothing_ms": 1.0049580596387386,
+          "validation_ms": 2.05820775590837
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -890,7 +956,7 @@
         },
         "budget_usage": {
           "work_used": 1798,
-          "wall_time_used_ms": 346.95570915937424,
+          "wall_time_used_ms": 342.474167002365,
           "termination": "goal-reached"
         }
       }
@@ -902,26 +968,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 2,
       "planner_seed": null,
-      "pid": 88263,
+      "pid": 33816,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 427.75204102508724,
+      "process_wall_time_ms": 425.49358308315277,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-20c472bc198fcc126cb9",
+        "run_id": "run-9b89708bea2c49164528",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 372.95262492261827,
+        "planning_time_ms": 371.8834170140326,
         "timing": {
-          "planning_ms": 372.95262492261827,
-          "setup_ms": 0.5024578422307968,
-          "search_ms": 372.4501670803875,
-          "smoothing_ms": 0.8964999578893185,
-          "validation_ms": 2.5155418552458286
+          "planning_ms": 371.8834170140326,
+          "setup_ms": 0.5055000074207783,
+          "search_ms": 371.3779170066118,
+          "smoothing_ms": 0.8887499570846558,
+          "validation_ms": 2.50708288513124
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -930,7 +999,7 @@
         },
         "budget_usage": {
           "work_used": 2247,
-          "wall_time_used_ms": 372.95262492261827,
+          "wall_time_used_ms": 371.8834170140326,
           "termination": "goal-reached"
         }
       }
@@ -942,26 +1011,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 2,
       "planner_seed": null,
-      "pid": 88264,
+      "pid": 33817,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 371.59462505951524,
+      "process_wall_time_ms": 369.10424986854196,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-bc927138150646bead1a",
+        "run_id": "run-e3e62d70cd899423264e",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 317.06245918758214,
+        "planning_time_ms": 316.3042499218136,
         "timing": {
-          "planning_ms": 317.06245918758214,
-          "setup_ms": 0.4994170740246773,
-          "search_ms": 316.56304211355746,
-          "smoothing_ms": 0.7738748099654913,
-          "validation_ms": 2.3825832176953554
+          "planning_ms": 316.3042499218136,
+          "setup_ms": 0.5128749180585146,
+          "search_ms": 315.7913750037551,
+          "smoothing_ms": 0.7425828371196985,
+          "validation_ms": 2.283291192725301
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -970,7 +1042,7 @@
         },
         "budget_usage": {
           "work_used": 1645,
-          "wall_time_used_ms": 317.06245918758214,
+          "wall_time_used_ms": 316.3042499218136,
           "termination": "goal-reached"
         }
       }
@@ -982,26 +1054,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 0,
       "planner_seed": 17,
-      "pid": 88265,
+      "pid": 33818,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 869.4535000249743,
+      "process_wall_time_ms": 863.7518750037998,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-609c786bc032d45c7011",
+        "run_id": "run-fa2ebff03c73e1615630",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 814.5463748369366,
+        "planning_time_ms": 809.8844159394503,
         "timing": {
-          "planning_ms": 814.5463748369366,
-          "setup_ms": 0.030166935175657272,
-          "search_ms": 814.5162079017609,
-          "smoothing_ms": 1.2912920210510492,
-          "validation_ms": 2.290333155542612
+          "planning_ms": 809.8844159394503,
+          "setup_ms": 0.026499852538108826,
+          "search_ms": 809.8579160869122,
+          "smoothing_ms": 1.297457842156291,
+          "validation_ms": 2.3360000923275948
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -1010,7 +1085,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 814.5463748369366,
+          "wall_time_used_ms": 809.8844159394503,
           "termination": "sample-budget-completed"
         }
       }
@@ -1022,26 +1097,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 1,
       "planner_seed": null,
-      "pid": 88266,
+      "pid": 33820,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 118.31966694444418,
+      "process_wall_time_ms": 117.19941697083414,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-ba015ab0c561410e59af",
+        "run_id": "run-69594504d1318848b7f8",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 64.50224993750453,
+        "planning_time_ms": 64.54966706223786,
         "timing": {
-          "planning_ms": 64.50224993750453,
-          "setup_ms": 0.5728329997509718,
-          "search_ms": 63.92941693775356,
-          "smoothing_ms": 0.8484169375151396,
-          "validation_ms": 1.8971660174429417
+          "planning_ms": 64.54966706223786,
+          "setup_ms": 0.5761249922215939,
+          "search_ms": 63.973542070016265,
+          "smoothing_ms": 0.8412080351263285,
+          "validation_ms": 1.913165906444192
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1050,7 +1128,7 @@
         },
         "budget_usage": {
           "work_used": 305,
-          "wall_time_used_ms": 64.50224993750453,
+          "wall_time_used_ms": 64.54966706223786,
           "termination": "goal-reached"
         }
       }
@@ -1062,26 +1140,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 2,
       "planner_seed": null,
-      "pid": 88267,
+      "pid": 33822,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 444.26925014704466,
+      "process_wall_time_ms": 435.1272920612246,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-d8fa3bfa5ae53ea9f933",
+        "run_id": "run-0ab01bac701df3f52e9b",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 388.2046660874039,
+        "planning_time_ms": 381.0587921179831,
         "timing": {
-          "planning_ms": 388.2046660874039,
-          "setup_ms": 0.5055409856140614,
-          "search_ms": 387.69912510178983,
-          "smoothing_ms": 1.113958191126585,
-          "validation_ms": 3.3005420118570328
+          "planning_ms": 381.0587921179831,
+          "setup_ms": 0.4999591037631035,
+          "search_ms": 380.55883301422,
+          "smoothing_ms": 1.1070838663727045,
+          "validation_ms": 3.119958098977804
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1090,7 +1171,7 @@
         },
         "budget_usage": {
           "work_used": 1921,
-          "wall_time_used_ms": 388.2046660874039,
+          "wall_time_used_ms": 381.0587921179831,
           "termination": "goal-reached"
         }
       }
@@ -1102,26 +1183,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 0,
       "planner_seed": null,
-      "pid": 88268,
+      "pid": 33823,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 118.80075000226498,
+      "process_wall_time_ms": 116.77141604013741,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-9263943a02ffea3d9dce",
+        "run_id": "run-fffaf245d994e4fa5042",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 64.85904194414616,
+        "planning_time_ms": 64.40329109318554,
         "timing": {
-          "planning_ms": 64.85904194414616,
-          "setup_ms": 0.5689579993486404,
-          "search_ms": 64.29008394479752,
-          "smoothing_ms": 0.8706250227987766,
-          "validation_ms": 1.9056671299040318
+          "planning_ms": 64.40329109318554,
+          "setup_ms": 0.5653330590575933,
+          "search_ms": 63.83795803412795,
+          "smoothing_ms": 0.836291816085577,
+          "validation_ms": 1.895209075883031
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1130,7 +1214,7 @@
         },
         "budget_usage": {
           "work_used": 305,
-          "wall_time_used_ms": 64.85904194414616,
+          "wall_time_used_ms": 64.40329109318554,
           "termination": "goal-reached"
         }
       }
@@ -1142,26 +1226,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 2,
       "planner_seed": null,
-      "pid": 88269,
+      "pid": 33824,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 355.88608402758837,
+      "process_wall_time_ms": 353.5754999611527,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-2db6c7803582a60604c6",
+        "run_id": "run-d73287520e733f9fbbc3",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 300.8508749771863,
+        "planning_time_ms": 299.8652921523899,
         "timing": {
-          "planning_ms": 300.8508749771863,
-          "setup_ms": 0.5137079861015081,
-          "search_ms": 300.3371669910848,
-          "smoothing_ms": 0.9657919872552156,
-          "validation_ms": 2.799584064632654
+          "planning_ms": 299.8652921523899,
+          "setup_ms": 0.5065831355750561,
+          "search_ms": 299.3587090168148,
+          "smoothing_ms": 1.0679590050131083,
+          "validation_ms": 2.8486251831054688
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1170,7 +1257,7 @@
         },
         "budget_usage": {
           "work_used": 1241,
-          "wall_time_used_ms": 300.8508749771863,
+          "wall_time_used_ms": 299.8652921523899,
           "termination": "goal-reached"
         }
       }
@@ -1182,26 +1269,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 0,
       "planner_seed": null,
-      "pid": 88270,
+      "pid": 33825,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 142.60525000281632,
+      "process_wall_time_ms": 139.62662499397993,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-623c453041c866c1cf0e",
+        "run_id": "run-f86e1e9b650e3fff951b",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 87.57629105821252,
+        "planning_time_ms": 87.17045793309808,
         "timing": {
-          "planning_ms": 87.57629105821252,
-          "setup_ms": 0.5626659840345383,
-          "search_ms": 87.01362507417798,
-          "smoothing_ms": 1.1592090595513582,
-          "validation_ms": 2.2024160716682673
+          "planning_ms": 87.17045793309808,
+          "setup_ms": 0.5616659764200449,
+          "search_ms": 86.60879195667803,
+          "smoothing_ms": 1.1227079667150974,
+          "validation_ms": 2.07116617821157
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1210,7 +1300,7 @@
         },
         "budget_usage": {
           "work_used": 497,
-          "wall_time_used_ms": 87.57629105821252,
+          "wall_time_used_ms": 87.17045793309808,
           "termination": "goal-reached"
         }
       }
@@ -1222,26 +1312,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 1,
       "planner_seed": null,
-      "pid": 88271,
+      "pid": 33826,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 304.11995807662606,
+      "process_wall_time_ms": 305.3537090308964,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-6d71a92c4163fb9e17ae",
+        "run_id": "run-10910b521cb47e97a873",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 249.8724169563502,
+        "planning_time_ms": 251.99200003407896,
         "timing": {
-          "planning_ms": 249.8724169563502,
-          "setup_ms": 0.5624168552458286,
-          "search_ms": 249.31000010110438,
-          "smoothing_ms": 0.880667008459568,
-          "validation_ms": 1.8712910823523998
+          "planning_ms": 251.99200003407896,
+          "setup_ms": 0.576250022277236,
+          "search_ms": 251.41575001180172,
+          "smoothing_ms": 0.8793340530246496,
+          "validation_ms": 1.8712079618126154
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1250,7 +1343,7 @@
         },
         "budget_usage": {
           "work_used": 1104,
-          "wall_time_used_ms": 249.8724169563502,
+          "wall_time_used_ms": 251.99200003407896,
           "termination": "goal-reached"
         }
       }
@@ -1262,26 +1355,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 0,
       "planner_seed": null,
-      "pid": 88272,
+      "pid": 33827,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 402.17737504281104,
+      "process_wall_time_ms": 397.20450015738606,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-cebbcf6f066325ed9207",
+        "run_id": "run-e2a78f0ebd529702e7a1",
+        "run_purpose": "timing",
+        "timing_repetition": 0,
         "scene_id": "restricted-core",
+        "problem_fingerprint": "sha256:be76e250e17398b69d44b43e5630bf19b2288dc50e4ae7fc981aaea39cb72924",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 347.9903331026435,
+        "planning_time_ms": 344.21479096636176,
         "timing": {
-          "planning_ms": 347.9903331026435,
-          "setup_ms": 0.5588328931480646,
-          "search_ms": 347.4315002094954,
-          "smoothing_ms": 0.9804998990148306,
-          "validation_ms": 2.0125419832766056
+          "planning_ms": 344.21479096636176,
+          "setup_ms": 0.5584578029811382,
+          "search_ms": 343.6563331633806,
+          "smoothing_ms": 0.9856249671429396,
+          "validation_ms": 2.0299158059060574
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1290,7 +1386,7 @@
         },
         "budget_usage": {
           "work_used": 1798,
-          "wall_time_used_ms": 347.9903331026435,
+          "wall_time_used_ms": 344.21479096636176,
           "termination": "goal-reached"
         }
       }
@@ -1302,26 +1398,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 1,
       "planner_seed": null,
-      "pid": 88274,
+      "pid": 33828,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 144.28216591477394,
+      "process_wall_time_ms": 141.10337500460446,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-400062c896e720f855a7",
+        "run_id": "run-e70cc2a9fe35a33c050e",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 89.15649983100593,
+        "planning_time_ms": 87.60074991732836,
         "timing": {
-          "planning_ms": 89.15649983100593,
-          "setup_ms": 0.5641670431941748,
-          "search_ms": 88.59233278781176,
-          "smoothing_ms": 1.1442091781646013,
-          "validation_ms": 2.10687518119812
+          "planning_ms": 87.60074991732836,
+          "setup_ms": 0.5597500130534172,
+          "search_ms": 87.04099990427494,
+          "smoothing_ms": 1.1373329907655716,
+          "validation_ms": 2.117583993822336
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1330,7 +1429,7 @@
         },
         "budget_usage": {
           "work_used": 497,
-          "wall_time_used_ms": 89.15649983100593,
+          "wall_time_used_ms": 87.60074991732836,
           "termination": "goal-reached"
         }
       }
@@ -1342,26 +1441,29 @@
       "algorithm": "astar-3d",
       "timing_repetition": 1,
       "planner_seed": null,
-      "pid": 88276,
+      "pid": 33829,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 429.1782910004258,
+      "process_wall_time_ms": 423.6440409440547,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-f52bddd9651d0883670d",
+        "run_id": "run-cef56b495c67c72c85ef",
+        "run_purpose": "timing",
+        "timing_repetition": 1,
         "scene_id": "urban-canyon",
+        "problem_fingerprint": "sha256:91d7800b11953c398432ca16bbae1187fa49480a763bca67ebc8190ec09eff6e",
         "algorithm": "astar-3d",
-        "configuration_id": "astar-3d|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "astar-3d@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 374.28558291867375,
+        "planning_time_ms": 370.75983406975865,
         "timing": {
-          "planning_ms": 374.28558291867375,
-          "setup_ms": 0.49899984151124954,
-          "search_ms": 373.7865830771625,
-          "smoothing_ms": 0.8920419495552778,
-          "validation_ms": 2.534667029976845
+          "planning_ms": 370.75983406975865,
+          "setup_ms": 0.4979169461876154,
+          "search_ms": 370.26191712357104,
+          "smoothing_ms": 0.8786669932305813,
+          "validation_ms": 2.522458089515567
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1370,7 +1472,7 @@
         },
         "budget_usage": {
           "work_used": 2247,
-          "wall_time_used_ms": 374.28558291867375,
+          "wall_time_used_ms": 370.75983406975865,
           "termination": "goal-reached"
         }
       }
@@ -1382,26 +1484,29 @@
       "algorithm": "rrt-star",
       "timing_repetition": 2,
       "planner_seed": 17,
-      "pid": 88277,
+      "pid": 33830,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 1035.5496660340577,
+      "process_wall_time_ms": 1030.7465000078082,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-fd6dda8dd7fa45671e17",
+        "run_id": "run-e35cc5a140da784ad0d2",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "open-blocks",
+        "problem_fingerprint": "sha256:cd060091183221f321333a534eb2c9f42957ad18162f9d0d9f781e9696f86db5",
         "algorithm": "rrt-star",
-        "configuration_id": "rrt-star|sample-attempts=3000|wall-ms=none",
+        "configuration_id": "rrt-star@0.2.0|sample-attempts=3000|wall-ms=none|params=901d17ea1542",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 980.0252499990165,
+        "planning_time_ms": 973.7062910571694,
         "timing": {
-          "planning_ms": 980.0252499990165,
-          "setup_ms": 0.027625123038887978,
-          "search_ms": 979.9976248759776,
-          "smoothing_ms": 1.1499999091029167,
-          "validation_ms": 3.121041925624013
+          "planning_ms": 973.7062910571694,
+          "setup_ms": 0.029708025977015495,
+          "search_ms": 973.6765830311924,
+          "smoothing_ms": 1.067749923095107,
+          "validation_ms": 3.066541161388159
         },
         "budget": {
           "work_unit": "sample-attempts",
@@ -1410,7 +1515,7 @@
         },
         "budget_usage": {
           "work_used": 3000,
-          "wall_time_used_ms": 980.0252499990165,
+          "wall_time_used_ms": 973.7062910571694,
           "termination": "sample-budget-completed"
         }
       }
@@ -1422,26 +1527,29 @@
       "algorithm": "lazy-theta-star",
       "timing_repetition": 2,
       "planner_seed": null,
-      "pid": 88278,
+      "pid": 33831,
       "process_status": "completed",
       "process_returncode": 0,
-      "process_wall_time_ms": 119.6510421577841,
+      "process_wall_time_ms": 116.89729196950793,
       "stderr": null,
       "parse_error": null,
       "planner_record": {
-        "run_id": "run-16a0368e27d16252f659",
+        "run_id": "run-870be081b3beacca38bd",
+        "run_purpose": "timing",
+        "timing_repetition": 2,
         "scene_id": "vertical-gate",
+        "problem_fingerprint": "sha256:20c84cd97e1fec8d28b8e5aaa18b5a50b8e2252b75c14ad63f2ee7c32003aaa0",
         "algorithm": "lazy-theta-star",
-        "configuration_id": "lazy-theta-star|resolution=4|expanded-nodes=120000|wall-ms=none",
+        "configuration_id": "lazy-theta-star@0.2.0|resolution=4|expanded-nodes=120000|wall-ms=none|params=7de53e9d0e62",
         "status": "success",
         "failure_reason": null,
-        "planning_time_ms": 65.50404196605086,
+        "planning_time_ms": 64.18670807033777,
         "timing": {
-          "planning_ms": 65.50404196605086,
-          "setup_ms": 0.5807499401271343,
-          "search_ms": 64.92329202592373,
-          "smoothing_ms": 0.8435409981757402,
-          "validation_ms": 1.912000123411417
+          "planning_ms": 64.18670807033777,
+          "setup_ms": 0.5752078723162413,
+          "search_ms": 63.61150019802153,
+          "smoothing_ms": 0.8367500267922878,
+          "validation_ms": 1.8987918738275766
         },
         "budget": {
           "work_unit": "expanded-nodes",
@@ -1450,7 +1558,7 @@
         },
         "budget_usage": {
           "work_used": 305,
-          "wall_time_used_ms": 65.50404196605086,
+          "wall_time_used_ms": 64.18670807033777,
           "termination": "goal-reached"
         }
       }

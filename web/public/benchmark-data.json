@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-05T06:09:25+00:00",
+  "generatedAt": "2026-08-05T07:03:32+00:00",
   "evidenceLabel": "DESCRIPTIVE_BENCHMARK",
-  "sourceCommit": "worktree-v0.2.0",
+  "sourceCommit": "cfe9c377cfa3b8a496c794df0f3619ade81e6e3f",
   "protocol": {
     "id": "static-city-descriptive-v2",
     "rawPathPrimary": true,
@@ -16,6 +16,16 @@
     "timing": {
       "isolatedProcesses": true,
       "repetitionsPerCell": 3
+    },
+    "quality": {
+      "deterministicRunsPerScene": 1,
+      "rrtPlannerSeeds": [
+        11,
+        23,
+        37,
+        47,
+        59
+      ]
     }
   },
   "dataset": {
@@ -153,18 +163,20 @@
         "ci95Low": 1.0,
         "ci95High": 1.0,
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 4,
         "nSuccesses": 4
       },
       "planningTimeMs": {
         "estimator": "median-of-scene-medians",
-        "median": 360.620646039024,
-        "q1": 282.2517401073128,
-        "q3": 377.59410397848114,
-        "ci95Low": 88.13983295112848,
-        "ci95High": 387.5196671579033,
+        "median": 357.6851875986904,
+        "q1": 279.4767603627406,
+        "q3": 374.425427231472,
+        "ci95Low": 87.44616690091789,
+        "ci95High": 382.05145788379014,
         "conditioning": "all-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 12,
         "nSuccesses": 12
       },
@@ -177,6 +189,7 @@
         "ci95High": 54.701204924793956,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 4,
         "nSuccesses": 4
       },
@@ -189,6 +202,7 @@
         "ci95High": 43.37417564661767,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 4,
         "nSuccesses": 4
       },
@@ -201,6 +215,7 @@
         "ci95High": 2.8211297995183426,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 4,
         "nSuccesses": 4
       }
@@ -214,18 +229,20 @@
         "ci95Low": 1.0,
         "ci95High": 1.0,
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 4,
         "nSuccesses": 4
       },
       "planningTimeMs": {
         "estimator": "median-of-scene-medians",
-        "median": 275.41364601347595,
-        "q1": 203.6190732032992,
-        "q3": 305.2458540769294,
-        "ci95Low": 64.85904194414616,
-        "ci95High": 318.11879109591246,
+        "median": 275.07712494116277,
+        "q1": 204.01132246479392,
+        "q3": 303.4791044774465,
+        "ci95Low": 64.40329109318554,
+        "ci95High": 315.09566702879965,
         "conditioning": "all-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 12,
         "nSuccesses": 12
       },
@@ -238,6 +255,7 @@
         "ci95High": 43.01965135585941,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 4,
         "nSuccesses": 4
       },
@@ -250,6 +268,7 @@
         "ci95High": 42.61375650704204,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 4,
         "nSuccesses": 4
       },
@@ -262,6 +281,7 @@
         "ci95High": 1.521674927209113,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 4,
         "nSuccesses": 4
       }
@@ -275,18 +295,20 @@
         "ci95Low": 1.0,
         "ci95High": 1.0,
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 20,
         "nSuccesses": 20
       },
       "planningTimeMs": {
         "estimator": "median-of-scene-medians",
-        "median": 836.1605625832453,
-        "q1": 778.9001044002362,
-        "q3": 889.0622499748133,
-        "ci95Low": 673.9150420762599,
-        "ci95High": 980.970999924466,
+        "median": 832.9470829339698,
+        "q1": 775.8369683870114,
+        "q3": 882.5421039946377,
+        "ci95Low": 666.3587498478591,
+        "ci95High": 969.4750420749187,
         "conditioning": "all-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 12,
         "nSuccesses": 12
       },
@@ -299,6 +321,7 @@
         "ci95High": 73.13234063410374,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 20,
         "nSuccesses": 20
       },
@@ -311,6 +334,7 @@
         "ci95High": 62.02369601909532,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 20,
         "nSuccesses": 20
       },
@@ -323,6 +347,7 @@
         "ci95High": 1.6701861998637915,
         "conditioning": "successful-runs",
         "nScenes": 4,
+        "nDefinedScenes": 4,
         "nRuns": 20,
         "nSuccesses": 20
       }
@@ -342,6 +367,7 @@
           "ci95High": 55.62062472967708,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 4,
           "nSuccesses": 4
         }
@@ -358,6 +384,7 @@
           "ci95High": 54.701204924793956,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 4,
           "nSuccesses": 4
         }
@@ -374,6 +401,7 @@
           "ci95High": 60.916655010543884,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 4,
           "nSuccesses": 4
         }
@@ -390,6 +418,7 @@
           "ci95High": 63.57472064455671,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 4,
           "nSuccesses": 4
         }
@@ -406,6 +435,7 @@
           "ci95High": 44.34997216639758,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 4,
           "nSuccesses": 4
         }
@@ -422,6 +452,7 @@
           "ci95High": 43.01965135585941,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 4,
           "nSuccesses": 4
         }
@@ -438,6 +469,7 @@
           "ci95High": 49.08366284636183,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 4,
           "nSuccesses": 4
         }
@@ -454,6 +486,7 @@
           "ci95High": 50.817032349888635,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 4,
           "nSuccesses": 4
         }
@@ -471,6 +504,7 @@
           "ci95High": 92.26592494610082,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 3,
           "nRuns": 20,
           "nSuccesses": 9
         }
@@ -486,6 +520,7 @@
           "ci95High": 86.19816484737974,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 20,
           "nSuccesses": 16
         }
@@ -501,6 +536,7 @@
           "ci95High": 76.3789630163084,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 20,
           "nSuccesses": 20
         }
@@ -516,6 +552,7 @@
           "ci95High": 74.83966326088594,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 20,
           "nSuccesses": 20
         }
@@ -531,6 +568,7 @@
           "ci95High": 73.13234063410381,
           "conditioning": "successful-runs",
           "nScenes": 4,
+          "nDefinedScenes": 4,
           "nRuns": 20,
           "nSuccesses": 20
         }
@@ -538,9 +576,25 @@
     ]
   },
   "downloads": {
-    "recordsCsv": "benchmark-records.csv",
-    "summariesCsv": "benchmark-summary.csv",
-    "datasetManifest": "dataset-manifest.json",
-    "timingManifest": "timing-manifest.json"
+    "recordsCsv": {
+      "path": "benchmark-records.csv",
+      "sha256": "sha256:f851ea10fcc7c9d45a733d6c600c456836fc356af23577e0b395ca30caf88689",
+      "bytes": 48476
+    },
+    "summariesCsv": {
+      "path": "benchmark-summary.csv",
+      "sha256": "sha256:16e75627925513a1a3336aa068d2fb7053afd5eee067e6fa004b25ff8e9c256f",
+      "bytes": 959
+    },
+    "datasetManifest": {
+      "path": "dataset-manifest.json",
+      "sha256": "sha256:bda5e674b8ef454c008fed5d7898fe5dad86c212398bde1bd81faf97903353c5",
+      "bytes": 964
+    },
+    "timingManifest": {
+      "path": "timing-manifest.json",
+      "sha256": "sha256:16529de781920a4260bc632b939e268396d8d517e44a1cdfe858e008cd193304",
+      "bytes": 54204
+    }
   }
 }
