@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Recorded comparison of reactive and predictive UAV planning in time-varying three-dimensional urban environments."
+      content="Recorded comparison of reactive and predictive UAV planning in layered three-dimensional urban environments."
     />
     <title>Predictive space–time planning — UAV 3D Planner Lab</title>
   </head>
@@ -20,102 +20,203 @@
 
       <header class="predictive-masthead">
         <div>
-          <p class="eyebrow">Recorded space–time planning study</p>
+          <p class="eyebrow">Experiment P5 · recorded deterministic study</p>
           <h1>Predictive space–time planning</h1>
           <p class="scope">
-            Reactive and predictive trajectories under shared temporary restrictions and moving-obstacle schedules.
+            Reactive and forecast-aware trajectories in layered urban geometry, shown as certified
+            recorded evidence rather than live planner output.
           </p>
         </div>
-        <p class="evidence-label">Recorded deterministic traces · non-confirmatory</p>
+        <p class="evidence-label">Non-confirmatory · raw paths retained</p>
       </header>
 
       <p id="load-state" class="load-state" role="status" aria-live="polite">
         Loading recorded predictive traces…
       </p>
 
-      <section class="selection-controls" aria-label="Trace selection and camera view">
-        <label>
-          <span>Scenario</span>
-          <select id="scenario-select"></select>
-        </label>
-        <label>
-          <span>Planner</span>
-          <select id="planner-select"></select>
-        </label>
-        <div class="view-controls" aria-label="Camera view">
-          <span>View</span>
-          <button type="button" data-view="isometric">Isometric</button>
-          <button type="button" data-view="top">Top</button>
-          <button type="button" data-view="reset">Reset</button>
+      <section class="experiment-plate" aria-labelledby="figure-one-heading">
+        <header class="plate-header">
+          <div class="plate-title">
+            <p class="figure-number">Figure 1</p>
+            <div>
+              <h2 id="figure-one-heading">Space–time trajectory replay</h2>
+              <p>Geometry, restrictions, moving hazards, and the selected execution record.</p>
+            </div>
+          </div>
+          <div class="selection-controls" aria-label="Trace selection">
+            <label>
+              <span>Scenario</span>
+              <select id="scenario-select"></select>
+            </label>
+            <label>
+              <span>Planner</span>
+              <select id="planner-select"></select>
+            </label>
+          </div>
+        </header>
+
+        <div class="figure-grid">
+          <figure class="scene-panel" aria-labelledby="scene-panel-heading">
+            <header class="panel-heading">
+              <div>
+                <span class="panel-letter" aria-hidden="true">A</span>
+                <h3 id="scene-panel-heading">Urban flight volume</h3>
+              </div>
+              <div class="compact-controls">
+                <div class="segmented-control" aria-label="Trajectory geometry">
+                  <button type="button" data-path-mode="raw" aria-pressed="false">Raw</button>
+                  <button type="button" data-path-mode="certified" aria-pressed="true">
+                    Certified
+                  </button>
+                </div>
+                <div class="view-controls" aria-label="Camera projection">
+                  <button type="button" data-view="isometric" aria-pressed="true">ISO</button>
+                  <button type="button" data-view="xy" aria-pressed="false">XY</button>
+                  <button type="button" data-view="xz" aria-pressed="false">XZ</button>
+                  <button type="button" data-view="yz" aria-pressed="false">YZ</button>
+                  <button type="button" data-view="fit" aria-label="Fit scene to view">Fit</button>
+                </div>
+              </div>
+            </header>
+
+            <div class="viewer-shell">
+              <div
+                id="predictive-viewer"
+                class="predictive-viewer"
+                role="img"
+                aria-label="Three-dimensional predictive planning replay"
+              ></div>
+              <div class="orientation-reference" aria-hidden="true">
+                <span class="north-mark">N</span>
+                <span>ENU coordinates</span>
+              </div>
+              <p id="canvas-summary" class="sr-only"></p>
+            </div>
+
+            <div class="playback-controls" aria-label="Playback controls">
+              <div class="button-group">
+                <button id="previous-frame" type="button" aria-label="Previous recorded event">
+                  Previous event
+                </button>
+                <button id="play-pause" type="button" aria-pressed="false">Play</button>
+                <button id="next-frame" type="button" aria-label="Next recorded event">
+                  Next event
+                </button>
+              </div>
+              <div class="speed-control" aria-label="Playback speed">
+                <span>Speed</span>
+                <button type="button" data-speed="0.5" aria-pressed="false">0.5×</button>
+                <button type="button" data-speed="1" aria-pressed="true">1×</button>
+                <button type="button" data-speed="2" aria-pressed="false">2×</button>
+              </div>
+              <label class="timeline-control" for="timeline">
+                <span>Time <output id="timeline-value" for="timeline">0.0 s</output></span>
+                <input id="timeline" type="range" min="0" max="0" step="0.05" value="0" />
+              </label>
+              <div class="event-strip" aria-labelledby="event-strip-heading">
+                <span id="event-strip-heading">Recorded events</span>
+                <div id="event-axis" class="event-axis"></div>
+              </div>
+            </div>
+
+            <figcaption>
+              <div class="legend" aria-label="Figure legend">
+                <span class="legend-item raw"><i aria-hidden="true"></i>Raw lattice path</span>
+                <span class="legend-item planned"><i aria-hidden="true"></i>Selected trajectory</span>
+                <span class="legend-item executed"><i aria-hidden="true"></i>Executed prefix</span>
+                <span class="legend-item restricted"><i aria-hidden="true"></i>Restricted volume</span>
+                <span class="legend-item moving"><i aria-hidden="true"></i>Moving hazard</span>
+              </div>
+              <p id="scene-caption"></p>
+            </figcaption>
+          </figure>
+
+          <aside class="inspection-panel" aria-labelledby="inspection-heading">
+            <header class="panel-heading">
+              <div>
+                <span class="panel-letter" aria-hidden="true">B</span>
+                <h3 id="inspection-heading">Recorded state</h3>
+              </div>
+              <span id="run-status" class="run-status">—</span>
+            </header>
+
+            <section aria-labelledby="scenario-summary-heading">
+              <h4 id="scenario-summary-heading">Environment</h4>
+              <p id="scenario-description" class="panel-copy"></p>
+              <dl id="scenario-meta" class="evidence-list"></dl>
+            </section>
+
+            <section aria-labelledby="state-summary-heading">
+              <h4 id="state-summary-heading">Current state</h4>
+              <dl id="current-meta" class="evidence-list"></dl>
+              <p id="current-event" class="current-event">No recorded event at this time.</p>
+            </section>
+
+            <section aria-labelledby="smoothing-summary-heading">
+              <h4 id="smoothing-summary-heading">Trajectory post-processing</h4>
+              <dl id="smoothing-meta" class="evidence-list"></dl>
+              <p id="smoothing-note" class="panel-note"></p>
+            </section>
+
+            <fieldset class="layer-controls">
+              <legend>Visible layers</legend>
+              <label><input type="checkbox" data-layer="buildings" checked /> Buildings</label>
+              <label><input type="checkbox" data-layer="zones" checked /> Restricted volumes</label>
+              <label><input type="checkbox" data-layer="dynamic" checked /> Dynamic hazards</label>
+              <label><input type="checkbox" data-layer="raw" /> Raw reference overlay</label>
+            </fieldset>
+          </aside>
         </div>
       </section>
 
-      <figure class="predictive-figure">
-        <div
-          id="predictive-viewer"
-          class="predictive-viewer"
-          role="img"
-          aria-label="Three-dimensional predictive planning replay"
-        ></div>
-        <div class="playback-controls" aria-label="Playback controls">
-          <div class="button-group">
-            <button id="previous-frame" type="button" aria-label="Previous frame">Previous</button>
-            <button id="play-pause" type="button" aria-pressed="false">Play</button>
-            <button id="next-frame" type="button" aria-label="Next frame">Next</button>
-          </div>
-          <label class="timeline-control" for="timeline">
-            <span>Time <output id="timeline-value" for="timeline">0.0 s</output></span>
-            <input id="timeline" type="range" min="0" max="0" step="1" value="0" />
-          </label>
-        </div>
-        <div class="event-strip" aria-labelledby="event-strip-heading">
-          <span id="event-strip-heading">Recorded events</span>
-          <div id="event-axis" class="event-axis"></div>
-        </div>
-        <figcaption>
-          <div class="legend" aria-label="Figure legend">
-            <span class="legend-item scheduled"><i aria-hidden="true"></i>Timed trajectory</span>
-            <span class="legend-item planned"><i aria-hidden="true"></i>Current plan</span>
-            <span class="legend-item executed"><i aria-hidden="true"></i>Executed trajectory</span>
-            <span class="legend-item temporary"><i aria-hidden="true"></i>Active temporary zone</span>
-            <span class="legend-item moving"><i aria-hidden="true"></i>Moving obstacle</span>
-            <span class="legend-item vehicle"><i aria-hidden="true"></i>Vehicle</span>
-          </div>
-          <p id="scene-caption"></p>
-        </figcaption>
-      </figure>
-
-      <section class="trace-section" aria-labelledby="trace-heading">
+      <section class="trace-section" aria-labelledby="figure-two-heading">
         <header class="section-heading">
-          <h2 id="trace-heading">Time–height trace</h2>
+          <div>
+            <p class="figure-number">Figure 2</p>
+            <h2 id="figure-two-heading">Trajectory profile</h2>
+          </div>
           <p id="frame-summary">Select a recorded trace.</p>
         </header>
-        <div id="altitude-chart" class="altitude-chart"></div>
+        <div class="chart-grid">
+          <figure class="chart-panel">
+            <figcaption>Altitude over mission time</figcaption>
+            <div id="altitude-chart" class="trajectory-chart"></div>
+          </figure>
+          <figure class="chart-panel">
+            <figcaption>Local turn angle along the trajectory</figcaption>
+            <div id="turn-chart" class="trajectory-chart"></div>
+          </figure>
+        </div>
         <p class="chart-note">
-          The line is the recorded timed trajectory; shaded intervals indicate stationary time.
+          Lines use exported polyline samples only. No browser-side spline interpolation is applied.
         </p>
       </section>
 
       <section class="comparison-section" aria-labelledby="comparison-heading">
         <header class="section-heading">
-          <h2 id="comparison-heading">Scenario comparison</h2>
-          <p>One deterministic trace per planner under the same geometry and event schedule.</p>
+          <div>
+            <p class="figure-number">Table 1</p>
+            <h2 id="comparison-heading">Scenario comparison</h2>
+          </div>
+          <p>Select a row to inspect its recorded trajectory.</p>
         </header>
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" aria-label="Scrollable planner comparison table">
           <table class="comparison-table">
             <caption>
-              Expanded work retains its declared unit; node expansions, queue pops, and space–time states are not directly equivalent. Minimum separation is not recorded in v0.4.
+              Planning-work units retain algorithm-specific meanings and are not normalized across
+              conditions. Minimum separation remains unavailable unless explicitly recorded.
             </caption>
             <thead>
               <tr>
                 <th scope="col">Planner</th>
-                <th scope="col">Predictive</th>
+                <th scope="col">Forecast</th>
                 <th scope="col">Status</th>
                 <th scope="col">Arrival (s)</th>
-                <th scope="col">Total stationary time (s)</th>
+                <th scope="col">Stationary (s)</th>
                 <th scope="col">Path (m)</th>
-                <th scope="col">Min. separation (not recorded)</th>
-                <th scope="col">Safety violations</th>
+                <th scope="col">Post-process</th>
+                <th scope="col">Peak turn</th>
+                <th scope="col">Safety</th>
                 <th scope="col">Planning work</th>
               </tr>
             </thead>

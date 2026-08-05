@@ -53,6 +53,21 @@ The v0.4 public bundle is a 24-run non-confirmatory diagnostic. It assumes a com
 forecast and reports Space-Time A* as earliest-arrival only on the declared spatial/time lattice.
 Total stationary time includes separately labelled endpoint time-lattice alignment waits.
 
+## v0.5 — complex-city trajectory study (released)
+
+- eight outcome-independent predictive scenarios across calibration, demo, and diagnostic cohorts;
+- seven complex maps with 14–16 unequal-height buildings, static no-fly volumes, temporary
+  restrictions, and moving hazards;
+- raw planner paths retained beside a common wait-preserving circular-fillet post-processor;
+- deterministic radius fallback plus continuous space-time and speed certification for every
+  published execution segment;
+- a schema-v2, 32-run public bundle with compact semantic event frames;
+- a redesigned academic figure with raw/certified comparison, continuous playback, orthographic
+  views, semantic layers, outcome tables, and provenance downloads.
+
+The v0.5 public bundle remains non-confirmatory and is not pooled with v0.4. Rounded output is a
+dense piecewise-linear geometric path, not a kinodynamic or minimum-snap trajectory.
+
 ## Later, deliberately separate
 
 - kinodynamic planning and vehicle attitude constraints;

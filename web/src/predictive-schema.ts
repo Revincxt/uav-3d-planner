@@ -41,6 +41,7 @@ export interface PredictiveProtocol {
   predictionHorizonS: number;
   reactiveMaxWorkPerReplan: number;
   predictiveMaxExpandedStatesPerMission: number;
+  trajectoryPostprocessor: string;
 }
 
 export interface TimedWaypoint {
@@ -74,11 +75,23 @@ export interface PredictiveEvent {
 export interface PredictiveFrame {
   timeS: number;
   vehicle: Vec3;
-  path: Vec3[];
-  executedPath: Vec3[];
   activeTemporaryZoneIds: string[];
   movingSpheres: MovingSphereState[];
   event: PredictiveEvent | null;
+}
+
+export interface PredictiveSmoothing {
+  method: string;
+  applied: boolean;
+  certified: boolean;
+  rawWaypointCount: number;
+  outputWaypointCount: number;
+  roundedCornerCount: number;
+  requestedTurnRadiusM: number;
+  appliedTurnRadiusM: number | null;
+  sampleSpacingM: number;
+  maxTurnAngleBeforeDeg: number | null;
+  maxTurnAngleAfterDeg: number | null;
 }
 
 export interface PredictiveRunMetrics {
@@ -104,7 +117,9 @@ export interface PredictiveRun {
   status: "success" | "no-path" | "timeout" | "invalid";
   failureReason: string | null;
   parameters: Record<string, number>;
+  rawTimedPath: TimedWaypoint[];
   timedPath: TimedWaypoint[];
+  smoothing: PredictiveSmoothing;
   waitIntervals: WaitInterval[];
   metrics: PredictiveRunMetrics;
   frames: PredictiveFrame[];
@@ -123,6 +138,12 @@ export interface PredictiveScenario {
     vehicleRadiusM: number;
     safetyMarginM: number;
   };
+  environment: {
+    district: string;
+    streetPattern: string;
+    buildingCount: number;
+    hazardCount: number;
+  };
   buildings: Building[];
   staticNoFlyZones: StaticNoFlyZone[];
   temporaryNoFlyZones: TemporaryNoFlyZone[];
@@ -130,8 +151,8 @@ export interface PredictiveScenario {
   runs: PredictiveRun[];
 }
 
-export interface PredictiveBundleV1 {
-  schemaVersion: 1;
+export interface PredictiveBundleV2 {
+  schemaVersion: 2;
   generatedAt: string;
   sourceCommit: string;
   verificationStatus: "PREDICTIVE_DEMO_NON_CONFIRMATORY";
@@ -143,3 +164,5 @@ export interface PredictiveBundleV1 {
     scenarioManifest: ArtifactReference & { path: "predictive-scenario-manifest.json" };
   };
 }
+
+export type PredictivePathMode = "raw" | "certified";

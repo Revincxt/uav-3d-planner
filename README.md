@@ -8,9 +8,11 @@
 A dependency-free Python benchmark for collision-aware UAV planning in three-dimensional cities.
 The static study compares **3D A\***, **Lazy Theta\***, and **RRT\***; the separate dynamic study
 compares repeated A*, repeated Lazy Theta*, and state-reusing **3D D* Lite** under deterministic
-temporary restrictions and moving obstacles. The v0.4 predictive study adds **4D Space-Time A\***
-with explicit waits and compares complete schedule access against reactive snapshots. Every study
-uses explicit contracts, continuous collision checks, reproducible records, and independent release
+temporary restrictions and moving obstacles. The predictive study adds **4D Space-Time A\*** with
+explicit waits and compares complete schedule access against reactive snapshots. Version 0.5 moves
+that comparison into eight denser urban missions and adds a common, collision-certified
+circular-fillet post-processor while preserving each planner's raw timed path. Every study uses
+explicit contracts, continuous collision checks, reproducible records, and independent release
 audits.
 
 **Web study:** [recorded paths](https://revincxt.github.io/uav-3d-planner-lab/) ·
@@ -30,9 +32,11 @@ The v0.3 extension asks a separate question: when the same deterministic obstacl
 presented to every planner, how do cold-start and state-reusing geometric replanners differ in
 mission outcome, route stability, and algorithm-specific work?
 
-The v0.4 extension asks whether complete deterministic look-ahead can avoid late holds, detours, or
-no-safe-action outcomes produced by snapshot-only planning, while separately controlling D* Lite
-state reuse with reset and reuse conditions.
+The predictive extension asks whether complete deterministic look-ahead can avoid late holds,
+detours, or no-safe-action outcomes produced by snapshot-only planning, while separately
+controlling D* Lite state reuse with reset and reuse conditions. Version 0.5 changes the environment
+and presentation, not that causal boundary: it asks the same descriptive question in more
+structured city geometry and reports raw and certified execution polylines separately.
 
 | Planner | Search space | Characteristic | Reproducibility |
 | --- | --- | --- | --- |
@@ -77,9 +81,11 @@ Dynamic episodes are kept separate from the static cohort:
 - `closing-gate` — a scheduled restriction closes an urban passage.
 - `vertical-escape` — a temporary low-altitude block rewards a vertical response.
 
-The v0.4 predictive cohort contains six curated deterministic episodes: `wait-then-straight`,
-`closing-window`, `periodic-traffic`, `chained-restrictions`, `multi-obstacle`, and
-`vertical-time-window`. Scenario acceptance is based on construction contracts, never planner
+The v0.5 predictive cohort contains eight curated deterministic episodes: `wait-then-straight`,
+`closing-window`, `periodic-traffic`, `chained-restrictions`, `multi-obstacle`,
+`vertical-time-window`, `urban-canyon-merge`, and `rooftop-transfer`. Except for the calibration
+case, each map contains 14–16 unequal-height buildings, a static no-fly zone, and at least two
+scheduled or moving hazards. Scenario acceptance is based on construction contracts, never planner
 outcome. These are diagnostic cases in this source revision, not preregistered held-out data.
 
 Scene distances use metres in an ENU frame. A spherical UAV is represented conservatively by inflating every obstacle by `vehicle radius + safety margin` and shrinking the flight boundary by the same amount.
@@ -151,12 +157,12 @@ The simulator uses a deterministic clock, constant cruise speed, scheduled repla
 continuous space-time gate before executing every segment. Its committed records contain no
 machine-dependent planner timing; use algorithm-specific work counters for replayable diagnostics.
 
-Inspect and run the v0.4 predictive protocol:
+Inspect and run the v0.5 predictive protocol:
 
 ```bash
 uav3d predictive list
 uav3d predictive plan \
-  --scenario wait-then-straight \
+  --scenario urban-canyon-merge \
   --algorithm space-time-astar-4d \
   --output artifacts/predictive-run.json
 
@@ -167,7 +173,8 @@ uav3d export-predictive \
 
 Space-Time A* is earliest-arrival on its declared `4 m × 0.5 s` lattice, not in continuous
 state-time space. Public `waitTimeS` is total stationary time and includes separately labelled
-time-lattice alignment waits.
+time-lattice alignment waits. The exported `rawTimedPath` is the planner/simulator result;
+`timedPath` is the common certified dense polyline used for execution and display.
 
 ## Web studies
 
@@ -175,8 +182,10 @@ The Vite application has four restrained academic views. The static trajectory v
 to inspect recorded paths. The results view uses accessible inline SVG to show voxel-resolution and
 RRT* budget sensitivity. The dynamic view synchronizes a Three.js scene with play, pause, stepping,
 scrubbing, event annotations, current plans, executed prefixes, and exact outcome tables. The
-predictive view adds a time-height trace, explicit wait intervals, paired planner outcomes, and
-provenance downloads. No planner runs in the browser.
+predictive view is a restrained research figure with eight selectable city missions, raw/certified
+trajectory comparison, orthographic and isometric views, a continuous timeline, layer controls,
+algorithm outcomes, smoothing diagnostics, and provenance downloads. No planner or trajectory
+smoother runs in the browser.
 
 ```bash
 cd web
@@ -210,6 +219,8 @@ run, sample-count, timing, and summary identities.
   never presented as equivalent units.
 - Predictive contrasts use the scenario fingerprint as the independent unit. Frames, waits, and
   replanning epochs are not counted as samples.
+- The v0.5 predictive cohort and protocol differ from v0.4, so their runs are not pooled. All eight
+  scenarios are accepted before any planner outcome is observed.
 - The reactive conditions use 26-connected snapshot graphs, a 1 s execution clock, periodic
   replanning, and a per-replan work cap. Space-Time A* uses a six-connected 0.5 s lattice, plans once
   from the complete schedule, and has a per-mission expansion cap. Their comparison describes the
@@ -232,6 +243,10 @@ run, sample-count, timing, and summary identities.
   trigger one immediate replan and can become a hold only when remaining stationary is safe.
 - Space-Time A* audits every movement, explicit wait, and exact endpoint connector against the same
   continuous space-time predicates used by the independent release validator.
+- Predictive corner rounding is a common downstream geometric operation. Wait timestamps and
+  mission endpoints are preserved, radius candidates fall back deterministically, and every dense
+  linear space-time segment is re-audited. The result does not certify attitude, acceleration,
+  curvature continuity, or jerk.
 
 See [Methodology](docs/methodology.md) for definitions, assumptions, statistical estimands, and
 comparison limits.
@@ -268,10 +283,12 @@ docs/                  methodology, schemas, and roadmap
 
 ## Current limits
 
-Version `0.4.0` supports deterministic complete-schedule prediction on a finite 4D lattice while
-retaining a spherical vehicle and constant-speed geometric motion. Its six-scenario, 24-run bundle
-is non-confirmatory. It does not model attitude, acceleration, wind, sensing or forecast
-uncertainty, energy, minimum-snap trajectories, PX4/MAVLink export, or regulatory compliance.
+Version `0.5.0` supports deterministic complete-schedule prediction on a finite 4D lattice while
+retaining a spherical vehicle and geometric motion bounded by the declared cruise speed. Its
+eight-scenario, 32-run complex-city bundle is non-confirmatory. The certified rounded trajectory is
+still a dense piecewise-linear path; the project does not model attitude, acceleration, wind,
+sensing or forecast uncertainty, energy, minimum-snap trajectories, PX4/MAVLink export, or
+regulatory compliance.
 
 Planned extensions are listed in the [roadmap](docs/roadmap.md). Kinodynamic trajectory generation,
 uncertain prediction, and flight-stack integration remain separate experiments so they do not blur

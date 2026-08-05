@@ -137,27 +137,38 @@ and cross-checks the CSV and manifest.
 
 ## Predictive path and Web bundle
 
-`predictive-run-v1` contains a semantic dynamic-scenario fingerprint, one of four planner-condition
-IDs, numeric protocol parameters, a timestamped path, and mission metrics. `TimedPath` timestamps
-must increase strictly. Its first action is `start`; each later segment is explicitly classified as
-`move` or `wait`, and that classification must agree with its endpoint positions.
+`predictive-run-v2` contains a semantic dynamic-scenario fingerprint, one of four planner-condition
+IDs, numeric protocol parameters, a raw timestamped planner path, a certified timestamped execution
+path, smoothing diagnostics, and mission metrics. `TimedPath` timestamps must increase strictly.
+Its first action is `start`; each later segment is explicitly classified as `move` or `wait`, and
+that classification must agree with its endpoint positions.
 
-`web/public/predictive-data.json` is schema version `1` with the verification status
-`PREDICTIVE_DEMO_NON_CONFIRMATORY`. It contains six scenarios and one run for each condition:
+`web/public/predictive-data.json` is schema version `2` with the verification status
+`PREDICTIVE_DEMO_NON_CONFIRMATORY`. It contains eight scenarios and one run for each condition:
 
 - repeated 3D A*;
 - D* Lite reset at every epoch;
 - D* Lite with state reuse;
 - 4D Space-Time A* with the complete deterministic schedule.
 
-Every run exports the complete timed path, explicit wait intervals and their reasons, mission
-metrics, and presentation frames containing the vehicle, remaining path, executed prefix, active
-temporary zones, moving-sphere states, and event annotation. `waitTimeS` is total stationary time;
-short time-lattice alignment waits are not represented as policy waits. Work units are carried in
-each metric record and are not normalized across algorithms.
+Every run exports `rawTimedPath` and `timedPath`. The former is the direct planner/simulator output;
+the latter is either a common sampled circular-fillet polyline that passed the continuous
+space-time audit or an explicit certified raw fallback. The smoothing object records the method,
+certification state, input/output waypoint counts, rounded-corner count, requested/applied radius,
+sample spacing, and maximum sampled turn angle before and after processing. Wait blocks are hard
+boundaries: their positions and absolute timestamps are preserved.
+
+Explicit wait intervals retain their reasons. `waitTimeS` is total stationary time, including short
+time-lattice alignment waits. Work units are carried in each metric record and are not normalized
+across algorithms. Compact presentation frames retain only semantic event anchors: timestamp,
+vehicle position, active temporary-zone IDs, moving-sphere states, and event annotation. Path arrays
+and uneventful dense smoothing samples are not duplicated inside frames; the Web client derives
+continuous positions, prefixes, and suffixes from `timedPath`.
 
 The bundle references `predictive-records.csv` and `predictive-scenario-manifest.json` by byte size
-and SHA-256. Python reruns all 24 deterministic missions, collision-audits every timestamped segment,
-and cross-checks the JSON/CSV/manifest identities. JavaScript independently validates structural
-geometry bounds, temporal order, endpoints, wait intervals, frames, metrics, digests, and run-count
-invariants; it does not repeat the continuous collision calculation.
+and SHA-256. Python reruns all 32 deterministic missions, independently collision-audits both raw
+and certified timestamped paths, and cross-checks the JSON/CSV/manifest identities. JavaScript
+independently validates structural geometry bounds, temporal order, endpoints, waits, smoothing,
+frames, metrics, digests, and run-count invariants; it does not repeat the continuous collision
+calculation. Predictive public floats are rounded to eleven decimal places at the serialization
+boundary so platform-level `libm` drift cannot change deterministic evidence bytes.

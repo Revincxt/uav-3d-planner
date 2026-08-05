@@ -143,6 +143,10 @@ function parseProtocol(value) {
       entry.predictiveMaxExpandedStatesPerMission,
       "protocol.predictiveMaxExpandedStatesPerMission",
     ),
+    trajectoryPostprocessor: text(
+      entry.trajectoryPostprocessor,
+      "protocol.trajectoryPostprocessor",
+    ),
   };
   if (protocol.timeResolutionS > protocol.planningHorizonS) {
     fail("protocol.timeResolutionS cannot exceed planningHorizonS");
@@ -229,14 +233,6 @@ function interpolate(points, timeS) {
   return last.position;
 }
 
-function spatialPath(value, label, bounds) {
-  return list(value, label).map((raw, index) => {
-    const point = vec3(raw, `${label}[${index}]`);
-    if (!inBounds(point, bounds)) fail(`${label}[${index}] is outside scenario bounds`);
-    return point;
-  });
-}
-
 function timedPath(value, label, bounds) {
   const points = list(value, label).map((raw, index) => {
     const entry = object(raw, `${label}[${index}]`);
@@ -253,6 +249,16 @@ function timedPath(value, label, bounds) {
     }
   }
   return points;
+}
+
+function sameTimedPath(left, right) {
+  return (
+    left.length === right.length &&
+    left.every(
+      (point, index) =>
+        sameNumber(point.timeS, right[index].timeS) && samePoint(point.position, right[index].position),
+    )
+  );
 }
 
 function waitIntervals(value, label, bounds, points) {
@@ -316,21 +322,12 @@ function parseEvent(value, label) {
 
 function frame(value, label, scenario) {
   const entry = object(value, label);
+  if ("path" in entry || "executedPath" in entry) {
+    fail(`${label} must not duplicate O(N) path geometry`);
+  }
   const timeS = nonNegative(entry.timeS, `${label}.timeS`);
   const vehicle = vec3(entry.vehicle, `${label}.vehicle`);
   if (!inBounds(vehicle, scenario.bounds)) fail(`${label}.vehicle is outside bounds`);
-  const path = spatialPath(entry.path, `${label}.path`, scenario.bounds);
-  const executedPath = spatialPath(entry.executedPath, `${label}.executedPath`, scenario.bounds);
-  if (executedPath.length === 0 || !samePoint(executedPath[0], scenario.start)) {
-    fail(`${label}.executedPath must start at the scenario start`);
-  }
-  if (!samePoint(executedPath.at(-1), vehicle)) {
-    fail(`${label}.executedPath must end at the vehicle`);
-  }
-  if (path.length > 0 && (!samePoint(path[0], vehicle) || !samePoint(path.at(-1), scenario.goal))) {
-    fail(`${label}.path endpoints must be the vehicle and goal`);
-  }
-
   const activeTemporaryZoneIds = list(
     entry.activeTemporaryZoneIds,
     `${label}.activeTemporaryZoneIds`,
@@ -347,7 +344,6 @@ function frame(value, label, scenario) {
   ) {
     fail(`${label}.activeTemporaryZoneIds disagrees with half-open schedules`);
   }
-
   const movingSpheres = list(entry.movingSpheres, `${label}.movingSpheres`).map((raw, index) => {
     const state = object(raw, `${label}.movingSpheres[${index}]`);
     const id = text(state.id, `${label}.movingSpheres[${index}].id`);
@@ -373,7 +369,56 @@ function frame(value, label, scenario) {
   if (event?.kind === "goal-reached" && !samePoint(vehicle, scenario.goal)) {
     fail(`${label} goal-reached event must be at the goal`);
   }
-  return { timeS, vehicle, path, executedPath, activeTemporaryZoneIds, movingSpheres, event };
+  return { timeS, vehicle, event };
+}
+
+function smoothing(value, label) {
+  const entry = object(value, label);
+  const before =
+    entry.maxTurnAngleBeforeDeg === null
+      ? null
+      : nonNegative(entry.maxTurnAngleBeforeDeg, `${label}.maxTurnAngleBeforeDeg`);
+  const after =
+    entry.maxTurnAngleAfterDeg === null
+      ? null
+      : nonNegative(entry.maxTurnAngleAfterDeg, `${label}.maxTurnAngleAfterDeg`);
+  if ((before !== null && before > 180 + TOLERANCE) || (after !== null && after > 180 + TOLERANCE)) {
+    fail(`${label} turn angles cannot exceed 180 degrees`);
+  }
+  const parsed = {
+    method: text(entry.method, `${label}.method`),
+    applied: bool(entry.applied, `${label}.applied`),
+    certified: bool(entry.certified, `${label}.certified`),
+    rawWaypointCount: positiveInteger(entry.rawWaypointCount, `${label}.rawWaypointCount`),
+    outputWaypointCount: positiveInteger(entry.outputWaypointCount, `${label}.outputWaypointCount`),
+    roundedCornerCount: integer(entry.roundedCornerCount, `${label}.roundedCornerCount`),
+    requestedTurnRadiusM: positive(entry.requestedTurnRadiusM, `${label}.requestedTurnRadiusM`),
+    appliedTurnRadiusM:
+      entry.appliedTurnRadiusM === null
+        ? null
+        : positive(entry.appliedTurnRadiusM, `${label}.appliedTurnRadiusM`),
+    sampleSpacingM: positive(entry.sampleSpacingM, `${label}.sampleSpacingM`),
+    before,
+    after,
+  };
+  if (parsed.applied && !parsed.certified) fail(`${label} applied output must be certified`);
+  if (parsed.applied !== (parsed.appliedTurnRadiusM !== null)) {
+    fail(`${label}.appliedTurnRadiusM must be present exactly when smoothing is applied`);
+  }
+  if (
+    parsed.appliedTurnRadiusM !== null &&
+    parsed.appliedTurnRadiusM > parsed.requestedTurnRadiusM + TOLERANCE
+  ) {
+    fail(`${label}.appliedTurnRadiusM cannot exceed requestedTurnRadiusM`);
+  }
+  if (!parsed.applied && parsed.roundedCornerCount !== 0) {
+    fail(`${label}.roundedCornerCount must be zero when smoothing is not applied`);
+  }
+  // acos is ill-conditioned at a 180-degree reversal; permit only micro-degree drift.
+  if (before !== null && after !== null && after > before + 1e-5) {
+    fail(`${label} cannot increase maximum turn angle`);
+  }
+  return parsed;
 }
 
 function metrics(value, label) {
@@ -415,10 +460,23 @@ function run(value, label, scenario, planner) {
   if (predictive !== planner.predictive) fail(`${label}.predictive disagrees with its planner`);
   const parameters = object(entry.parameters, `${label}.parameters`);
   if (Object.keys(parameters).length === 0) fail(`${label}.parameters cannot be empty`);
-  Object.entries(parameters).forEach(([key, value]) => finite(value, `${label}.parameters.${key}`));
+  Object.entries(parameters).forEach(([key, parameter]) => finite(parameter, `${label}.parameters.${key}`));
 
+  const rawPoints = timedPath(entry.rawTimedPath, `${label}.rawTimedPath`, scenario.bounds);
   const points = timedPath(entry.timedPath, `${label}.timedPath`, scenario.bounds);
-  if (!samePoint(points[0].position, scenario.start)) fail(`${label}.timedPath must start at scenario start`);
+  if (!samePoint(rawPoints[0].position, scenario.start) || !samePoint(points[0].position, scenario.start)) {
+    fail(`${label} paths must start at scenario start`);
+  }
+  const postprocess = smoothing(entry.smoothing, `${label}.smoothing`);
+  if (
+    postprocess.rawWaypointCount !== rawPoints.length ||
+    postprocess.outputWaypointCount !== points.length
+  ) {
+    fail(`${label}.smoothing waypoint counts disagree with exported paths`);
+  }
+  if (!postprocess.applied && !sameTimedPath(rawPoints, points)) {
+    fail(`${label} unapplied smoothing must preserve the raw path exactly`);
+  }
   const waits = waitIntervals(entry.waitIntervals, `${label}.waitIntervals`, scenario.bounds, points);
   const frames = list(entry.frames, `${label}.frames`).map((raw, index) =>
     frame(raw, `${label}.frames[${index}]`, scenario),
@@ -430,14 +488,8 @@ function run(value, label, scenario, planner) {
     if (!samePoint(current.vehicle, interpolate(points, current.timeS))) {
       fail(`${label}.frames[${index}].vehicle disagrees with timedPath`);
     }
-    if (index === 0) return;
-    const previous = frames[index - 1];
-    if (current.timeS <= previous.timeS) fail(`${label}.frames must be strictly increasing in time`);
-    if (
-      previous.executedPath.length > current.executedPath.length ||
-      previous.executedPath.some((point, pointIndex) => !samePoint(point, current.executedPath[pointIndex]))
-    ) {
-      fail(`${label}.executedPath must grow monotonically`);
+    if (index > 0 && current.timeS <= frames[index - 1].timeS) {
+      fail(`${label}.frames must be strictly increasing in time`);
     }
   });
 
@@ -466,10 +518,12 @@ function run(value, label, scenario, planner) {
   }
   if (succeeded) {
     if (
+      !postprocess.certified ||
       outcome.arrivalTimeS === null ||
       outcome.travelTimeS === null ||
       outcome.pathExcessPct === null ||
       !samePoint(finalPoint.position, scenario.goal) ||
+      !samePoint(rawPoints.at(-1).position, scenario.goal) ||
       !samePoint(finalFrame.vehicle, scenario.goal) ||
       finalFrame.event?.kind !== "goal-reached"
     ) {
@@ -494,7 +548,10 @@ function run(value, label, scenario, planner) {
     scenario.goal[2] - scenario.start[2],
   );
   const executedLength = pathLength(points.map((point) => point.position));
-  if (!sameNumber(outcome.directDistanceM, directDistance) || !sameNumber(outcome.executedPathLengthM, executedLength)) {
+  if (
+    !sameNumber(outcome.directDistanceM, directDistance) ||
+    !sameNumber(outcome.executedPathLengthM, executedLength)
+  ) {
     fail(`${label}.metrics path lengths disagree with timedPath geometry`);
   }
   if (
@@ -535,7 +592,11 @@ function scenario(value, label, planners) {
   const buildings = uniqueIdObjects(entry.buildings, `${label}.buildings`).map((building, index) => {
     const min = vec3(building.min, `${label}.buildings[${index}].min`);
     const max = vec3(building.max, `${label}.buildings[${index}].max`);
-    if (min.some((coordinate, axis) => coordinate >= max[axis]) || !inBounds(min, bounds) || !inBounds(max, bounds)) {
+    if (
+      min.some((coordinate, axis) => coordinate >= max[axis]) ||
+      !inBounds(min, bounds) ||
+      !inBounds(max, bounds)
+    ) {
       fail(`${label}.buildings[${index}] is invalid`);
     }
     return { id: building.id };
@@ -560,20 +621,36 @@ function scenario(value, label, planners) {
     fail(`${label} obstacle IDs must be unique across geometry types`);
   }
 
+  const environmentEntry = object(entry.environment, `${label}.environment`);
+  const environment = {
+    district: text(environmentEntry.district, `${label}.environment.district`),
+    streetPattern: text(environmentEntry.streetPattern, `${label}.environment.streetPattern`),
+    buildingCount: integer(environmentEntry.buildingCount, `${label}.environment.buildingCount`),
+    hazardCount: integer(environmentEntry.hazardCount, `${label}.environment.hazardCount`),
+  };
+  const hazardCount = staticNoFlyZones.length + temporaryNoFlyZones.length + movingSpheres.length;
+  if (environment.buildingCount !== buildings.length || environment.hazardCount !== hazardCount) {
+    fail(`${label}.environment counts disagree with declared geometry`);
+  }
   const fingerprint = text(entry.fingerprint, `${label}.fingerprint`);
   if (!/^sha256:[0-9a-f]{64}$/.test(fingerprint)) fail(`${label}.fingerprint must be a digest`);
+  const cohort = entry.cohort === undefined ? null : text(entry.cohort, `${label}.cohort`);
   const parsedScenario = {
     id: text(entry.id, `${label}.id`),
     fingerprint,
+    cohort,
     bounds,
     start,
     goal,
+    buildings,
+    staticNoFlyZones,
     temporaryNoFlyZones,
+    movingSpheres,
     movingSphereMap: new Map(movingSpheres.map((sphere) => [sphere.id, sphere])),
+    environment,
   };
   text(entry.label, `${label}.label`);
   text(entry.description, `${label}.description`);
-  if (entry.cohort !== undefined) text(entry.cohort, `${label}.cohort`);
   const seen = new Set();
   const runs = list(entry.runs, `${label}.runs`).map((raw, index) => {
     const runEntry = object(raw, `${label}.runs[${index}]`);
@@ -587,7 +664,16 @@ function scenario(value, label, planners) {
   if (runs.length !== planners.size || [...planners.keys()].some((id) => !seen.has(id))) {
     fail(`${label} must contain exactly one run for every declared planner`);
   }
-  return { id: parsedScenario.id, fingerprint, runs };
+  const dynamicHazards = temporaryNoFlyZones.length + movingSpheres.length;
+  return {
+    id: parsedScenario.id,
+    fingerprint,
+    cohort,
+    buildingCount: buildings.length,
+    staticZoneCount: staticNoFlyZones.length,
+    dynamicHazards,
+    runs,
+  };
 }
 
 function artifact(value, label, expectedPath) {
@@ -600,7 +686,7 @@ function artifact(value, label, expectedPath) {
 
 function validateBundle(value) {
   const root = object(value, "root");
-  if (root.schemaVersion !== 1) fail("schemaVersion must be 1");
+  if (root.schemaVersion !== 2) fail("schemaVersion must be 2");
   if (root.verificationStatus !== "PREDICTIVE_DEMO_NON_CONFIRMATORY") {
     fail("verificationStatus must be PREDICTIVE_DEMO_NON_CONFIRMATORY");
   }
@@ -627,7 +713,7 @@ function validateBundle(value) {
     plannerEntries.length !== expectedPlannerIds.length ||
     expectedPlannerIds.some((id) => !plannerEntries.some((planner) => planner.id === id))
   ) {
-    fail("the public protocol requires exactly four declared planner conditions");
+    fail("the public protocol requires the four declared planner conditions");
   }
   if (!plannerEntries.some((planner) => planner.predictive) || plannerEntries.every((planner) => planner.predictive)) {
     fail("planners must include predictive and non-predictive baselines");
@@ -643,19 +729,31 @@ function validateBundle(value) {
     "chained-restrictions",
     "multi-obstacle",
     "vertical-time-window",
+    "urban-canyon-merge",
+    "rooftop-transfer",
   ];
   if (
     scenarios.length !== expectedScenarioIds.length ||
     expectedScenarioIds.some((id) => !scenarios.some((entry) => entry.id === id))
   ) {
-    fail("the public protocol requires exactly six registered scenarios");
+    fail("the public v0.5 protocol requires the eight declared scenarios");
   }
   if (new Set(scenarios.map((entry) => entry.id)).size !== scenarios.length) fail("scenario IDs must be unique");
   if (new Set(scenarios.map((entry) => entry.fingerprint)).size !== scenarios.length) {
     fail("scenario fingerprints must be unique");
   }
+  const complexDemo = scenarios.find(
+    (entry) =>
+      entry.cohort === "demo" &&
+      entry.buildingCount >= 14 &&
+      entry.staticZoneCount >= 1 &&
+      entry.dynamicHazards >= 2,
+  );
+  if (!complexDemo) {
+    fail("at least one demo scenario must have 14 buildings, a static NFZ, and two dynamic hazards");
+  }
   const runIds = scenarios.flatMap((entry) => entry.runs.map((record) => record.runId));
-  if (runIds.length !== 24) fail("the public protocol requires exactly 24 planner runs");
+  if (runIds.length !== 32) fail("the public v0.5 protocol requires exactly 32 planner runs");
   if (new Set(runIds).size !== runIds.length) fail("runId values must be unique across the bundle");
 
   const downloads = object(root.downloads, "downloads");
@@ -669,6 +767,7 @@ function validateBundle(value) {
   return {
     scenarioCount: scenarios.length,
     runCount: runIds.length,
+    complexDemoId: complexDemo.id,
     artifacts: [
       artifact(downloads.recordsCsv, "downloads.recordsCsv", "predictive-records.csv"),
       artifact(
@@ -702,5 +801,5 @@ try {
 const result = validateBundle(value);
 await Promise.all(result.artifacts.map(verifyArtifact));
 console.log(
-  `Validated ${result.scenarioCount} predictive scenarios, ${result.runCount} runs, and ${result.artifacts.length} referenced artifacts.`,
+  `Validated ${result.scenarioCount} predictive scenarios, ${result.runCount} runs, complex demo ${result.complexDemoId}, and ${result.artifacts.length} referenced artifacts.`,
 );

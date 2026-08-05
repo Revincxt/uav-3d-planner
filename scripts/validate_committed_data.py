@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from uav3d.benchmark import _configuration_id, _run_id, problem_fingerprint
-from uav3d.dynamic import dynamic_scenario_fingerprint, load_builtin_dynamic_scenario
+from uav3d.dynamic import (
+    DynamicScenario,
+    dynamic_scenario_fingerprint,
+    load_builtin_dynamic_scenario,
+)
 from uav3d.dynamic_collision import point_is_free_at_time, spacetime_segment_is_free
 from uav3d.dynamic_study import (
     DOWNLOAD_ARTIFACTS as DYNAMIC_DOWNLOADS,
@@ -58,6 +62,22 @@ DOWNLOADS = {
     "datasetManifest": "dataset-manifest.json",
     "timingManifest": "timing-manifest.json",
 }
+PREDICTIVE_SCENARIO_IDS = (
+    "wait-then-straight",
+    "closing-window",
+    "periodic-traffic",
+    "chained-restrictions",
+    "multi-obstacle",
+    "vertical-time-window",
+    "urban-canyon-merge",
+    "rooftop-transfer",
+)
+PREDICTIVE_PLANNER_IDS = (
+    "repeated-astar-3d",
+    "dstar-lite-reset-3d",
+    "dstar-lite-reuse-3d",
+    "space-time-astar-4d",
+)
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -565,65 +585,300 @@ def _audit_dynamic() -> int:
     return audited
 
 
-def _audit_predictive_execution(scenario_id: str, run: dict[str, Any]) -> None:
-    scenario = load_predictive_scenario(scenario_id)
-    raw_path = run.get("timedPath")
-    metrics = run.get("metrics")
-    if not isinstance(raw_path, list) or not raw_path or not isinstance(metrics, dict):
-        raise ValueError(f"predictive run has no timed path or metrics: {scenario_id}")
+def _audit_predictive_timed_path(
+    scenario: DynamicScenario,
+    planner_id: str,
+    value: object,
+    *,
+    label: str,
+    cruise_speed_mps: float,
+) -> list[tuple[float, Point3]]:
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{label} must be a non-empty timed path: {scenario.scenario_id}")
     timed_path: list[tuple[float, Point3]] = []
-    for index, item in enumerate(raw_path):
+    for index, item in enumerate(value):
         if not isinstance(item, dict):
-            raise ValueError(f"predictive timed waypoint is not an object: {scenario_id}")
+            raise ValueError(f"{label} waypoint is not an object: {scenario.scenario_id}")
         time_s = float(item["timeS"])
         position = as_point(item["position"])
+        if not math.isfinite(time_s) or not all(math.isfinite(axis) for axis in position):
+            raise ValueError(f"{label} contains a non-finite waypoint: {scenario.scenario_id}")
         if index == 0:
             if not math.isclose(time_s, 0.0, abs_tol=1e-12) or not _same_point(
                 position, scenario.static_scene.start
             ):
-                raise ValueError(f"predictive path has an invalid origin: {scenario_id}")
+                raise ValueError(f"{label} has an invalid origin: {scenario.scenario_id}")
             if not point_is_free_at_time(scenario, position, time_s):
-                raise ValueError(f"predictive path begins in collision: {scenario_id}")
-        elif time_s <= timed_path[-1][0]:
-            raise ValueError(f"predictive path times are not strictly increasing: {scenario_id}")
+                raise ValueError(f"{label} begins in collision: {scenario.scenario_id}")
+        else:
+            previous_time, previous_position = timed_path[-1]
+            if time_s <= previous_time:
+                raise ValueError(
+                    f"{label} times are not strictly increasing: {scenario.scenario_id}"
+                )
+            speed = distance(previous_position, position) / (time_s - previous_time)
+            if speed > cruise_speed_mps + max(1e-8, cruise_speed_mps * 1e-9):
+                raise ValueError(
+                    f"{label} exceeds the declared cruise speed: "
+                    f"{scenario.scenario_id}/{planner_id}"
+                )
         timed_path.append((time_s, position))
 
     for (start_time, start), (end_time, end) in pairwise(timed_path):
         if not spacetime_segment_is_free(scenario, start, end, start_time, end_time):
             raise ValueError(
-                "predictive trajectory failed collision audit: "
-                f"{scenario_id}/{run.get('plannerId')}"
+                f"{label} failed continuous space-time audit: {scenario.scenario_id}/{planner_id}"
             )
+    return timed_path
+
+
+def _predictive_waits(
+    timed_path: list[tuple[float, Point3]],
+) -> list[tuple[float, float, Point3]]:
+    return [
+        (start_time, end_time, end)
+        for (start_time, start), (end_time, end) in pairwise(timed_path)
+        if _same_point(start, end)
+    ]
+
+
+def _same_timed_path(left: list[tuple[float, Point3]], right: list[tuple[float, Point3]]) -> bool:
+    return len(left) == len(right) and all(
+        math.isclose(left_time, right_time, rel_tol=1e-10, abs_tol=1e-8)
+        and _same_point(left_point, right_point)
+        for (left_time, left_point), (right_time, right_point) in zip(left, right, strict=True)
+    )
+
+
+def _audit_predictive_wait_records(
+    scenario_id: str,
+    value: object,
+    expected: list[tuple[float, float, Point3]],
+) -> None:
+    if not isinstance(value, list) or len(value) != len(expected):
+        raise ValueError(f"predictive wait-interval count mismatch: {scenario_id}")
+    for index, (record, (start_time, end_time, position)) in enumerate(
+        zip(value, expected, strict=True)
+    ):
+        if not isinstance(record, dict) or not isinstance(record.get("reason"), str):
+            raise ValueError(f"predictive wait interval is incomplete: {scenario_id}/{index}")
+        if not record["reason"].strip():
+            raise ValueError(f"predictive wait interval has no reason: {scenario_id}/{index}")
+        if (
+            not math.isclose(float(record["startTimeS"]), start_time, rel_tol=1e-10, abs_tol=1e-8)
+            or not math.isclose(float(record["endTimeS"]), end_time, rel_tol=1e-10, abs_tol=1e-8)
+            or not _same_point(as_point(record["position"]), position)
+        ):
+            raise ValueError(f"predictive wait interval disagrees with timedPath: {scenario_id}")
+
+
+def _finite_smoothing_number(smoothing: dict[str, Any], key: str) -> float:
+    value = smoothing.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"predictive smoothing {key} must be numeric")
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"predictive smoothing {key} must be finite")
+    return parsed
+
+
+def _audit_predictive_smoothing(
+    scenario_id: str,
+    raw_path: list[tuple[float, Point3]],
+    timed_path: list[tuple[float, Point3]],
+    value: object,
+) -> None:
+    if not isinstance(value, dict):
+        raise ValueError(f"predictive run has no smoothing record: {scenario_id}")
+    method = value.get("method")
+    applied = value.get("applied")
+    certified = value.get("certified")
+    if not isinstance(method, str) or not isinstance(applied, bool) or certified is not True:
+        raise ValueError(f"predictive smoothing status is invalid: {scenario_id}")
+    raw_count = value.get("rawWaypointCount")
+    output_count = value.get("outputWaypointCount")
+    rounded_count = value.get("roundedCornerCount")
+    if (
+        isinstance(raw_count, bool)
+        or not isinstance(raw_count, int)
+        or isinstance(output_count, bool)
+        or not isinstance(output_count, int)
+        or isinstance(rounded_count, bool)
+        or not isinstance(rounded_count, int)
+        or raw_count != len(raw_path)
+        or output_count != len(timed_path)
+        or rounded_count < 0
+    ):
+        raise ValueError(f"predictive smoothing counts are inconsistent: {scenario_id}")
+
+    requested_radius = _finite_smoothing_number(value, "requestedTurnRadiusM")
+    sample_spacing = _finite_smoothing_number(value, "sampleSpacingM")
+    before = _finite_smoothing_number(value, "maxTurnAngleBeforeDeg")
+    after = _finite_smoothing_number(value, "maxTurnAngleAfterDeg")
+    if requested_radius <= 0 or sample_spacing <= 0 or before < 0 or after < 0:
+        raise ValueError(f"predictive smoothing parameters are invalid: {scenario_id}")
+
+    applied_radius = value.get("appliedTurnRadiusM")
+    if applied:
+        if method != "sampled-circular-fillet" or rounded_count <= 0:
+            raise ValueError(f"applied predictive smoothing has invalid metadata: {scenario_id}")
+        if isinstance(applied_radius, bool) or not isinstance(applied_radius, (int, float)):
+            raise ValueError(f"applied predictive smoothing has no radius: {scenario_id}")
+        parsed_radius = float(applied_radius)
+        if (
+            not math.isfinite(parsed_radius)
+            or parsed_radius <= 0
+            or parsed_radius > requested_radius + 1e-8
+            or _same_timed_path(raw_path, timed_path)
+            or output_count < raw_count
+            # acos near a 180-degree reversal is numerically ill-conditioned; tolerate only the
+            # micro-degree serialization drift observed at that boundary.
+            or after > before + 1e-5
+        ):
+            raise ValueError(f"applied predictive smoothing is inconsistent: {scenario_id}")
+        return
+
+    if method not in {"raw-fallback", "raw-no-roundable-corners"}:
+        raise ValueError(f"predictive smoothing fallback method is invalid: {scenario_id}")
+    if (
+        applied_radius is not None
+        or rounded_count != 0
+        or raw_count != output_count
+        or not _same_timed_path(raw_path, timed_path)
+        or not math.isclose(before, after, rel_tol=1e-10, abs_tol=1e-8)
+    ):
+        raise ValueError(f"predictive smoothing fallback is inconsistent: {scenario_id}")
+
+
+def _audit_predictive_frames(
+    scenario_id: str,
+    value: object,
+    timed_path: list[tuple[float, Point3]],
+) -> None:
+    if not isinstance(value, list) or not value or len(value) > len(timed_path):
+        raise ValueError(
+            f"predictive event frames must be a compact timedPath subset: {scenario_id}"
+        )
+    previous_time = -math.inf
+    for index, frame in enumerate(value):
+        if not isinstance(frame, dict):
+            raise ValueError(f"predictive frame is not an object: {scenario_id}/{index}")
+        if "path" in frame or "executedPath" in frame:
+            raise ValueError(
+                f"predictive frames must not duplicate trajectory arrays: {scenario_id}"
+            )
+        time_s = float(frame["timeS"])
+        if time_s <= previous_time:
+            raise ValueError(f"predictive event frames are not strictly ordered: {scenario_id}")
+        matching_waypoint = next(
+            (
+                position
+                for waypoint_time, position in timed_path
+                if math.isclose(waypoint_time, time_s, rel_tol=1e-10, abs_tol=1e-8)
+            ),
+            None,
+        )
+        if matching_waypoint is None:
+            raise ValueError(f"predictive frame time is absent from timedPath: {scenario_id}")
+        if not _same_point(as_point(frame["vehicle"]), matching_waypoint):
+            raise ValueError(f"predictive frame vehicle disagrees with timedPath: {scenario_id}")
+        event = frame.get("event")
+        if not isinstance(event, dict) or event.get("kind") in {None, "none"}:
+            raise ValueError(f"predictive compact frame lacks a semantic event: {scenario_id}")
+        previous_time = time_s
+    if not math.isclose(
+        float(value[0]["timeS"]), timed_path[0][0], abs_tol=1e-8
+    ) or not math.isclose(float(value[-1]["timeS"]), timed_path[-1][0], abs_tol=1e-8):
+        raise ValueError(f"predictive event frames must anchor mission endpoints: {scenario_id}")
+
+
+def _audit_predictive_execution(
+    scenario: DynamicScenario,
+    run: dict[str, Any],
+    *,
+    cruise_speed_mps: float,
+) -> None:
+    scenario_id = scenario.scenario_id
+    planner_id = str(run.get("plannerId", ""))
+    metrics = run.get("metrics")
+    if not isinstance(metrics, dict):
+        raise ValueError(f"predictive run has no metrics: {scenario_id}/{planner_id}")
+    raw_path = _audit_predictive_timed_path(
+        scenario,
+        planner_id,
+        run.get("rawTimedPath"),
+        label="rawTimedPath",
+        cruise_speed_mps=cruise_speed_mps,
+    )
+    timed_path = _audit_predictive_timed_path(
+        scenario,
+        planner_id,
+        run.get("timedPath"),
+        label="certified timedPath",
+        cruise_speed_mps=cruise_speed_mps,
+    )
+    if (
+        not math.isclose(raw_path[0][0], timed_path[0][0], rel_tol=0.0, abs_tol=1e-12)
+        or not math.isclose(raw_path[-1][0], timed_path[-1][0], rel_tol=1e-10, abs_tol=1e-8)
+        or not _same_point(raw_path[0][1], timed_path[0][1])
+        or not _same_point(raw_path[-1][1], timed_path[-1][1])
+    ):
+        raise ValueError(f"predictive smoothing changed path endpoints or times: {scenario_id}")
+    raw_waits = _predictive_waits(raw_path)
+    certified_waits = _predictive_waits(timed_path)
+    if len(raw_waits) != len(certified_waits) or any(
+        not math.isclose(raw_start, smooth_start, rel_tol=1e-10, abs_tol=1e-8)
+        or not math.isclose(raw_end, smooth_end, rel_tol=1e-10, abs_tol=1e-8)
+        or not _same_point(raw_position, smooth_position)
+        for (raw_start, raw_end, raw_position), (smooth_start, smooth_end, smooth_position) in zip(
+            raw_waits, certified_waits, strict=True
+        )
+    ):
+        raise ValueError(f"predictive smoothing changed a wait interval: {scenario_id}")
+    _audit_predictive_wait_records(scenario_id, run.get("waitIntervals"), certified_waits)
+    _audit_predictive_smoothing(scenario_id, raw_path, timed_path, run.get("smoothing"))
+    _audit_predictive_frames(scenario_id, run.get("frames"), timed_path)
 
     positions = tuple(point for _, point in timed_path)
     observed_length = polyline_length(positions)
-    observed_wait = math.fsum(
-        end_time - start_time
-        for (start_time, start), (end_time, end) in pairwise(timed_path)
-        if _same_point(start, end)
-    )
+    observed_wait = math.fsum(end_time - start_time for start_time, end_time, _ in certified_waits)
+    direct_distance = distance(scenario.static_scene.start, scenario.static_scene.goal)
     if not math.isclose(
         observed_length,
         float(metrics["executedPathLengthM"]),
         rel_tol=1e-10,
         abs_tol=1e-8,
     ):
-        raise ValueError(f"predictive executed length mismatch: {scenario_id}")
+        raise ValueError(f"predictive certified-path length mismatch: {scenario_id}")
     if not math.isclose(
         observed_wait,
         float(metrics["waitTimeS"]),
         rel_tol=1e-10,
         abs_tol=1e-8,
     ):
-        raise ValueError(f"predictive stationary-time mismatch: {scenario_id}")
-    success = bool(metrics["success"])
+        raise ValueError(f"predictive certified-path stationary-time mismatch: {scenario_id}")
+    if not math.isclose(
+        direct_distance,
+        float(metrics["directDistanceM"]),
+        rel_tol=1e-10,
+        abs_tol=1e-8,
+    ):
+        raise ValueError(f"predictive direct-distance mismatch: {scenario_id}")
+
+    success = metrics.get("success")
+    failure_reason = metrics.get("failureReason")
+    if not isinstance(success, bool) or failure_reason != run.get("failureReason"):
+        raise ValueError(f"predictive metric status mismatch: {scenario_id}")
+    if success is not (run.get("status") == "success"):
+        raise ValueError(f"predictive success disagrees with status: {scenario_id}")
     if success:
-        if not _same_point(positions[-1], scenario.static_scene.goal):
-            raise ValueError(f"successful predictive path does not end at the goal: {scenario_id}")
+        if failure_reason is not None or not _same_point(positions[-1], scenario.static_scene.goal):
+            raise ValueError(f"successful predictive path is incomplete: {scenario_id}")
         arrival = metrics.get("arrivalTimeS")
         travel = metrics.get("travelTimeS")
-        if arrival is None or travel is None:
-            raise ValueError(f"successful predictive run lacks arrival metrics: {scenario_id}")
+        path_excess = metrics.get("pathExcessPct")
+        if arrival is None or travel is None or path_excess is None:
+            raise ValueError(f"successful predictive run lacks metrics: {scenario_id}")
         if not math.isclose(float(arrival), timed_path[-1][0], rel_tol=1e-10, abs_tol=1e-8):
             raise ValueError(f"predictive arrival time mismatch: {scenario_id}")
         if not math.isclose(
@@ -633,8 +888,17 @@ def _audit_predictive_execution(scenario_id: str, run: dict[str, Any]) -> None:
             abs_tol=1e-8,
         ):
             raise ValueError(f"predictive movement-time mismatch: {scenario_id}")
-    elif metrics.get("arrivalTimeS") is not None or metrics.get("travelTimeS") is not None:
-        raise ValueError(f"failed predictive run fabricates arrival metrics: {scenario_id}")
+        if not math.isclose(
+            float(path_excess),
+            (observed_length / direct_distance - 1.0) * 100.0,
+            rel_tol=1e-10,
+            abs_tol=1e-8,
+        ):
+            raise ValueError(f"predictive path-excess mismatch: {scenario_id}")
+    elif any(
+        metrics.get(key) is not None for key in ("arrivalTimeS", "travelTimeS", "pathExcessPct")
+    ):
+        raise ValueError(f"failed predictive run fabricates success metrics: {scenario_id}")
     if int(metrics["safetyViolations"]) != 0:
         raise ValueError(f"predictive record contains a safety violation: {scenario_id}")
 
@@ -647,22 +911,84 @@ def _without_predictive_provenance(bundle: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _contains_forbidden_keys(value: object, forbidden: frozenset[str]) -> bool:
+    if isinstance(value, dict):
+        return bool(forbidden.intersection(value)) or any(
+            _contains_forbidden_keys(item, forbidden) for item in value.values()
+        )
+    if isinstance(value, list):
+        return any(_contains_forbidden_keys(item, forbidden) for item in value)
+    return False
+
+
 def _audit_predictive() -> int:
     bundle = _load_json(PUBLIC / "predictive-data.json")
+    if bundle.get("schemaVersion") != 2:
+        raise ValueError("predictive bundle must use schemaVersion 2")
     source_commit = str(bundle.get("sourceCommit", ""))
     _validate_source_ancestor(source_commit, label="predictive")
     _require_paths_at_commit(
         source_commit,
         (
             "src/uav3d/predictive.py",
+            "src/uav3d/predictive_city.py",
             "src/uav3d/predictive_scenarios.py",
+            "src/uav3d/predictive_smoothing.py",
             "src/uav3d/predictive_study.py",
             "src/uav3d/planners/space_time_astar.py",
         ),
         label="predictive",
     )
-    if _package_version_at(source_commit) != "0.4.0":
-        raise ValueError("predictive sourceCommit must identify the v0.4.0 implementation")
+    if _package_version_at(source_commit) != "0.5.0":
+        raise ValueError("predictive sourceCommit must identify the v0.5.0 implementation")
+
+    protocol = bundle.get("protocol")
+    scenarios = bundle.get("scenarios")
+    if not isinstance(protocol, dict) or not isinstance(scenarios, list):
+        raise ValueError("predictive protocol and scenarios must be structured objects")
+    if protocol.get("id") != "predictive-space-time-v2":
+        raise ValueError("predictive protocol must use predictive-space-time-v2")
+    cruise_speed_value = protocol.get("cruiseSpeedMps")
+    if (
+        isinstance(cruise_speed_value, bool)
+        or not isinstance(cruise_speed_value, (int, float))
+        or not math.isfinite(float(cruise_speed_value))
+        or float(cruise_speed_value) <= 0
+    ):
+        raise ValueError("predictive protocol cruiseSpeedMps must be finite and positive")
+    cruise_speed_mps = float(cruise_speed_value)
+
+    expected_work_units = {
+        "repeated-astar-3d": "expanded-nodes",
+        "dstar-lite-reset-3d": "queue-pops",
+        "dstar-lite-reuse-3d": "queue-pops",
+        "space-time-astar-4d": "expanded-spacetime-states",
+    }
+    expected_predictive_flags = {
+        "repeated-astar-3d": False,
+        "dstar-lite-reset-3d": False,
+        "dstar-lite-reuse-3d": False,
+        "space-time-astar-4d": True,
+    }
+    if (
+        tuple(PREDICTIVE_WORK_UNITS) != PREDICTIVE_PLANNER_IDS
+        or expected_work_units != PREDICTIVE_WORK_UNITS
+        or tuple(PREDICTIVE_FLAGS) != PREDICTIVE_PLANNER_IDS
+        or expected_predictive_flags != PREDICTIVE_FLAGS
+    ):
+        raise ValueError("predictive study constants do not define the fixed four-planner matrix")
+    planner_records = bundle.get("planners")
+    if not isinstance(planner_records, list) or len(planner_records) != len(PREDICTIVE_PLANNER_IDS):
+        raise ValueError("predictive planner metadata must contain exactly four planners")
+    planner_contract: list[tuple[str, object]] = []
+    for record in planner_records:
+        if not isinstance(record, dict):
+            raise ValueError("predictive planner metadata entries must be objects")
+        planner_contract.append((str(record.get("id", "")), record.get("predictive")))
+    if tuple(planner_contract) != tuple(
+        (planner_id, expected_predictive_flags[planner_id]) for planner_id in PREDICTIVE_PLANNER_IDS
+    ):
+        raise ValueError("predictive planner metadata disagrees with the fixed planner matrix")
 
     downloads = bundle.get("downloads")
     if not isinstance(downloads, dict) or set(downloads) != set(PREDICTIVE_DOWNLOADS):
@@ -678,6 +1004,36 @@ def _audit_predictive() -> int:
         ):
             raise ValueError(f"predictive download provenance mismatch: {filename}")
 
+    manifest = _load_json(PUBLIC / PREDICTIVE_DOWNLOADS["scenarioManifest"])
+    selection = manifest.get("selection")
+    manifest_scenarios = manifest.get("scenarios")
+    if manifest.get("schemaVersion") != 2:
+        raise ValueError("predictive scenario manifest must use schemaVersion 2")
+    if not isinstance(selection, dict) or selection.get("planner_outcomes_consulted") is not False:
+        raise ValueError("predictive scenario selection must be independent of planner outcomes")
+    if _contains_forbidden_keys(
+        manifest,
+        frozenset({"planner_id", "algorithm", "mission_success"}),
+    ):
+        raise ValueError("predictive scenario manifest contains planner-outcome selection fields")
+    if (
+        manifest.get("requested") != 8
+        or manifest.get("accepted") != 8
+        or manifest.get("rejected") != 0
+        or manifest.get("acceptedByCohort") != {"calibration": 1, "demo": 3, "diagnostic": 4}
+        or manifest.get("scenarioCount") != 8
+        or manifest.get("runCount") != 32
+        or not isinstance(manifest_scenarios, list)
+    ):
+        raise ValueError("predictive scenario manifest counts disagree with the fixed v0.5 cohort")
+    manifest_scenario_ids: list[str] = []
+    for record in manifest_scenarios:
+        if not isinstance(record, dict) or record.get("selected") is not True:
+            raise ValueError("predictive manifest scenario entry is invalid or unselected")
+        manifest_scenario_ids.append(str(record.get("id", "")))
+    if tuple(manifest_scenario_ids) != PREDICTIVE_SCENARIO_IDS:
+        raise ValueError("predictive manifest scenario IDs differ from the fixed v0.5 cohort")
+
     expected, expected_manifest = build_predictive_bundle(
         source_commit=source_commit,
         generated_at=str(bundle.get("generatedAt", "ignored")),
@@ -688,10 +1044,9 @@ def _audit_predictive() -> int:
     )
     if difference is not None:
         raise ValueError(
-            "committed predictive bundle differs from 24 deterministic reruns: " + difference
+            "committed predictive bundle differs from 32 deterministic reruns: " + difference
         )
 
-    manifest = _load_json(PUBLIC / PREDICTIVE_DOWNLOADS["scenarioManifest"])
     if manifest != expected_manifest:
         raise ValueError("predictive scenario manifest differs from the fixed protocol selection")
 
@@ -703,34 +1058,34 @@ def _audit_predictive() -> int:
     if rows != predictive_record_rows(expected):
         raise ValueError("predictive records CSV differs from predictive-data.json")
 
-    protocol = bundle.get("protocol")
-    scenarios = bundle.get("scenarios")
-    if not isinstance(protocol, dict) or not isinstance(scenarios, list):
-        raise ValueError("predictive protocol and scenarios must be structured objects")
+    scenario_ids: list[str] = []
     run_ids: set[str] = set()
     audited = 0
     for raw_scenario in scenarios:
         if not isinstance(raw_scenario, dict):
             raise ValueError("predictive scenario must be an object")
         scenario_id = str(raw_scenario["id"])
+        scenario_ids.append(scenario_id)
         scenario = load_predictive_scenario(scenario_id)
         fingerprint = str(raw_scenario["fingerprint"])
         if fingerprint != dynamic_scenario_fingerprint(scenario):
             raise ValueError(f"predictive scenario fingerprint mismatch: {scenario_id}")
         runs = raw_scenario.get("runs")
-        if not isinstance(runs, list) or len(runs) != len(PREDICTIVE_WORK_UNITS):
+        if not isinstance(runs, list) or len(runs) != len(PREDICTIVE_PLANNER_IDS):
             raise ValueError(f"predictive scenario has an incomplete planner matrix: {scenario_id}")
+        planner_ids: list[str] = []
         for run in runs:
             if not isinstance(run, dict) or not isinstance(run.get("parameters"), dict):
                 raise ValueError(f"predictive run must be a structured object: {scenario_id}")
             planner_id = str(run["plannerId"])
+            planner_ids.append(planner_id)
             parameters = run["parameters"]
             run_id = str(run["runId"])
             expected_id = predictive_run_id(
                 fingerprint,
                 planner_id,
                 protocol,
-                parameters,  # type: ignore[arg-type]
+                parameters,
             )
             if run_id != expected_id or run_id in run_ids:
                 raise ValueError(
@@ -746,10 +1101,16 @@ def _audit_predictive() -> int:
                 raise ValueError(
                     f"predictive planner contract mismatch: {scenario_id}/{planner_id}"
                 )
-            _audit_predictive_execution(scenario_id, run)
+            _audit_predictive_execution(
+                scenario,
+                run,
+                cruise_speed_mps=cruise_speed_mps,
+            )
             audited += 1
-    if len(scenarios) != 6 or audited != 24:
-        raise ValueError("predictive bundle must contain exactly six scenarios by four planners")
+        if tuple(planner_ids) != PREDICTIVE_PLANNER_IDS:
+            raise ValueError(f"predictive planner order or membership mismatch: {scenario_id}")
+    if tuple(scenario_ids) != PREDICTIVE_SCENARIO_IDS or audited != 32 or len(run_ids) != 32:
+        raise ValueError("predictive bundle must contain exactly eight scenarios by four planners")
     return audited
 
 

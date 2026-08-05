@@ -6,7 +6,7 @@ import {
   validatePredictiveBundle,
 } from "../src/predictive-data";
 import type {
-  PredictiveBundleV1,
+  PredictiveBundleV2,
   PredictiveFrame,
   PredictiveRun,
   TimedWaypoint,
@@ -31,6 +31,15 @@ function reactiveTimedPath(): TimedWaypoint[] {
   ];
 }
 
+function predictiveRawPath(): TimedWaypoint[] {
+  return [
+    { timeS: 0, position: [...start] },
+    { timeS: 4, position: [0, 20, 10] },
+    { timeS: 10, position: [30, 20, 10] },
+    { timeS: 14, position: [...goal] },
+  ];
+}
+
 function predictiveTimedPath(): TimedWaypoint[] {
   return [
     { timeS: 0, position: [...start] },
@@ -42,10 +51,7 @@ function predictiveTimedPath(): TimedWaypoint[] {
   ];
 }
 
-function frames(
-  waypoints: TimedWaypoint[],
-  predictive: boolean,
-): PredictiveFrame[] {
+function frames(waypoints: TimedWaypoint[], predictive: boolean): PredictiveFrame[] {
   return waypoints.map((waypoint, index) => {
     const event: PredictiveFrame["event"] =
       index === 0
@@ -62,11 +68,6 @@ function frames(
     return {
       timeS: waypoint.timeS,
       vehicle: [...waypoint.position],
-      path:
-        waypoint.position.every((coordinate, axis) => coordinate === goal[axis])
-          ? [[...goal]]
-          : [[...waypoint.position], [...goal]],
-      executedPath: waypoints.slice(0, index + 1).map((entry) => [...entry.position]),
       activeTemporaryZoneIds:
         waypoint.timeS >= 2 && waypoint.timeS < 6 ? ["popup-zone"] : [],
       movingSpheres: movingState(waypoint.timeS),
@@ -76,6 +77,7 @@ function frames(
 }
 
 function run(plannerId: string, predictive: boolean): PredictiveRun {
+  const rawTimedPath = predictive ? predictiveRawPath() : reactiveTimedPath();
   const timedPath = predictive ? predictiveTimedPath() : reactiveTimedPath();
   return {
     runId: `sha256:${predictive ? "2".repeat(64) : "1".repeat(64)}`,
@@ -84,7 +86,35 @@ function run(plannerId: string, predictive: boolean): PredictiveRun {
     status: "success",
     failureReason: null,
     parameters: { resolutionM: 4, predictionHorizonS: predictive ? 12 : 0 },
+    rawTimedPath,
     timedPath,
+    smoothing: predictive
+      ? {
+          method: "certified-rounded-corners-v1",
+          applied: true,
+          certified: true,
+          rawWaypointCount: rawTimedPath.length,
+          outputWaypointCount: timedPath.length,
+          roundedCornerCount: 2,
+          requestedTurnRadiusM: 4,
+          appliedTurnRadiusM: 4,
+          sampleSpacingM: 1,
+          maxTurnAngleBeforeDeg: 90,
+          maxTurnAngleAfterDeg: 0,
+        }
+      : {
+          method: "certified-raw-fallback",
+          applied: false,
+          certified: true,
+          rawWaypointCount: rawTimedPath.length,
+          outputWaypointCount: timedPath.length,
+          roundedCornerCount: 0,
+          requestedTurnRadiusM: 4,
+          appliedTurnRadiusM: null,
+          sampleSpacingM: 1,
+          maxTurnAngleBeforeDeg: 0,
+          maxTurnAngleAfterDeg: 0,
+        },
     waitIntervals: predictive
       ? []
       : [
@@ -114,14 +144,14 @@ function run(plannerId: string, predictive: boolean): PredictiveRun {
   };
 }
 
-function fixture(): PredictiveBundleV1 {
+function fixture(): PredictiveBundleV2 {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: "2026-08-05T08:00:00Z",
     sourceCommit: "0123456789abcdef0123456789abcdef01234567",
     verificationStatus: "PREDICTIVE_DEMO_NON_CONFIRMATORY",
     protocol: {
-      id: "predictive-space-time-v1",
+      id: "predictive-space-time-v2",
       timeStepS: 1,
       cruiseSpeedMps: 8,
       maxTimeS: 120,
@@ -131,6 +161,7 @@ function fixture(): PredictiveBundleV1 {
       predictionHorizonS: 12,
       reactiveMaxWorkPerReplan: 120_000,
       predictiveMaxExpandedStatesPerMission: 120_000,
+      trajectoryPostprocessor: "certified-rounded-corners-v1",
     },
     planners: [
       { id: "repeated-astar-3d", label: "Repeated 3D A*", predictive: false },
@@ -142,10 +173,17 @@ function fixture(): PredictiveBundleV1 {
         label: "Crossing traffic",
         description: "A moving obstacle crosses the nominal route.",
         fingerprint: `sha256:${"a".repeat(64)}`,
+        cohort: "demo",
         bounds: { min: [0, 0, 0], max: [100, 100, 50] },
         start: [...start],
         goal: [...goal],
         constraints: { vehicleRadiusM: 0.5, safetyMarginM: 0.5 },
+        environment: {
+          district: "Mixed-use research district",
+          streetPattern: "Staggered urban grid",
+          buildingCount: 1,
+          hazardCount: 3,
+        },
         buildings: [{ id: "tower", min: [60, 60, 0], max: [70, 70, 30] }],
         staticNoFlyZones: [
           { id: "static-zone", center: [80, 20], radiusM: 5, zMinM: 0, zMaxM: 20 },
@@ -189,12 +227,13 @@ function fixture(): PredictiveBundleV1 {
   };
 }
 
-describe("predictive bundle v1", () => {
-  it("accepts reactive and predictive timed runs with explicit waits and work units", () => {
+describe("predictive bundle v2", () => {
+  it("accepts O(N) event frames with raw and certified trajectories", () => {
     const parsed = validatePredictiveBundle(fixture());
-    expect(parsed.scenarios[0]!.runs).toHaveLength(2);
-    expect(parsed.scenarios[0]!.runs[0]!.waitIntervals).toHaveLength(1);
-    expect(parsed.scenarios[0]!.runs[1]!.predictive).toBe(true);
+    expect(parsed.schemaVersion).toBe(2);
+    expect(parsed.scenarios[0]!.runs[0]!.frames[0]).not.toHaveProperty("executedPath");
+    expect(parsed.scenarios[0]!.runs[1]!.smoothing.certified).toBe(true);
+    expect(parsed.scenarios[0]!.environment.hazardCount).toBe(3);
   });
 
   it("loads and validates predictive-data.json through an injected fetch implementation", async () => {
@@ -204,7 +243,7 @@ describe("predictive bundle v1", () => {
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("predictive-data.json"));
   });
 
-  it("builds comparison rows in declared planner order without erasing work semantics", () => {
+  it("builds comparison rows in declared order with post-processing evidence", () => {
     const value = validatePredictiveBundle(fixture());
     const rows = buildPredictiveComparisonRows(value, value.scenarios[0]!);
     expect(rows.map((row) => row.plannerId)).toEqual([
@@ -215,9 +254,11 @@ describe("predictive bundle v1", () => {
       "expanded-nodes",
       "expanded-spacetime-states",
     ]);
+    expect(rows[1]!.smoothingApplied).toBe(true);
+    expect(rows[1]!.maxTurnAngleAfterDeg).toBe(0);
   });
 
-  it("rejects non-monotonic timed paths and frame times", () => {
+  it("rejects non-monotonic timed paths and event-frame times", () => {
     const timed = fixture();
     timed.scenarios[0]!.runs[0]!.timedPath[2]!.timeS = 1;
     expect(() => validatePredictiveBundle(timed)).toThrow(/timedPath must be strictly increasing/);
@@ -225,7 +266,7 @@ describe("predictive bundle v1", () => {
     const frame = fixture();
     frame.scenarios[0]!.runs[0]!.frames[2]!.timeS = 2;
     frame.scenarios[0]!.runs[0]!.frames[2]!.movingSpheres[0]!.position = [50, 12, 10];
-    expect(() => validatePredictiveBundle(frame)).toThrow(/strictly increasing|timedPath/);
+    expect(() => validatePredictiveBundle(frame)).toThrow(/strictly increasing/);
   });
 
   it("rejects overlapping waits and wait metrics that disagree with intervals", () => {
@@ -272,5 +313,30 @@ describe("predictive bundle v1", () => {
     const duplicate = fixture();
     duplicate.scenarios[0]!.runs[1]!.runId = duplicate.scenarios[0]!.runs[0]!.runId;
     expect(() => validatePredictiveBundle(duplicate)).toThrow(/runId values must be unique/);
+  });
+
+  it("rejects smoothing evidence that disagrees with exported trajectory geometry", () => {
+    const count = fixture();
+    count.scenarios[0]!.runs[1]!.smoothing.outputWaypointCount = 5;
+    expect(() => validatePredictiveBundle(count)).toThrow(/waypoint counts disagree/);
+
+    const uncertified = fixture();
+    uncertified.scenarios[0]!.runs[1]!.smoothing.certified = false;
+    expect(() => validatePredictiveBundle(uncertified)).toThrow(/applied output must be certified/);
+
+    const worse = fixture();
+    worse.scenarios[0]!.runs[1]!.smoothing.maxTurnAngleAfterDeg = 100;
+    expect(() => validatePredictiveBundle(worse)).toThrow(/cannot increase/);
+  });
+
+  it("rejects environment counts and legacy quadratic frame paths", () => {
+    const environment = fixture();
+    environment.scenarios[0]!.environment.buildingCount = 2;
+    expect(() => validatePredictiveBundle(environment)).toThrow(/environment counts disagree/);
+
+    const legacy = fixture();
+    const frame = legacy.scenarios[0]!.runs[0]!.frames[0] as unknown as Record<string, unknown>;
+    frame.executedPath = [[...start]];
+    expect(() => validatePredictiveBundle(legacy)).toThrow(/must not|executedPath/);
   });
 });

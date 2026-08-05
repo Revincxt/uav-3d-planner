@@ -2,6 +2,28 @@
 
 All notable changes are documented here. The project follows Semantic Versioning.
 
+## [0.5.0] - 2026-08-05
+
+### Added
+
+- Eight deterministic predictive cases spanning dense street grids, urban canyons, rooftop
+  transfers, static no-fly volumes, temporary restrictions, and coordinated air traffic.
+- A wait-preserving trajectory post-processor that rounds feasible turns, retimes samples by
+  path progress, and continuously re-audits every space-time segment before accepting it.
+- Explicit raw-versus-certified trajectory records with smoothing provenance, turn diagnostics,
+  and fail-closed fallback to the planner output.
+- A rebuilt predictive-study figure with continuous-time playback, raw/certified comparison,
+  orthogonal camera views, layer controls, richer urban context, and motion-profile plots.
+
+### Changed
+
+- The predictive public bundle now uses its v2 schema and compact semantic event frames instead of
+  repeating path prefixes, suffixes, or every dense smoothing sample.
+- The predictive protocol is now a distinct v0.5 diagnostic cohort; results are not pooled with or
+  treated as directly comparable to the v0.4 cohort.
+- The default GitHub Pages predictive view opens on a complex demonstration case rather than the
+  calibration corridor.
+
 ## [0.4.0] - 2026-08-05
 
 ### Added
@@ -97,3 +119,4 @@ All notable changes are documented here. The project follows Semantic Versioning
 [0.2.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.2.0
 [0.3.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.3.0
 [0.4.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.4.0
+[0.5.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.5.0
