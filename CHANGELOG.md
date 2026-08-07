@@ -22,6 +22,8 @@ All notable changes are documented here. The project follows Semantic Versioning
   non-confirmatory missions.
 - D* Lite endpoint handling now evaluates multiple visible start and goal anchors with a
   goal-aware, non-backtracking preference while retaining reset/reuse comparability.
+- Dynamic-replanning records were regenerated from the same v0.6 source commit because the shared
+  D* Lite endpoint policy removes a redundant connector waypoint in the recorded replay.
 - Predictive records distinguish dense-piecewise-linear collision certification from descriptive
   kinematic diagnostics and carry the closest-approach method and exactness flag.
 

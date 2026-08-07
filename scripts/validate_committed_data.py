@@ -967,11 +967,38 @@ def _audit_predictive_execution(
         }
         for key, expected in expected_numbers.items():
             item = recorded_witness.get(key)
+            absolute_tolerance = 1e-6 if key == "timeS" and not separation.exact else 1e-8
             if (
                 isinstance(item, bool)
                 or not isinstance(item, (int, float))
                 or not math.isfinite(float(item))
-                or not math.isclose(float(item), expected, rel_tol=1e-10, abs_tol=1e-8)
+                or not math.isclose(
+                    float(item), expected, rel_tol=1e-10, abs_tol=absolute_tolerance
+                )
+            ):
+                raise ValueError(f"predictive separation witness {key} mismatch: {scenario_id}")
+        position_tolerance = 1e-8 if separation.exact else 1e-6
+        expected_positions = {
+            "vehiclePosition": separation.vehicle_position,
+            "obstaclePosition": separation.obstacle_position,
+        }
+        for key, expected in expected_positions.items():
+            item = recorded_witness.get(key)
+            if (
+                not isinstance(item, list)
+                or len(item) != 3
+                or any(
+                    isinstance(coordinate, bool)
+                    or not isinstance(coordinate, (int, float))
+                    or not math.isfinite(float(coordinate))
+                    or not math.isclose(
+                        float(coordinate),
+                        expected[index],
+                        rel_tol=1e-10,
+                        abs_tol=position_tolerance,
+                    )
+                    for index, coordinate in enumerate(item)
+                )
             ):
                 raise ValueError(f"predictive separation witness {key} mismatch: {scenario_id}")
         if float(recorded_separation) < separation.declared_safety_margin_m - 1e-8:
