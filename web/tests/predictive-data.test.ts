@@ -7,6 +7,7 @@ import {
 } from "../src/predictive-data";
 import type {
   PredictiveBundleV2,
+  PredictiveDiscreteKinematicDiagnostics,
   PredictiveFrame,
   PredictiveRun,
   TimedWaypoint,
@@ -76,6 +77,24 @@ function frames(waypoints: TimedWaypoint[], predictive: boolean): PredictiveFram
   });
 }
 
+function kinematicDiagnostics(
+  segmentCount: number,
+  movementSegmentCount: number,
+): PredictiveDiscreteKinematicDiagnostics {
+  return {
+    status: "discrete-diagnostic-only",
+    continuousDynamicsCertified: false,
+    segmentCount,
+    movementSegmentCount,
+    reversalCount: 0,
+    reversalThresholdDeg: 150,
+    maxSpeedMps: 8,
+    maxDiscreteVelocityChangeMps: 5,
+    maxDiscreteAccelerationProxyMps2: 2.5,
+    maxAbsClimbRateMps: 0,
+  };
+}
+
 function run(plannerId: string, predictive: boolean): PredictiveRun {
   const rawTimedPath = predictive ? predictiveRawPath() : reactiveTimedPath();
   const timedPath = predictive ? predictiveTimedPath() : reactiveTimedPath();
@@ -93,6 +112,8 @@ function run(plannerId: string, predictive: boolean): PredictiveRun {
           method: "certified-rounded-corners-v1",
           applied: true,
           certified: true,
+          collisionCertified: true,
+          collisionCertificationScope: "dense-piecewise-linear-space-time-path",
           rawWaypointCount: rawTimedPath.length,
           outputWaypointCount: timedPath.length,
           roundedCornerCount: 2,
@@ -101,11 +122,19 @@ function run(plannerId: string, predictive: boolean): PredictiveRun {
           sampleSpacingM: 1,
           maxTurnAngleBeforeDeg: 90,
           maxTurnAngleAfterDeg: 0,
+          kinematicDiagnostics: {
+            status: "discrete-diagnostic-only",
+            continuousDynamicsCertified: false,
+            raw: kinematicDiagnostics(rawTimedPath.length - 1, rawTimedPath.length - 1),
+            output: kinematicDiagnostics(timedPath.length - 1, timedPath.length - 1),
+          },
         }
       : {
           method: "certified-raw-fallback",
           applied: false,
           certified: true,
+          collisionCertified: true,
+          collisionCertificationScope: "dense-piecewise-linear-space-time-path",
           rawWaypointCount: rawTimedPath.length,
           outputWaypointCount: timedPath.length,
           roundedCornerCount: 0,
@@ -114,6 +143,12 @@ function run(plannerId: string, predictive: boolean): PredictiveRun {
           sampleSpacingM: 1,
           maxTurnAngleBeforeDeg: 0,
           maxTurnAngleAfterDeg: 0,
+          kinematicDiagnostics: {
+            status: "discrete-diagnostic-only",
+            continuousDynamicsCertified: false,
+            raw: kinematicDiagnostics(rawTimedPath.length - 1, rawTimedPath.length - 2),
+            output: kinematicDiagnostics(timedPath.length - 1, timedPath.length - 2),
+          },
         },
     waitIntervals: predictive
       ? []
@@ -137,7 +172,18 @@ function run(plannerId: string, predictive: boolean): PredictiveRun {
       replans: 1,
       expandedStates: predictive ? 1800 : 900,
       workUnit: predictive ? "expanded-spacetime-states" : "expanded-nodes",
-      minimumSeparationM: predictive ? 6.5 : 4.5,
+      minimumSeparationM: 25.784271247461902,
+      minimumSeparationWitness: {
+        separationM: 25.784271247461902,
+        timeS: 10,
+        vehiclePosition: [...goal],
+        obstacleId: "traffic-1",
+        obstacleKind: "moving-sphere",
+        obstaclePosition: [50 - Math.SQRT2, 20 + Math.SQRT2, 10],
+        declaredSafetyMarginM: 0.5,
+        method: "exact-relative-linear-motion",
+        exact: true,
+      },
       safetyViolations: 0,
     },
     frames: frames(timedPath, predictive),
@@ -151,7 +197,7 @@ function fixture(): PredictiveBundleV2 {
     sourceCommit: "0123456789abcdef0123456789abcdef01234567",
     verificationStatus: "PREDICTIVE_DEMO_NON_CONFIRMATORY",
     protocol: {
-      id: "predictive-space-time-v2",
+      id: "predictive-space-time-v3",
       timeStepS: 1,
       cruiseSpeedMps: 8,
       maxTimeS: 120,
@@ -233,6 +279,11 @@ describe("predictive bundle v2", () => {
     expect(parsed.schemaVersion).toBe(2);
     expect(parsed.scenarios[0]!.runs[0]!.frames[0]).not.toHaveProperty("executedPath");
     expect(parsed.scenarios[0]!.runs[1]!.smoothing.certified).toBe(true);
+    expect(
+      parsed.scenarios[0]!.runs[1]!.smoothing.kinematicDiagnostics.output
+        .continuousDynamicsCertified,
+    ).toBe(false);
+    expect(parsed.scenarios[0]!.runs[1]!.metrics.minimumSeparationWitness?.exact).toBe(true);
     expect(parsed.scenarios[0]!.environment.hazardCount).toBe(3);
   });
 
@@ -318,15 +369,39 @@ describe("predictive bundle v2", () => {
   it("rejects smoothing evidence that disagrees with exported trajectory geometry", () => {
     const count = fixture();
     count.scenarios[0]!.runs[1]!.smoothing.outputWaypointCount = 5;
-    expect(() => validatePredictiveBundle(count)).toThrow(/waypoint counts disagree/);
+    expect(() => validatePredictiveBundle(count)).toThrow(/segment counts|waypoint counts/);
 
     const uncertified = fixture();
     uncertified.scenarios[0]!.runs[1]!.smoothing.certified = false;
+    uncertified.scenarios[0]!.runs[1]!.smoothing.collisionCertified = false;
     expect(() => validatePredictiveBundle(uncertified)).toThrow(/applied output must be certified/);
 
     const worse = fixture();
     worse.scenarios[0]!.runs[1]!.smoothing.maxTurnAngleAfterDeg = 100;
     expect(() => validatePredictiveBundle(worse)).toThrow(/cannot increase/);
+
+    const dynamicsClaim = fixture();
+    const diagnostics = dynamicsClaim.scenarios[0]!.runs[1]!.smoothing
+      .kinematicDiagnostics as unknown as Record<string, unknown>;
+    diagnostics.continuousDynamicsCertified = true;
+    expect(() => validatePredictiveBundle(dynamicsClaim)).toThrow(
+      /continuousDynamicsCertified must remain false/,
+    );
+
+    const scope = fixture();
+    const smoothing = scope.scenarios[0]!.runs[1]!.smoothing as unknown as Record<string, unknown>;
+    smoothing.collisionCertificationScope = "continuous-dynamics";
+    expect(() => validatePredictiveBundle(scope)).toThrow(/collisionCertificationScope/);
+  });
+
+  it("rejects minimum-separation witnesses that disagree with the executed run", () => {
+    const distance = fixture();
+    distance.scenarios[0]!.runs[0]!.metrics.minimumSeparationWitness!.separationM = 24;
+    expect(() => validatePredictiveBundle(distance)).toThrow(/witness is inconsistent/);
+
+    const obstacle = fixture();
+    obstacle.scenarios[0]!.runs[0]!.metrics.minimumSeparationWitness!.obstacleId = "unknown";
+    expect(() => validatePredictiveBundle(obstacle)).toThrow(/moving-sphere witness/);
   });
 
   it("rejects environment counts and legacy quadratic frame paths", () => {

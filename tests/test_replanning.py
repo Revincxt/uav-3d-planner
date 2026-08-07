@@ -55,6 +55,30 @@ def test_dstar_lite_uses_the_shared_direct_endpoint_contract() -> None:
     assert dstar.parameters["direct_line_of_sight"] is True
 
 
+def test_dstar_lite_goal_aware_anchor_avoids_an_avoidable_reverse_connector() -> None:
+    scene = Scene(
+        "goal-aware-anchor",
+        "Goal-aware anchor",
+        Bounds3D((0.0, 0.0, 0.0), (24.0, 24.0, 16.0)),
+        (5.9, 8.0, 4.0),
+        (18.1, 8.0, 4.0),
+        (AABB("barrier", (10.0, 6.0, 0.0), (14.0, 10.0, 8.0)),),
+        drone_radius=0.1,
+        safety_margin=0.1,
+    )
+    planner = DStarLite3D(DStarLiteConfig(resolution=4.0, max_queue_pops=20_000))
+
+    result = planner.plan(scene)
+
+    assert result.success, result.failure_reason
+    assert result.parameters["anchor_policy"] == "goal-aware-start-multi-goal-v1"
+    assert result.parameters["start_anchor_candidates"] > 1
+    assert result.parameters["goal_anchor_candidates"] > 1
+    assert result.path[1][0] > scene.start[0]
+    assert result.parameters["selected_start_anchor"] == (2, 2, 1)
+    assert result.parameters["selected_goal_anchor"] == (4, 1, 1)
+
+
 def test_dstar_lite_repeated_direct_calls_without_grid_anchors() -> None:
     scene = Scene(
         "sub-resolution-direct",

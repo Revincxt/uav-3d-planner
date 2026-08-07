@@ -372,6 +372,63 @@ function frame(value, label, scenario) {
   return { timeS, vehicle, event };
 }
 
+function discreteKinematicDiagnostics(value, label) {
+  const entry = object(value, label);
+  if (entry.status !== "discrete-diagnostic-only") {
+    fail(`${label}.status must be discrete-diagnostic-only`);
+  }
+  if (entry.continuousDynamicsCertified !== false) {
+    fail(`${label}.continuousDynamicsCertified must remain false`);
+  }
+  const parsed = {
+    status: entry.status,
+    continuousDynamicsCertified: false,
+    segmentCount: integer(entry.segmentCount, `${label}.segmentCount`),
+    movementSegmentCount: integer(entry.movementSegmentCount, `${label}.movementSegmentCount`),
+    reversalCount: integer(entry.reversalCount, `${label}.reversalCount`),
+    reversalThresholdDeg: positive(entry.reversalThresholdDeg, `${label}.reversalThresholdDeg`),
+    maxSpeedMps: nonNegative(entry.maxSpeedMps, `${label}.maxSpeedMps`),
+    maxDiscreteVelocityChangeMps: nonNegative(
+      entry.maxDiscreteVelocityChangeMps,
+      `${label}.maxDiscreteVelocityChangeMps`,
+    ),
+    maxDiscreteAccelerationProxyMps2: nonNegative(
+      entry.maxDiscreteAccelerationProxyMps2,
+      `${label}.maxDiscreteAccelerationProxyMps2`,
+    ),
+    maxAbsClimbRateMps: nonNegative(
+      entry.maxAbsClimbRateMps,
+      `${label}.maxAbsClimbRateMps`,
+    ),
+  };
+  if (parsed.reversalThresholdDeg > 180 + TOLERANCE) {
+    fail(`${label}.reversalThresholdDeg cannot exceed 180 degrees`);
+  }
+  if (parsed.movementSegmentCount > parsed.segmentCount) {
+    fail(`${label}.movementSegmentCount cannot exceed segmentCount`);
+  }
+  if (parsed.reversalCount > Math.max(0, parsed.movementSegmentCount - 1)) {
+    fail(`${label}.reversalCount is inconsistent with movementSegmentCount`);
+  }
+  return parsed;
+}
+
+function kinematicDiagnostics(value, label) {
+  const entry = object(value, label);
+  if (entry.status !== "discrete-diagnostic-only") {
+    fail(`${label}.status must be discrete-diagnostic-only`);
+  }
+  if (entry.continuousDynamicsCertified !== false) {
+    fail(`${label}.continuousDynamicsCertified must remain false`);
+  }
+  return {
+    status: entry.status,
+    continuousDynamicsCertified: false,
+    raw: discreteKinematicDiagnostics(entry.raw, `${label}.raw`),
+    output: discreteKinematicDiagnostics(entry.output, `${label}.output`),
+  };
+}
+
 function smoothing(value, label) {
   const entry = object(value, label);
   const before =
@@ -389,6 +446,11 @@ function smoothing(value, label) {
     method: text(entry.method, `${label}.method`),
     applied: bool(entry.applied, `${label}.applied`),
     certified: bool(entry.certified, `${label}.certified`),
+    collisionCertified: bool(entry.collisionCertified, `${label}.collisionCertified`),
+    collisionCertificationScope:
+      entry.collisionCertificationScope === "dense-piecewise-linear-space-time-path"
+        ? entry.collisionCertificationScope
+        : fail(`${label}.collisionCertificationScope is unsupported`),
     rawWaypointCount: positiveInteger(entry.rawWaypointCount, `${label}.rawWaypointCount`),
     outputWaypointCount: positiveInteger(entry.outputWaypointCount, `${label}.outputWaypointCount`),
     roundedCornerCount: integer(entry.roundedCornerCount, `${label}.roundedCornerCount`),
@@ -400,7 +462,14 @@ function smoothing(value, label) {
     sampleSpacingM: positive(entry.sampleSpacingM, `${label}.sampleSpacingM`),
     before,
     after,
+    kinematicDiagnostics: kinematicDiagnostics(
+      entry.kinematicDiagnostics,
+      `${label}.kinematicDiagnostics`,
+    ),
   };
+  if (parsed.collisionCertified !== parsed.certified) {
+    fail(`${label}.collisionCertified must agree with certified`);
+  }
   if (parsed.applied && !parsed.certified) fail(`${label} applied output must be certified`);
   if (parsed.applied !== (parsed.appliedTurnRadiusM !== null)) {
     fail(`${label}.appliedTurnRadiusM must be present exactly when smoothing is applied`);
@@ -418,7 +487,35 @@ function smoothing(value, label) {
   if (before !== null && after !== null && after > before + 1e-5) {
     fail(`${label} cannot increase maximum turn angle`);
   }
+  if (
+    parsed.kinematicDiagnostics.raw.segmentCount !== parsed.rawWaypointCount - 1 ||
+    parsed.kinematicDiagnostics.output.segmentCount !== parsed.outputWaypointCount - 1
+  ) {
+    fail(`${label}.kinematicDiagnostics segment counts disagree with waypoint counts`);
+  }
   return parsed;
+}
+
+function minimumSeparationWitness(value, label) {
+  if (value === null) return null;
+  const entry = object(value, label);
+  if (entry.obstacleKind !== "moving-sphere" && entry.obstacleKind !== "temporary-cylinder") {
+    fail(`${label}.obstacleKind is unsupported`);
+  }
+  return {
+    separationM: finite(entry.separationM, `${label}.separationM`),
+    timeS: nonNegative(entry.timeS, `${label}.timeS`),
+    vehiclePosition: vec3(entry.vehiclePosition, `${label}.vehiclePosition`),
+    obstacleId: text(entry.obstacleId, `${label}.obstacleId`),
+    obstacleKind: entry.obstacleKind,
+    obstaclePosition: vec3(entry.obstaclePosition, `${label}.obstaclePosition`),
+    declaredSafetyMarginM: nonNegative(
+      entry.declaredSafetyMarginM,
+      `${label}.declaredSafetyMarginM`,
+    ),
+    method: text(entry.method, `${label}.method`),
+    exact: bool(entry.exact, `${label}.exact`),
+  };
 }
 
 function metrics(value, label) {
@@ -440,7 +537,11 @@ function metrics(value, label) {
     minimumSeparationM:
       entry.minimumSeparationM === null
         ? null
-        : nonNegative(entry.minimumSeparationM, `${label}.minimumSeparationM`),
+        : finite(entry.minimumSeparationM, `${label}.minimumSeparationM`),
+    minimumSeparationWitness: minimumSeparationWitness(
+      entry.minimumSeparationWitness,
+      `${label}.minimumSeparationWitness`,
+    ),
     safetyViolations: integer(entry.safetyViolations, `${label}.safetyViolations`),
   };
 }
@@ -494,6 +595,77 @@ function run(value, label, scenario, planner) {
   });
 
   const outcome = metrics(entry.metrics, `${label}.metrics`);
+  const separationWitness = outcome.minimumSeparationWitness;
+  if ((outcome.minimumSeparationM === null) !== (separationWitness === null)) {
+    fail(`${label}.metrics minimum separation and witness must be present together`);
+  }
+  if (separationWitness !== null) {
+    if (
+      !sameNumber(outcome.minimumSeparationM, separationWitness.separationM) ||
+      !sameNumber(separationWitness.declaredSafetyMarginM, scenario.constraints.safetyMarginM)
+    ) {
+      fail(`${label}.metrics minimum-separation witness is inconsistent`);
+    }
+    if (
+      separationWitness.timeS > points.at(-1).timeS + TOLERANCE ||
+      !inBounds(separationWitness.vehiclePosition, scenario.bounds) ||
+      !inBounds(separationWitness.obstaclePosition, scenario.bounds) ||
+      !samePoint(separationWitness.vehiclePosition, interpolate(points, separationWitness.timeS))
+    ) {
+      fail(`${label}.metrics minimum-separation witness is outside the executed trajectory`);
+    }
+    const witnessSurfaceDistance = Math.hypot(
+      separationWitness.vehiclePosition[0] - separationWitness.obstaclePosition[0],
+      separationWitness.vehiclePosition[1] - separationWitness.obstaclePosition[1],
+      separationWitness.vehiclePosition[2] - separationWitness.obstaclePosition[2],
+    );
+    if (
+      !sameNumber(
+        separationWitness.separationM,
+        witnessSurfaceDistance - scenario.constraints.vehicleRadiusM,
+      )
+    ) {
+      fail(`${label}.metrics minimum-separation witness geometry is inconsistent`);
+    }
+    if (separationWitness.obstacleKind === "moving-sphere") {
+      const definition = scenario.movingSphereMap.get(separationWitness.obstacleId);
+      const center = definition && interpolate(definition.keyframes, separationWitness.timeS);
+      if (
+        definition === undefined ||
+        center === undefined ||
+        !separationWitness.exact ||
+        !sameNumber(
+          Math.hypot(
+            separationWitness.obstaclePosition[0] - center[0],
+            separationWitness.obstaclePosition[1] - center[1],
+            separationWitness.obstaclePosition[2] - center[2],
+          ),
+          definition.radiusM,
+        ) ||
+        !sameNumber(
+          Math.hypot(
+            separationWitness.vehiclePosition[0] - center[0],
+            separationWitness.vehiclePosition[1] - center[1],
+            separationWitness.vehiclePosition[2] - center[2],
+          ),
+          witnessSurfaceDistance + definition.radiusM,
+        )
+      ) {
+        fail(`${label}.metrics moving-sphere witness is inconsistent`);
+      }
+    } else if (
+      separationWitness.exact ||
+      !scenario.temporaryNoFlyZones.some((zone) => zone.id === separationWitness.obstacleId)
+    ) {
+      fail(`${label}.metrics temporary-cylinder witness is inconsistent`);
+    }
+    if (
+      outcome.safetyViolations === 0 &&
+      separationWitness.separationM + TOLERANCE < scenario.constraints.safetyMarginM
+    ) {
+      fail(`${label}.metrics safe run violates its declared dynamic safety margin`);
+    }
+  }
   const expectedWorkUnit =
     planner.id === "space-time-astar-4d"
       ? "expanded-spacetime-states"
@@ -642,6 +814,7 @@ function scenario(value, label, planners) {
     bounds,
     start,
     goal,
+    constraints: { vehicleRadiusM, safetyMarginM },
     buildings,
     staticNoFlyZones,
     temporaryNoFlyZones,
@@ -696,7 +869,10 @@ function validateBundle(value) {
   if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sourceCommit)) {
     fail("sourceCommit must be a full lowercase Git object ID");
   }
-  parseProtocol(root.protocol);
+  const protocol = parseProtocol(root.protocol);
+  if (protocol.id !== "predictive-space-time-v3") {
+    fail("protocol.id must be predictive-space-time-v3");
+  }
 
   const plannerEntries = uniqueIdObjects(root.planners, "planners").map((planner, index) => ({
     id: planner.id,
@@ -731,12 +907,14 @@ function validateBundle(value) {
     "vertical-time-window",
     "urban-canyon-merge",
     "rooftop-transfer",
+    "braided-skyway",
+    "harbor-switchback",
   ];
   if (
     scenarios.length !== expectedScenarioIds.length ||
     expectedScenarioIds.some((id) => !scenarios.some((entry) => entry.id === id))
   ) {
-    fail("the public v0.5 protocol requires the eight declared scenarios");
+    fail("the public v0.6 protocol requires the ten declared scenarios");
   }
   if (new Set(scenarios.map((entry) => entry.id)).size !== scenarios.length) fail("scenario IDs must be unique");
   if (new Set(scenarios.map((entry) => entry.fingerprint)).size !== scenarios.length) {
@@ -753,7 +931,7 @@ function validateBundle(value) {
     fail("at least one demo scenario must have 14 buildings, a static NFZ, and two dynamic hazards");
   }
   const runIds = scenarios.flatMap((entry) => entry.runs.map((record) => record.runId));
-  if (runIds.length !== 32) fail("the public v0.5 protocol requires exactly 32 planner runs");
+  if (runIds.length !== 40) fail("the public v0.6 protocol requires exactly 40 planner runs");
   if (new Set(runIds).size !== runIds.length) fail("runId values must be unique across the bundle");
 
   const downloads = object(root.downloads, "downloads");

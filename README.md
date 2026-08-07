@@ -21,7 +21,7 @@
   <img src="docs/assets/readme/predictive-urban-canyon-focused.jpg" alt="Predictive planning study showing a dense urban canyon, no-fly volumes, moving hazards, a certified trajectory, and the recorded-state panel">
 </a>
 
-<p align="center"><sub><strong>Recorded v0.5 evidence.</strong> Urban canyon merge · 15 buildings · 4 hazards · 4D Space-Time A* · certified trajectory.</sub></p>
+<p align="center"><sub><strong>Representative retained case.</strong> Urban canyon merge · 15 buildings · 4 hazards · 4D Space-Time A* · certified trajectory.</sub></p>
 
 UAV 3D Planner Lab is an experiment-first Python benchmark for studying how grid, any-angle,
 sampling-based, incremental, and space–time planners behave in the same declared urban geometry.
@@ -43,25 +43,27 @@ smoother: it replays committed records that Python regenerates and independently
 
 <p align="center"><sub>Study design. Planner families are compared within explicit information, discretization, execution, and work-budget contracts.</sub></p>
 
-## Recorded evidence in v0.5
+## Recorded evidence in v0.6
 
 | Scope | Recorded result |
 | --- | ---: |
-| Curated deterministic missions | **8** — 1 calibration case + 7 complex city cases |
+| Curated deterministic missions | **10** — 1 calibration case + 9 complex city cases |
 | Planner conditions per mission | **4** |
-| Completed recorded runs | **32 / 32** |
+| Completed recorded runs | **40 / 40** |
 | Safety violations in the declared continuous space–time audit | **0** |
-| Runs accepting sampled circular-fillet rounding | **26 / 32** |
-| Runs retaining a certified execution polyline | **32 / 32** |
+| Runs accepting sampled circular-fillet rounding | **34 / 40** |
+| Runs retaining a certified execution polyline | **40 / 40** |
+| Runs carrying a dynamic closest-approach witness | **40 / 40** |
 
-Each non-calibration map contains 14–16 unequal-height buildings, at least one static no-fly zone,
-and at least two scheduled or moving hazards. The raw timed path is retained for every run. Rounding
-is a common downstream operation—not a property attributed to any planner—and falls back to the
-certified raw polyline if a candidate fails the audit.
+Seven non-calibration maps contain 14–16 unequal-height buildings; the new `braided-skyway` and
+`harbor-switchback` diagnostics each contain 20. Every complex case has at least one static no-fly
+zone and two time-dependent hazards, while the two extended cases each carry four. The raw timed
+path is retained for every run. Rounding is a common downstream operation—not a property attributed
+to any planner—and falls back to the certified raw polyline if a candidate fails the audit.
 
-> These are curated, non-preregistered diagnostic cases. “0 violations” describes the fixed v0.5
+> These are curated, non-preregistered diagnostic cases. “0 violations” describes the fixed v0.6
 > records under the declared geometry and deterministic schedule; it is not a general safety claim
-> or flight certification. The independent unit is the scenario (n = 8), not the 32 planner runs,
+> or flight certification. The independent unit is the scenario (n = 10), not the 40 planner runs,
 > playback frames, waits, or replanning epochs.
 
 ## Algorithm map
@@ -126,6 +128,8 @@ cd web && pnpm validate:data && pnpm test && pnpm typecheck && pnpm build
 The geometry audit uses continuous segment tests for axis-aligned boxes and finite vertical
 cylinders. Dynamic validation adds exact relative-motion checks for moving spheres, scheduled
 restrictions, endpoint connectors, explicit waits, and every dense linear space–time segment.
+Closest-approach witnesses and waypoint-level kinematic values are descriptive diagnostics: they do
+not expand the collision certificate into a continuous vehicle-dynamics certificate.
 
 ## Project guide
 
@@ -134,6 +138,7 @@ restrictions, endpoint connectors, explicit waits, and every dense linear space�
 | [Methodology](docs/methodology.md) | Assumptions, experiment contracts, estimands, collision model, and comparison limits |
 | [Data schema](docs/data-schema.md) | Static, dynamic, and predictive record formats |
 | [v0.5 study plan](docs/v0.5-demo-plan.md) | Scenario contracts, smoothing policy, and release acceptance criteria |
+| [v0.6 model/UI plan](docs/v0.6-model-ui-plan.md) | Extended-city cases, diagnostic metrics, UI scope, and acceptance gates |
 | [Roadmap](docs/roadmap.md) | Planned research extensions and explicit non-goals |
 | [Changelog](CHANGELOG.md) | Version-by-version changes |
 | [Citation metadata](CITATION.cff) | Repository citation information |
@@ -144,12 +149,13 @@ behavioral tests live in `tests/`; the four recorded study views live in `web/`.
 ## Current limits
 
 - The vehicle is spherical and follows a speed-limited dense piecewise-linear geometric path.
-- The model does not certify attitude, acceleration, turn rate, continuous curvature, jerk,
+- Discrete velocity-change, acceleration-proxy, climb-rate, and reversal values are diagnostics only.
+  The model does not certify attitude, acceleration, turn rate, continuous curvature, jerk,
   minimum-snap dynamics, wind, energy use, sensing uncertainty, or forecast uncertainty.
 - Predictive experiments use a known deterministic schedule; the Pages application is recorded
   continuous-time playback, not a real-time planner.
-- The v0.5 cohort is diagnostic and non-confirmatory. Its protocol differs from v0.4, so results
-  should not be pooled across those versions.
+- The v0.6 cohort is diagnostic and non-confirmatory. It contains the v0.5 cases as a historical
+  subset, so rows from both releases must not be pooled as independent scenarios.
 - The project is a planning research benchmark, not a flight controller, regulatory-compliance
   tool, or operational safety system.
 

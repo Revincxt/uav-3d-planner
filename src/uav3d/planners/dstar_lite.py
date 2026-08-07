@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 
 from uav3d.collision import point_is_free, segment_is_free
-from uav3d.geometry import Point3, distance
+from uav3d.geometry import Point3, distance, dot, subtract
 from uav3d.planners.base import BudgetUsage, PlanningBudget, PlanningResult, Scalar
 from uav3d.planners.grid import GridIndex, VoxelGrid, attach_exact_endpoints
 from uav3d.scene import Scene
@@ -40,9 +40,11 @@ class DStarLite3D:
         self._grid: VoxelGrid | None = None
         self._scene: Scene | None = None
         self._goal_point: Point3 | None = None
-        self._goal: GridIndex | None = None
+        self._goal_terminal_costs: dict[GridIndex, float] = {}
         self._start: GridIndex | None = None
         self._last_start: GridIndex | None = None
+        self._start_anchor_candidates_last = 0
+        self._selected_goal_last: GridIndex | None = None
         self._g: dict[GridIndex, float] = {}
         self._rhs: dict[GridIndex, float] = {}
         self._queue: list[tuple[float, float, int, GridIndex]] = []
@@ -87,9 +89,11 @@ class DStarLite3D:
         self._grid = None
         self._scene = None
         self._goal_point = None
-        self._goal = None
+        self._goal_terminal_costs.clear()
         self._start = None
         self._last_start = None
+        self._start_anchor_candidates_last = 0
+        self._selected_goal_last = None
         self._g.clear()
         self._rhs.clear()
         self._queue.clear()
@@ -105,13 +109,15 @@ class DStarLite3D:
     def plan(self, scene: Scene, seed: int = 0) -> PlanningResult:
         del seed
         started = time.perf_counter()
+        self._start_anchor_candidates_last = 0
+        self._selected_goal_last = None
         budget = PlanningBudget("queue-pops", self.config.max_queue_pops)
         parameters: dict[str, Scalar] = {
             "resolution": self.config.resolution,
             "max_queue_pops": self.config.max_queue_pops,
             "connectivity": 26,
             "incremental": True,
-            "anchor_policy": "nearest-visible",
+            "anchor_policy": "goal-aware-start-multi-goal-v1",
         }
         if not point_is_free(scene, scene.start) or not point_is_free(scene, scene.goal):
             self._queue_pops_last = 0
@@ -218,7 +224,7 @@ class DStarLite3D:
             or self._scene is None
             or self._goal_point is None
             or self._start is None
-            or self._goal is None
+            or not self._goal_terminal_costs
         ):
             return False
         old = self._scene
@@ -229,38 +235,111 @@ class DStarLite3D:
             and old.safety_margin == scene.safety_margin
         )
 
-    def _anchor(self, scene: Scene, point: Point3) -> GridIndex | None:
-        anchors = VoxelGrid(scene, self.config.resolution).anchor_indices(point)
-        return anchors[0] if anchors else None
+    def _visible_goal_terminal_costs(
+        self, scene: Scene, grid: VoxelGrid
+    ) -> dict[GridIndex, float]:
+        """Return every visible goal anchor and its exact-endpoint connector cost."""
+
+        return {
+            anchor: distance(grid.point(anchor), scene.goal)
+            for anchor in grid.anchor_indices(scene.goal)
+        }
+
+    def _start_anchor_key(
+        self,
+        scene: Scene,
+        grid: VoxelGrid,
+        anchor: GridIndex,
+        goal_terminal_costs: dict[GridIndex, float],
+    ) -> tuple[bool, float, float, GridIndex]:
+        """Rank a visible start anchor by progress, then a goal-aware lower bound.
+
+        A negative projection along the start-to-goal axis indicates an avoidable backwards exact
+        connector.  Such candidates remain valid fallbacks, but are ranked after candidates that
+        make non-negative progress.  The second key considers every visible goal connector instead
+        of coupling D* Lite to one nearest goal voxel.
+        """
+
+        anchor_point = grid.point(anchor)
+        mission_axis = subtract(scene.goal, scene.start)
+        connector = subtract(anchor_point, scene.start)
+        backwards = dot(connector, mission_axis) < -1e-12
+        connector_cost = distance(scene.start, anchor_point)
+        goal_lower_bound = min(
+            distance(anchor_point, grid.point(goal_anchor)) + terminal_cost
+            for goal_anchor, terminal_cost in goal_terminal_costs.items()
+        )
+        return (backwards, connector_cost + goal_lower_bound, connector_cost, anchor)
+
+    def _select_start_anchor(
+        self,
+        scene: Scene,
+        grid: VoxelGrid,
+        candidates: list[GridIndex],
+        goal_terminal_costs: dict[GridIndex, float],
+    ) -> GridIndex | None:
+        self._start_anchor_candidates_last = len(candidates)
+        if not candidates or not goal_terminal_costs:
+            return None
+        return min(
+            candidates,
+            key=lambda anchor: self._start_anchor_key(
+                scene, grid, anchor, goal_terminal_costs
+            ),
+        )
+
+    def _anchor_parameters(self) -> dict[str, Scalar]:
+        parameters: dict[str, Scalar] = {
+            "start_anchor_candidates": self._start_anchor_candidates_last,
+            "goal_anchor_candidates": len(self._goal_terminal_costs),
+        }
+        if self._start_anchor_candidates_last and self._start is not None:
+            parameters["selected_start_anchor"] = self._start
+        if self._selected_goal_last is not None:
+            parameters["selected_goal_anchor"] = self._selected_goal_last
+        return parameters
 
     def _initialize(self, scene: Scene) -> bool:
         self.reset()
         self._grid = VoxelGrid(scene, self.config.resolution)
         self._scene = scene
         self._goal_point = scene.goal
-        self._start = self._anchor(scene, scene.start)
-        self._goal = self._anchor(scene, scene.goal)
-        if self._start is None or self._goal is None:
+        self._goal_terminal_costs = self._visible_goal_terminal_costs(scene, self._grid)
+        self._start = self._select_start_anchor(
+            scene,
+            self._grid,
+            self._grid.anchor_indices(scene.start),
+            self._goal_terminal_costs,
+        )
+        if self._start is None or not self._goal_terminal_costs:
             return False
         self._last_start = self._start
-        self._rhs[self._goal] = 0.0
-        self._push(self._goal)
+        for goal, connector_cost in sorted(self._goal_terminal_costs.items()):
+            self._rhs[goal] = connector_cost
+            self._push(goal)
         return True
 
     def _update_problem(self, scene: Scene) -> bool:
         assert self._grid is not None
         assert self._scene is not None
         assert self._start is not None
-        new_start = self._anchor(scene, scene.start)
-        new_goal = self._anchor(scene, scene.goal)
-        if new_start is None or new_goal is None or new_goal != self._goal:
+        new_grid = VoxelGrid(scene, self.config.resolution)
+        new_goal_terminal_costs = self._visible_goal_terminal_costs(scene, new_grid)
+        new_start = self._select_start_anchor(
+            scene,
+            new_grid,
+            new_grid.anchor_indices(scene.start),
+            new_goal_terminal_costs,
+        )
+        if new_start is None or new_goal_terminal_costs != self._goal_terminal_costs:
             return False
         previous_start = self._start
         self._start = new_start
         self._km += self._heuristic(previous_start, new_start)
         self._last_start = previous_start
-        self._grid = VoxelGrid(scene, self.config.resolution)
+        self._grid = new_grid
         self._scene = scene
+        self._selected_goal_last = None
 
         changed: list[Edge] = []
         for edge, old_cost in tuple(self._edge_costs.items()):
@@ -348,8 +427,7 @@ class DStarLite3D:
         return self._edge_costs[edge]
 
     def _update_vertex(self, vertex: GridIndex) -> None:
-        assert self._goal is not None
-        if vertex != self._goal:
+        if vertex not in self._goal_terminal_costs:
             best = math.inf
             for successor in self._potential_neighbors(vertex):
                 candidate = self._edge_cost(vertex, successor) + self._value(self._g, successor)
@@ -389,14 +467,13 @@ class DStarLite3D:
     def _extract_path(self, scene: Scene) -> tuple[Point3, ...]:
         assert self._grid is not None
         assert self._start is not None
-        assert self._goal is not None
         if math.isinf(self._value(self._g, self._start)):
             return ()
         current = self._start
         indices = [current]
         seen = {current}
         vertex_limit = math.prod(self._grid.shape) + 1
-        while current != self._goal and len(indices) <= vertex_limit:
+        while current not in self._goal_terminal_costs and len(indices) <= vertex_limit:
             choices: list[tuple[float, GridIndex]] = []
             for successor in self._potential_neighbors(current):
                 cost = self._edge_cost(current, successor)
@@ -410,8 +487,9 @@ class DStarLite3D:
                 return ()
             seen.add(current)
             indices.append(current)
-        if current != self._goal:
+        if current not in self._goal_terminal_costs:
             return ()
+        self._selected_goal_last = current
         grid_path = [self._grid.point(index) for index in indices]
         return attach_exact_endpoints(scene, grid_path, scene.start, scene.goal)
 
@@ -424,6 +502,7 @@ class DStarLite3D:
         parameters: dict[str, Scalar],
         budget: PlanningBudget,
     ) -> PlanningResult:
+        parameters.update(self._anchor_parameters())
         elapsed = (time.perf_counter() - started) * 1000.0
         termination = "goal-reached" if success else (failure_reason or "failed")
         return PlanningResult(

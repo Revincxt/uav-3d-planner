@@ -1,6 +1,6 @@
 {
   "datasetId": "curated-dynamic-diagnostic-v1",
-  "generatedAt": "2026-08-05T10:15:59+00:00",
+  "generatedAt": "2026-08-07T13:06:38+00:00",
   "protocolId": "dynamic-replanning-demo-v1",
   "runCount": 12,
   "scenarioCount": 4,
@@ -35,5 +35,5 @@
     "algorithmFiltering": "none",
     "scenarioRule": "all built-in dynamic scenarios"
   },
-  "sourceCommit": "f772c0c788390047fa55ed3e3bfd9aa815953a89"
+  "sourceCommit": "9644c2dcaaeec458e4ec695b8ca19f3afeefc9b8"
 }

@@ -19,20 +19,71 @@
       </nav>
 
       <header class="predictive-masthead">
-        <div>
+        <div class="masthead-copy">
           <p class="eyebrow">Experiment P5 · recorded deterministic study</p>
           <h1>Predictive space–time planning</h1>
           <p class="scope">
-            Reactive and forecast-aware trajectories in layered urban geometry, shown as certified
-            recorded evidence rather than live planner output.
+            A recorded comparison of reactive and forecast-aware trajectories in structured urban
+            airspace. Geometry, timing, and post-processing remain directly inspectable.
           </p>
         </div>
-        <p class="evidence-label">Non-confirmatory · raw paths retained</p>
+        <dl class="study-register" aria-label="Study scope">
+          <div>
+            <dt>Design</dt>
+            <dd id="study-design-count">10 cases × 4 conditions</dd>
+          </div>
+          <div>
+            <dt>Geometry</dt>
+            <dd>3D city + time</dd>
+          </div>
+          <div>
+            <dt>Evidence</dt>
+            <dd>Recorded, certified</dd>
+          </div>
+          <div>
+            <dt>Inference</dt>
+            <dd>Non-confirmatory</dd>
+          </div>
+        </dl>
       </header>
 
       <p id="load-state" class="load-state" role="status" aria-live="polite">
         Loading recorded predictive traces…
       </p>
+
+      <section class="case-selector" aria-labelledby="case-selector-heading">
+        <div class="case-selector-intro">
+          <p class="figure-number">Case index</p>
+          <div>
+            <h2 id="case-selector-heading">Select an experimental record</h2>
+            <p>Scenario and planner choices update every panel below.</p>
+          </div>
+        </div>
+        <div class="selection-controls" aria-label="Trace selection">
+          <label>
+            <span>Urban scenario</span>
+            <select id="scenario-select"></select>
+          </label>
+          <label>
+            <span>Planning condition</span>
+            <select id="planner-select"></select>
+          </label>
+        </div>
+        <dl class="case-readout" aria-label="Selected case summary">
+          <div>
+            <dt>Information</dt>
+            <dd id="case-information">—</dd>
+          </div>
+          <div>
+            <dt>Urban fabric</dt>
+            <dd id="case-geometry">—</dd>
+          </div>
+          <div>
+            <dt>Mission</dt>
+            <dd id="case-mission">—</dd>
+          </div>
+        </dl>
+      </section>
 
       <section class="experiment-plate" aria-labelledby="figure-one-heading">
         <header class="plate-header">
@@ -40,20 +91,34 @@
             <p class="figure-number">Figure 1</p>
             <div>
               <h2 id="figure-one-heading">Space–time trajectory replay</h2>
-              <p>Geometry, restrictions, moving hazards, and the selected execution record.</p>
+              <p>Recorded geometry and mission state at the selected instant.</p>
             </div>
           </div>
-          <div class="selection-controls" aria-label="Trace selection">
-            <label>
-              <span>Scenario</span>
-              <select id="scenario-select"></select>
-            </label>
-            <label>
-              <span>Planner</span>
-              <select id="planner-select"></select>
-            </label>
-          </div>
+          <p class="plate-method">Continuous segment audit · ENU metres · deterministic clock</p>
         </header>
+
+        <dl class="result-strip" aria-label="Selected result summary">
+          <div>
+            <dt>Outcome</dt>
+            <dd id="metric-outcome">—</dd>
+          </div>
+          <div>
+            <dt>Arrival</dt>
+            <dd id="metric-arrival">—</dd>
+          </div>
+          <div>
+            <dt>Stationary</dt>
+            <dd id="metric-wait">—</dd>
+          </div>
+          <div>
+            <dt>Path length</dt>
+            <dd id="metric-path">—</dd>
+          </div>
+          <div>
+            <dt>Safety audit</dt>
+            <dd id="metric-safety">—</dd>
+          </div>
+        </dl>
 
         <div class="figure-grid">
           <figure class="scene-panel" aria-labelledby="scene-panel-heading">
@@ -63,18 +128,24 @@
                 <h3 id="scene-panel-heading">Urban flight volume</h3>
               </div>
               <div class="compact-controls">
-                <div class="segmented-control" aria-label="Trajectory geometry">
-                  <button type="button" data-path-mode="raw" aria-pressed="false">Raw</button>
-                  <button type="button" data-path-mode="certified" aria-pressed="true">
-                    Certified
-                  </button>
+                <div class="control-cluster">
+                  <span class="control-label" aria-hidden="true">Path</span>
+                  <div class="segmented-control" aria-label="Trajectory geometry">
+                    <button type="button" data-path-mode="raw" aria-pressed="false">Raw</button>
+                    <button type="button" data-path-mode="certified" aria-pressed="true">
+                      Certified
+                    </button>
+                  </div>
                 </div>
-                <div class="view-controls" aria-label="Camera projection">
-                  <button type="button" data-view="isometric" aria-pressed="true">ISO</button>
-                  <button type="button" data-view="xy" aria-pressed="false">XY</button>
-                  <button type="button" data-view="xz" aria-pressed="false">XZ</button>
-                  <button type="button" data-view="yz" aria-pressed="false">YZ</button>
-                  <button type="button" data-view="fit" aria-label="Fit scene to view">Fit</button>
+                <div class="control-cluster">
+                  <span class="control-label" aria-hidden="true">View</span>
+                  <div class="view-controls" aria-label="Camera projection">
+                    <button type="button" data-view="isometric" aria-pressed="true">ISO</button>
+                    <button type="button" data-view="xy" aria-pressed="false">XY</button>
+                    <button type="button" data-view="xz" aria-pressed="false">XZ</button>
+                    <button type="button" data-view="yz" aria-pressed="false">YZ</button>
+                    <button type="button" data-view="fit" aria-label="Fit scene to view">Fit</button>
+                  </div>
                 </div>
               </div>
             </header>
@@ -89,6 +160,20 @@
               <div class="orientation-reference" aria-hidden="true">
                 <span class="north-mark">N</span>
                 <span>ENU coordinates</span>
+              </div>
+              <div class="viewer-time" aria-hidden="true">
+                <span>Mission time</span>
+                <strong id="viewer-time-value">0.0 s</strong>
+              </div>
+              <div class="viewer-legend" aria-label="Map legend">
+                <p>Trajectory</p>
+                <span class="legend-item raw"><i aria-hidden="true"></i>Raw</span>
+                <span class="legend-item planned"><i aria-hidden="true"></i>Selected</span>
+                <span class="legend-item executed"><i aria-hidden="true"></i>Executed</span>
+                <p>Airspace</p>
+                <span class="legend-item buildings"><i aria-hidden="true"></i>Buildings</span>
+                <span class="legend-item restricted"><i aria-hidden="true"></i>Restriction</span>
+                <span class="legend-item moving"><i aria-hidden="true"></i>Moving</span>
               </div>
               <p id="canvas-summary" class="sr-only"></p>
             </div>
@@ -120,13 +205,7 @@
             </div>
 
             <figcaption>
-              <div class="legend" aria-label="Figure legend">
-                <span class="legend-item raw"><i aria-hidden="true"></i>Raw lattice path</span>
-                <span class="legend-item planned"><i aria-hidden="true"></i>Selected trajectory</span>
-                <span class="legend-item executed"><i aria-hidden="true"></i>Executed prefix</span>
-                <span class="legend-item restricted"><i aria-hidden="true"></i>Restricted volume</span>
-                <span class="legend-item moving"><i aria-hidden="true"></i>Moving hazard</span>
-              </div>
+              <span class="caption-label">Figure note</span>
               <p id="scene-caption"></p>
             </figcaption>
           </figure>
@@ -148,8 +227,8 @@
 
             <section aria-labelledby="state-summary-heading">
               <h4 id="state-summary-heading">Current state</h4>
-              <dl id="current-meta" class="evidence-list"></dl>
               <p id="current-event" class="current-event">No recorded event at this time.</p>
+              <dl id="current-meta" class="evidence-list"></dl>
             </section>
 
             <section aria-labelledby="smoothing-summary-heading">
@@ -163,7 +242,7 @@
               <label><input type="checkbox" data-layer="buildings" checked /> Buildings</label>
               <label><input type="checkbox" data-layer="zones" checked /> Restricted volumes</label>
               <label><input type="checkbox" data-layer="dynamic" checked /> Dynamic hazards</label>
-              <label><input type="checkbox" data-layer="raw" /> Raw reference overlay</label>
+              <label><input type="checkbox" data-layer="raw" checked /> Raw reference overlay</label>
             </fieldset>
           </aside>
         </div>
@@ -179,11 +258,11 @@
         </header>
         <div class="chart-grid">
           <figure class="chart-panel">
-            <figcaption>Altitude over mission time</figcaption>
+            <figcaption><span>A</span> Altitude over mission time</figcaption>
             <div id="altitude-chart" class="trajectory-chart"></div>
           </figure>
           <figure class="chart-panel">
-            <figcaption>Local turn angle along the trajectory</figcaption>
+            <figcaption><span>B</span> Local sampled turn angle</figcaption>
             <div id="turn-chart" class="trajectory-chart"></div>
           </figure>
         </div>
@@ -200,6 +279,11 @@
           </div>
           <p>Select a row to inspect its recorded trajectory.</p>
         </header>
+        <div class="table-key" aria-label="Comparison table key">
+          <span><i class="key-current" aria-hidden="true"></i>Selected condition</span>
+          <span><i class="key-reactive" aria-hidden="true"></i>Snapshot information</span>
+          <span><i class="key-predictive" aria-hidden="true"></i>Complete schedule</span>
+        </div>
         <div class="table-wrap" tabindex="0" aria-label="Scrollable planner comparison table">
           <table class="comparison-table">
             <caption>

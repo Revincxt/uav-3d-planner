@@ -25,10 +25,14 @@ interface ZoneVisual {
 interface ThemePalette {
   background: number;
   ground: number;
+  blockSurface: number;
+  blockEdge: number;
+  roadMarking: number;
   gridMajor: number;
   gridMinor: number;
   buildingLow: number;
   buildingHigh: number;
+  buildingRoof: number;
   buildingEdge: number;
   foreground: number;
   staticZone: number;
@@ -41,30 +45,38 @@ interface ThemePalette {
 }
 
 const LIGHT_PALETTE: ThemePalette = {
-  background: 0xf7f7f3,
-  ground: 0xe9ece8,
-  gridMajor: 0xaeb5b2,
-  gridMinor: 0xd5d9d6,
-  buildingLow: 0xb8bfbd,
-  buildingHigh: 0x697579,
-  buildingEdge: 0x515b5f,
-  foreground: 0x1d252c,
-  staticZone: 0xa34a3f,
+  background: 0xf1f1ec,
+  ground: 0xd7d9d4,
+  blockSurface: 0xe9e9e3,
+  blockEdge: 0xb8bbb4,
+  roadMarking: 0xf5f3e9,
+  gridMajor: 0x9fa6a2,
+  gridMinor: 0xc2c7c2,
+  buildingLow: 0xb7bebc,
+  buildingHigh: 0x657176,
+  buildingRoof: 0xd5d9d5,
+  buildingEdge: 0x4d585d,
+  foreground: 0x1b252b,
+  staticZone: 0x9b4239,
   temporaryZone: 0xb2742f,
-  movingSphere: 0x76558f,
-  rawPath: 0x71797e,
-  plannedPath: 0x315f8c,
-  executedPath: 0x15766b,
+  movingSphere: 0x6f578a,
+  rawPath: 0x697176,
+  plannedPath: 0x245a85,
+  executedPath: 0x0f7468,
   goal: 0xf7f7f3,
 };
 
 const DARK_PALETTE: ThemePalette = {
   background: 0x1e2427,
   ground: 0x282f31,
+  blockSurface: 0x353d3e,
+  blockEdge: 0x596364,
+  roadMarking: 0xa9a99d,
   gridMajor: 0x697274,
   gridMinor: 0x424a4c,
   buildingLow: 0x687376,
   buildingHigh: 0xaab3b3,
+  buildingRoof: 0xc7cdca,
   buildingEdge: 0xd1d5d3,
   foreground: 0xf0f1ed,
   staticZone: 0xe08779,
@@ -157,7 +169,7 @@ export class PredictiveViewer {
     buildings: true,
     zones: true,
     dynamic: true,
-    raw: false,
+    raw: true,
   };
   private scenario: PredictiveScenario | null = null;
   private run: PredictiveRun | null = null;
@@ -165,7 +177,7 @@ export class PredictiveViewer {
   private currentTimeS = 0;
   private currentView: ViewPreset = "isometric";
   private temporaryZones = new Map<string, ZoneVisual>();
-  private movingSpheres = new Map<string, THREE.Mesh>();
+  private movingSpheres = new Map<string, THREE.Object3D>();
   private lineMaterials = new Set<LineMaterial>();
   private vehicle: THREE.Mesh | null = null;
   private primaryPath: Line2 | null = null;
@@ -329,8 +341,8 @@ export class PredictiveViewer {
     this.clearContent();
     const palette = this.palette;
     this.scene.background = new THREE.Color(palette.background);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, palette.ground, 1.75));
-    const sun = new THREE.DirectionalLight(0xffffff, 2.3);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, palette.ground, 1.55));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.05);
     const lightTarget = new THREE.Vector3(
       (this.scenario.bounds.min[0] + this.scenario.bounds.max[0]) / 2,
       (this.scenario.bounds.min[2] + this.scenario.bounds.max[2]) / 2,
@@ -366,6 +378,17 @@ export class PredictiveViewer {
         heightFraction,
       );
       const geometry = new THREE.BoxGeometry(size[0], size[2], size[1]);
+      const parcel = new THREE.Mesh(
+        new THREE.BoxGeometry(size[0] + 2.4, 0.14, size[1] + 2.4),
+        new THREE.MeshStandardMaterial({
+          color: palette.blockSurface,
+          roughness: 1,
+          metalness: 0,
+        }),
+      );
+      parcel.position.set(center[0], this.scenario.bounds.min[2] + 0.07, -center[1]);
+      parcel.receiveShadow = true;
+      this.buildingsGroup.add(parcel);
       const mesh = new THREE.Mesh(
         geometry,
         new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0.02 }),
@@ -384,6 +407,20 @@ export class PredictiveViewer {
       );
       edges.position.copy(mesh.position);
       this.buildingsGroup.add(edges);
+
+      const roof = new THREE.Mesh(
+        new THREE.PlaneGeometry(size[0] * 0.86, size[1] * 0.86),
+        new THREE.MeshBasicMaterial({
+          color: palette.buildingRoof,
+          transparent: true,
+          opacity: 0.2,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        }),
+      );
+      roof.rotation.x = -Math.PI / 2;
+      roof.position.set(center[0], building.max[2] + 0.025, -center[1]);
+      this.buildingsGroup.add(roof);
     }
 
     for (const zone of this.scenario.staticNoFlyZones) this.addZone(zone, "static");
@@ -473,7 +510,63 @@ export class PredictiveViewer {
     );
     grid.position.copy(ground.position);
     grid.position.y += 0.025;
+    if (Array.isArray(grid.material)) {
+      for (const material of grid.material) {
+        material.transparent = true;
+        material.opacity = 0.62;
+      }
+    } else {
+      grid.material.transparent = true;
+      grid.material.opacity = 0.62;
+    }
     this.content.add(grid);
+
+    const boundaryPoints = [
+      new THREE.Vector3(this.scenario.bounds.min[0], 0, -this.scenario.bounds.min[1]),
+      new THREE.Vector3(this.scenario.bounds.max[0], 0, -this.scenario.bounds.min[1]),
+      new THREE.Vector3(this.scenario.bounds.max[0], 0, -this.scenario.bounds.max[1]),
+      new THREE.Vector3(this.scenario.bounds.min[0], 0, -this.scenario.bounds.max[1]),
+    ];
+    const boundary = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(boundaryPoints),
+      new THREE.LineBasicMaterial({ color: palette.blockEdge, transparent: true, opacity: 0.9 }),
+    );
+    boundary.position.y = this.scenario.bounds.min[2] + 0.055;
+    this.content.add(boundary);
+
+    const roadMarks = new THREE.Group();
+    const spacing = Math.max(16, Math.round(Math.max(width, depth) / 6));
+    const markMaterial = new THREE.LineDashedMaterial({
+      color: palette.roadMarking,
+      transparent: true,
+      opacity: 0.52,
+      dashSize: 2.2,
+      gapSize: 2.2,
+    });
+    for (let east = this.scenario.bounds.min[0] + spacing; east < this.scenario.bounds.max[0]; east += spacing) {
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(east, this.scenario.bounds.min[2] + 0.045, -this.scenario.bounds.min[1]),
+          new THREE.Vector3(east, this.scenario.bounds.min[2] + 0.045, -this.scenario.bounds.max[1]),
+        ]),
+        markMaterial.clone(),
+      );
+      line.computeLineDistances();
+      roadMarks.add(line);
+    }
+    for (let north = this.scenario.bounds.min[1] + spacing; north < this.scenario.bounds.max[1]; north += spacing) {
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(this.scenario.bounds.min[0], this.scenario.bounds.min[2] + 0.045, -north),
+          new THREE.Vector3(this.scenario.bounds.max[0], this.scenario.bounds.min[2] + 0.045, -north),
+        ]),
+        markMaterial.clone(),
+      );
+      line.computeLineDistances();
+      roadMarks.add(line);
+    }
+    markMaterial.dispose();
+    this.content.add(roadMarks);
   }
 
   private addZone(zone: StaticNoFlyZone, role: "static" | "temporary"): ZoneVisual {
@@ -532,6 +625,7 @@ export class PredictiveViewer {
 
   private addMovingSphere(definition: MovingSphereDefinition): void {
     const palette = this.palette;
+    const visual = new THREE.Group();
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(definition.radiusM, 24, 16),
       new THREE.MeshStandardMaterial({
@@ -542,8 +636,24 @@ export class PredictiveViewer {
       }),
     );
     mesh.castShadow = true;
-    this.movingSpheres.set(definition.id, mesh);
-    this.dynamicGroup.add(mesh);
+    visual.add(mesh);
+    const haloMaterial = new THREE.LineBasicMaterial({
+      color: palette.movingSphere,
+      transparent: true,
+      opacity: 0.78,
+    });
+    const horizontalHalo = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(ringPoints(definition.radiusM * 1.45, 0, 48)),
+      haloMaterial,
+    );
+    const verticalHalo = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(ringPoints(definition.radiusM * 1.45, 0, 48)),
+      haloMaterial.clone(),
+    );
+    verticalHalo.rotation.z = Math.PI / 2;
+    visual.add(horizontalHalo, verticalHalo);
+    this.movingSpheres.set(definition.id, visual);
+    this.dynamicGroup.add(visual);
     this.replaceLine(
       this.dynamicGroup,
       null,

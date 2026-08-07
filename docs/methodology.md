@@ -175,11 +175,12 @@ usage. Re-running the same source revision and protocol must reproduce the non-t
 
 ## Predictive space-time protocol
 
-Version 0.5 retains the independent complete-forecast experiment introduced in v0.4, but replaces
-the small maps with a larger complex-city cohort and adds a shared certified trajectory
-post-processor. A `TimedPath` carries a strictly increasing timestamp at every exact endpoint, grid
-waypoint, and stationary interval. Equal-position segments must be explicit `wait` actions; raw
-moving segments use the declared cruise speed and certified rounded segments do not exceed it.
+Version 0.6 retains the complete-forecast experiment and shared certified trajectory post-processor
+from v0.5, then adds two extended-city diagnostic cases and two descriptive measurement families:
+dynamic closest-approach witnesses and discrete waypoint-level kinematics. A `TimedPath` carries a
+strictly increasing timestamp at every exact endpoint, grid waypoint, and stationary interval.
+Equal-position segments must be explicit `wait` actions; raw moving segments use the declared cruise
+speed and certified rounded segments do not exceed it.
 
 The predictive baseline searches states `(v, k)`, where `v` is a free spatial voxel and `k` is a
 discrete time layer. The frozen public configuration uses a `4 m` spatial lattice, `0.5 s` time
@@ -208,25 +209,40 @@ one-shot versus periodic planning, safety-gate behavior, and budget scope. It th
 two complete information-and-control protocols rather than a pure causal estimate of forecast
 value.
 
-The eight predictive scenarios are accepted by construction and metadata validation before any
-planner is invoked. One calibration, three demonstration, and four curated diagnostic labels are
-identified by semantic fingerprints. The seven non-calibration scenes each contain 14–16
-unequal-height buildings, at least one static no-fly volume, and at least two time-dependent
-hazards. The cases were not preregistered in an earlier immutable revision, so the public page
-treats all 32 runs as non-confirmatory examples rather than held-out evidence. Because the cohort,
-horizon, work cap, and post-processing contract changed, v0.5 results are not pooled with v0.4.
+The ten predictive scenarios are accepted by construction and metadata validation before any
+planner is invoked. One calibration, three demonstration, and six curated diagnostic labels are
+identified by semantic fingerprints. Seven non-calibration scenes contain 14–16 unequal-height
+buildings; `braided-skyway` and `harbor-switchback` each contain 20 buildings, one static no-fly
+volume, two altitude-selective temporary restrictions, and two moving hazards. The cases were not
+preregistered in an earlier immutable revision, so the public page treats all 40 runs as
+non-confirmatory examples rather than held-out evidence. Version 0.6 contains the v0.5 cases as a
+historical subset; records from both releases are not pooled as independent scenarios, and neither
+cohort is pooled with v0.4.
 
 Predictive outcomes include success, failure reason, arrival time, movement time, total stationary
-time, executed length, path excess, replans, algorithm-specific work, and safety violations. Total
-stationary time contains both forecast-aware waiting and short connector-to-layer alignment waits;
-the interval records distinguish those reasons. Expanded spatial nodes, D* Lite queue pops, and
-expanded space-time states are not interchangeable measures of equal effort. The 240,000 cap applies
-to each reactive replanning call but to the complete Space-Time A* mission search, so cumulative
-reactive work may exceed that number.
+time, executed length, path excess, replans, algorithm-specific work, safety violations, and a
+dynamic minimum-separation witness. Total stationary time contains both forecast-aware waiting and
+short connector-to-layer alignment waits; the interval records distinguish those reasons. Expanded
+spatial nodes, D* Lite queue pops, and expanded space-time states are not interchangeable measures of
+equal effort. The 240,000 cap applies to each reactive replanning call but to the complete Space-Time
+A* mission search, so cumulative reactive work may exceed that number.
+
+### Dynamic minimum-separation diagnostic
+
+`minimumSeparationM` is physical surface-to-surface separation after subtracting the spherical
+vehicle radius; the declared safety margin remains a separate threshold. The associated witness
+records time, vehicle position, nearest obstacle-surface position, obstacle identity and kind,
+method, declared margin, and whether the closest-approach calculation is exact.
+
+For a moving sphere, closest approach is exact under the declared piecewise-linear vehicle and
+obstacle motion model. For an active temporary cylinder, the implementation uses a deterministic
+one-dimensional convex distance search and records `exact = false`. This diagnostic is independent
+of collision certification: it describes the closest recorded approach but does not certify
+continuous vehicle dynamics, forecast validity, or operational risk.
 
 ### Certified predictive trajectory post-processing
 
-The v0.5 exporter preserves the planner/simulator output as `rawTimedPath`. It then divides that
+The v0.6 exporter preserves the planner/simulator output as `rawTimedPath`. It then divides that
 path at every wait, proposes sampled three-dimensional circular fillets for eligible movement
 corners, and deterministically tries turn-radius scales of `1.0`, `0.75`, `0.5`, and `0.25` from a
 requested `6 m`. Samples are spaced no farther than `0.5 m`; each movement block keeps its original
@@ -239,11 +255,19 @@ operation, so its shorter or smoother-looking line is not attributed to the plan
 applies only to the dense piecewise-linear path; it is not a claim of continuous curvature,
 aircraft attitude feasibility, acceleration bounds, minimum snap, or bounded jerk.
 
-Python independently re-executes every public timed path against the declared dynamic schedule and
-checks JSON, CSV, scenario-manifest identities, run IDs, source ancestry, required generator files,
-byte sizes, and SHA-256 digests. The Web build independently validates structural, numeric, temporal,
-and digest invariants; it does not reimplement collision geometry. Public floats are rounded to 11
-decimal places only at the serialization boundary.
+Every raw and output path also carries discrete kinematic diagnostics computed from segment-average
+velocities. They report movement/segment counts, reversals at the declared 150-degree threshold,
+maximum segment-average speed, maximum adjacent velocity-vector change, a finite-difference
+acceleration proxy, and maximum absolute climb rate. Waits are hard boundaries for reversal
+counting. These values detect abrupt waypoint motion; they do not establish continuous
+acceleration, attitude, curvature, jerk, actuator, or flight-envelope feasibility.
+
+Python independently reruns all 40 public missions, collision-audits both raw and certified paths
+against the declared dynamic schedule, and checks JSON, CSV, scenario-manifest identities, run IDs,
+source ancestry, required generator files, byte sizes, and SHA-256 digests. The Web build
+independently validates structural, numeric, temporal, and digest invariants; it does not reimplement
+collision geometry. Public floats are rounded to 11 decimal places only at the serialization
+boundary.
 
 ## Experiment identity
 

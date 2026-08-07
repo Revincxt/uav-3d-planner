@@ -23,6 +23,8 @@ EXPECTED_IDS = (
     "vertical-time-window",
     "urban-canyon-merge",
     "rooftop-transfer",
+    "braided-skyway",
+    "harbor-switchback",
 )
 
 
@@ -54,6 +56,8 @@ def test_predictive_registry_has_fixed_v05_cohorts_and_demo_order() -> None:
         "chained-restrictions",
         "multi-obstacle",
         "vertical-time-window",
+        "braided-skyway",
+        "harbor-switchback",
     )
     with pytest.raises(ValueError, match="unknown predictive cohort"):
         list_predictive_scenarios("test")
@@ -91,6 +95,10 @@ def test_city_complexity_geometry_ids_and_time_zero_endpoints() -> None:
             assert abs(scene.goal[0] - scene.start[0]) >= 72
             assert abs(scene.goal[1] - scene.start[1]) >= 24
             assert scene.goal[2] != scene.start[2]
+        if scenario.metadata.get("complexity_tier") == "extended-city":
+            assert 18 <= len(scene.buildings) <= 22
+            assert hazards >= 3
+            assert len(scenario.metadata["decision_axes"]) >= 3
 
         obstacle_ids = [building.obstacle_id for building in scene.buildings]
         obstacle_ids.extend(zone.zone_id for zone in scene.no_fly_zones)
@@ -126,10 +134,10 @@ def test_cohort_manifest_is_v05_geometry_only_and_outcome_independent() -> None:
     scenarios, manifest = build_predictive_cohort()
     assert tuple(scenario.scenario_id for scenario in scenarios) == EXPECTED_IDS
     assert manifest["schema_version"] == "predictive-scenario-manifest-v2"
-    assert manifest["dataset_id"] == "predictive-urban-v0.5"
+    assert manifest["dataset_id"] == "predictive-urban-v0.6"
     assert manifest["requested"] == manifest["accepted"] + manifest["rejected"]
-    assert (manifest["requested"], manifest["accepted"], manifest["rejected"]) == (8, 8, 0)
-    assert manifest["accepted_by_cohort"] == {"calibration": 1, "demo": 3, "diagnostic": 4}
+    assert (manifest["requested"], manifest["accepted"], manifest["rejected"]) == (10, 10, 0)
+    assert manifest["accepted_by_cohort"] == {"calibration": 1, "demo": 3, "diagnostic": 6}
 
     selection = manifest["selection"]
     assert isinstance(selection, dict)
@@ -202,18 +210,38 @@ def test_vertical_canyon_and_rooftop_events_are_preserved() -> None:
     assert not rooftop.temporary_cylinders[0].is_active(20.0)
 
 
+def test_extended_city_hazards_encode_distinct_altitude_decisions() -> None:
+    braided = load_predictive_scenario("braided-skyway")
+    assert len(braided.static_scene.buildings) == 20
+    assert len(braided.temporary_cylinders) == 2
+    assert len(braided.moving_spheres) == 2
+    assert braided.temporary_cylinders[0].is_active(3.0)
+    assert not braided.temporary_cylinders[1].is_active(6.999)
+    assert braided.temporary_cylinders[1].is_active(7.0)
+    assert braided.moving_spheres[0].position_at(6.0) == (52.0, 44.0, 16.0)
+
+    harbor = load_predictive_scenario("harbor-switchback")
+    assert len(harbor.static_scene.buildings) == 20
+    assert len(harbor.temporary_cylinders) == 2
+    assert len(harbor.moving_spheres) == 2
+    assert harbor.temporary_cylinders[0].is_active(0.0)
+    assert not harbor.temporary_cylinders[0].is_active(10.0)
+    assert harbor.temporary_cylinders[1].is_active(8.0)
+    assert harbor.moving_spheres[1].position_at(6.0) == (52.0, 76.0, 32.0)
+
+
 def test_every_scenario_declares_v05_urban_metadata() -> None:
     case_ids: set[int] = set()
     for scenario_id in EXPECTED_IDS:
         scenario = load_predictive_scenario(scenario_id)
-        assert scenario.metadata["study"] == "predictive-space-time-v0.5"
-        assert scenario.metadata["dataset"] == "predictive-urban-v0.5"
+        assert scenario.metadata["study"] == "predictive-space-time-v0.6"
+        assert scenario.metadata["dataset"] == "predictive-urban-v0.6"
         assert scenario.metadata["forecast_required"] is True
         assert scenario.metadata["selection_basis"] == "validated-scenario-construction-only"
         assert scenario.metadata["planner_outcome_filtering"] == "forbidden"
         assert scenario.metadata["decision_contract"]
         assert scenario.metadata["district"]
         assert scenario.metadata["street_pattern"]
-        assert scenario.static_scene.metadata["dataset"] == "predictive-urban-v0.5"
+        assert scenario.static_scene.metadata["dataset"] == "predictive-urban-v0.6"
         case_ids.add(int(scenario.metadata["case_id"]))
-    assert case_ids == set(range(5101, 5109))
+    assert case_ids == set(range(5101, 5111))

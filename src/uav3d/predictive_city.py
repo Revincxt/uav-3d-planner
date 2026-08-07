@@ -1,4 +1,4 @@
-"""Reusable deterministic city geometry for the v0.5 predictive demonstrations."""
+"""Reusable deterministic city geometry for the v0.6 predictive demonstrations."""
 
 from __future__ import annotations
 
@@ -76,6 +76,40 @@ ROOFTOP_TOWERS: tuple[Footprint, ...] = tuple(
     (x, y, 12, 12) for y in (4, 28, 52, 76) for x in (12, 36, 60, 84)
 )
 
+# Five narrow towers per band produce alternating east-west channels.  The one-column offset
+# between adjacent bands turns the otherwise regular street grid into a braided sequence of route
+# commitments while keeping every passage explicit on the four-metre lattice.
+BRAIDED_TOWERS: tuple[Footprint, ...] = tuple(
+    (x, y, 8, 12)
+    for row, y in enumerate((4, 28, 52, 76))
+    for x in ((4, 24, 44, 64, 84) if row % 2 == 0 else (12, 32, 52, 72, 92))
+)
+
+# Unequal dock blocks form five offset horizontal bands.  Alternating short and long footprints
+# create switchback choices that differ structurally from the regular tower and canyon families.
+SWITCHBACK_DOCKS: tuple[Footprint, ...] = (
+    (12, 0, 20, 12),
+    (44, 0, 12, 12),
+    (68, 0, 20, 12),
+    (96, 0, 8, 12),
+    (0, 20, 16, 12),
+    (28, 20, 20, 12),
+    (60, 20, 12, 12),
+    (84, 20, 20, 12),
+    (8, 40, 12, 12),
+    (32, 40, 20, 12),
+    (64, 40, 20, 12),
+    (96, 40, 8, 12),
+    (0, 60, 20, 12),
+    (32, 60, 12, 12),
+    (56, 60, 20, 12),
+    (88, 60, 16, 12),
+    (8, 80, 16, 8),
+    (36, 80, 20, 8),
+    (68, 80, 12, 8),
+    (92, 80, 12, 8),
+)
+
 CALIBRATION_BLOCKS: tuple[Footprint, ...] = (
     (48, 0, 8, 36),
     (48, 52, 8, 36),
@@ -125,7 +159,7 @@ def make_city_scene(
     heights: Sequence[int],
     static_zones: tuple[Cylinder, ...] = (),
 ) -> Scene:
-    """Build a v0.5 scene while keeping selection independent of planner outcomes."""
+    """Build a v0.6 scene while keeping selection independent of planner outcomes."""
 
     return Scene(
         scene_id=scene_id,
@@ -138,8 +172,8 @@ def make_city_scene(
         drone_radius=0.5,
         safety_margin=0.5,
         metadata={
-            "family": "predictive-urban-v0.5",
-            "dataset": "predictive-urban-v0.5",
+            "family": "predictive-urban-v0.6",
+            "dataset": "predictive-urban-v0.6",
             "district": district,
             "street_pattern": street_pattern,
         },
@@ -147,6 +181,7 @@ def make_city_scene(
 
 
 __all__ = [
+    "BRAIDED_TOWERS",
     "CALIBRATION_BLOCKS",
     "CITY_BOUNDS",
     "CIVIC_COURTYARDS",
@@ -154,6 +189,7 @@ __all__ = [
     "ORTHOGONAL_GRID",
     "ROOFTOP_TOWERS",
     "STAGGERED_MARKET",
+    "SWITCHBACK_DOCKS",
     "TERRACED_HEIGHTS",
     "TRANSIT_BOULEVARD",
     "make_buildings",
