@@ -16,6 +16,7 @@ from itertools import pairwise
 
 from uav3d.dynamic import DynamicScenario
 from uav3d.geometry import Point3, add, distance, dot, lerp, scale, subtract
+from uav3d.kinematics import DiscreteKinematicDiagnostics, diagnose_timed_path_kinematics
 from uav3d.predictive import TimedPath, TimedWaypoint
 
 _GEOMETRY_EPSILON = 1e-9
@@ -40,6 +41,14 @@ class PredictiveSmoothingResult:
     sample_spacing_m: float
     max_turn_before_deg: float
     max_turn_after_deg: float
+    raw_kinematics: DiscreteKinematicDiagnostics
+    output_kinematics: DiscreteKinematicDiagnostics
+
+    @property
+    def collision_certified(self) -> bool:
+        """Compatibility-safe explicit name for the dense-polyline collision certificate."""
+
+        return self.certified
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -47,6 +56,8 @@ class PredictiveSmoothingResult:
             "method": self.method,
             "applied": self.applied,
             "certified": self.certified,
+            "collision_certified": self.collision_certified,
+            "collision_certification_scope": "dense-piecewise-linear-space-time-path",
             "raw_waypoint_count": self.raw_waypoint_count,
             "output_waypoint_count": self.output_waypoint_count,
             "rounded_corners": self.rounded_corners,
@@ -55,6 +66,12 @@ class PredictiveSmoothingResult:
             "sample_spacing_m": self.sample_spacing_m,
             "max_turn_before_deg": self.max_turn_before_deg,
             "max_turn_after_deg": self.max_turn_after_deg,
+            "kinematic_diagnostics": {
+                "status": "discrete-diagnostic-only",
+                "continuous_dynamics_certified": False,
+                "raw": self.raw_kinematics.to_dict(),
+                "output": self.output_kinematics.to_dict(),
+            },
         }
 
 
@@ -327,6 +344,7 @@ def smooth_predictive_timed_path(
         raise ValueError("raw_path exceeds max_speed_mps and cannot be a certified fallback")
 
     max_turn_before = _max_turn_degrees(raw_path)
+    raw_kinematics = diagnose_timed_path_kinematics(raw_path)
     saw_roundable_corner = False
     for scale_factor in (1.0, 0.75, 0.5, 0.25):
         candidate_radius = requested_radius_m * scale_factor
@@ -354,6 +372,8 @@ def smooth_predictive_timed_path(
             sample_spacing_m=sample_spacing_m,
             max_turn_before_deg=max_turn_before,
             max_turn_after_deg=_max_turn_degrees(candidate),
+            raw_kinematics=raw_kinematics,
+            output_kinematics=diagnose_timed_path_kinematics(candidate),
         )
 
     method = "raw-fallback" if saw_roundable_corner else "raw-no-roundable-corners"
@@ -370,6 +390,8 @@ def smooth_predictive_timed_path(
         sample_spacing_m=sample_spacing_m,
         max_turn_before_deg=max_turn_before,
         max_turn_after_deg=max_turn_before,
+        raw_kinematics=raw_kinematics,
+        output_kinematics=raw_kinematics,
     )
 
 

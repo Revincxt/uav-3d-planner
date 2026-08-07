@@ -143,8 +143,13 @@ path, smoothing diagnostics, and mission metrics. `TimedPath` timestamps must in
 Its first action is `start`; each later segment is explicitly classified as `move` or `wait`, and
 that classification must agree with its endpoint positions.
 
-`web/public/predictive-data.json` is schema version `2` with the verification status
-`PREDICTIVE_DEMO_NON_CONFIRMATORY`. It contains eight scenarios and one run for each condition:
+`web/public/predictive-data.json` is schema version `2`, uses protocol identifier
+`predictive-space-time-v3`, and carries the verification status
+`PREDICTIVE_DEMO_NON_CONFIRMATORY`. Version 0.6 contains ten scenarios and one run for each
+condition, producing 40 deterministic mission records. The added `braided-skyway` and
+`harbor-switchback` cases are extended-city diagnostics with 20 unequal-height buildings, one
+static no-fly volume, two temporary restrictions, and two moving hazards each. The four conditions
+remain:
 
 - repeated 3D A*;
 - D* Lite reset at every epoch;
@@ -154,9 +159,17 @@ that classification must agree with its endpoint positions.
 Every run exports `rawTimedPath` and `timedPath`. The former is the direct planner/simulator output;
 the latter is either a common sampled circular-fillet polyline that passed the continuous
 space-time audit or an explicit certified raw fallback. The smoothing object records the method,
-certification state, input/output waypoint counts, rounded-corner count, requested/applied radius,
-sample spacing, and maximum sampled turn angle before and after processing. Wait blocks are hard
-boundaries: their positions and absolute timestamps are preserved.
+`collisionCertified`, its dense-piecewise-linear certification scope, input/output waypoint counts,
+rounded-corner count, requested/applied radius, sample spacing, and maximum sampled turn angle before
+and after processing. Wait blocks are hard boundaries: their positions and absolute timestamps are
+preserved.
+
+`kinematicDiagnostics` contains `raw` and `output` measurements derived from segment-average
+velocities: segment and movement counts, reversal count and threshold, maximum speed, maximum
+adjacent velocity change, a finite-difference acceleration proxy, and maximum absolute climb rate.
+Both the wrapper and each path record declare `continuousDynamicsCertified = false` (or the
+snake-case equivalent). These are waypoint diagnostics, not bounds on continuous acceleration,
+attitude, curvature, jerk, or actuator dynamics.
 
 Explicit wait intervals retain their reasons. `waitTimeS` is total stationary time, including short
 time-lattice alignment waits. Work units are carried in each metric record and are not normalized
@@ -165,8 +178,21 @@ vehicle position, active temporary-zone IDs, moving-sphere states, and event ann
 and uneventful dense smoothing samples are not duplicated inside frames; the Web client derives
 continuous positions, prefixes, and suffixes from `timedPath`.
 
+Predictive metrics include `minimumSeparationM` and `minimumSeparationWitness`. Separation is the
+physical surface-to-surface distance after subtracting the vehicle radius; the declared safety
+margin is stored separately in the witness. The witness contains its time, vehicle position,
+nearest obstacle-surface position, obstacle ID/kind, method, `exact` flag, and declared margin.
+Moving-sphere witnesses are exact under piecewise-linear relative motion. Temporary-cylinder
+witnesses use a deterministic convex distance search and explicitly carry `exact: false`. Neither
+field changes the independent continuous collision verdict.
+
+`predictive-records.csv` projects the same closest-approach distance, witness time, obstacle
+identity/kind, and exactness flag. It also carries raw/output reversal counts and the output
+velocity-change, acceleration-proxy, and climb-rate diagnostics so downloaded records can be
+audited without parsing the dense trajectory arrays.
+
 The bundle references `predictive-records.csv` and `predictive-scenario-manifest.json` by byte size
-and SHA-256. Python reruns all 32 deterministic missions, independently collision-audits both raw
+and SHA-256. Python reruns all 40 deterministic missions, independently collision-audits both raw
 and certified timestamped paths, and cross-checks the JSON/CSV/manifest identities. JavaScript
 independently validates structural geometry bounds, temporal order, endpoints, waits, smoothing,
 frames, metrics, digests, and run-count invariants; it does not repeat the continuous collision

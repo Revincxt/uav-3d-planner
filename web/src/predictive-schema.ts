@@ -84,6 +84,8 @@ export interface PredictiveSmoothing {
   method: string;
   applied: boolean;
   certified: boolean;
+  collisionCertified: boolean;
+  collisionCertificationScope: "dense-piecewise-linear-space-time-path";
   rawWaypointCount: number;
   outputWaypointCount: number;
   roundedCornerCount: number;
@@ -92,6 +94,39 @@ export interface PredictiveSmoothing {
   sampleSpacingM: number;
   maxTurnAngleBeforeDeg: number | null;
   maxTurnAngleAfterDeg: number | null;
+  kinematicDiagnostics: PredictiveKinematicDiagnostics;
+}
+
+export interface PredictiveDiscreteKinematicDiagnostics {
+  status: "discrete-diagnostic-only";
+  continuousDynamicsCertified: false;
+  segmentCount: number;
+  movementSegmentCount: number;
+  reversalCount: number;
+  reversalThresholdDeg: number;
+  maxSpeedMps: number;
+  maxDiscreteVelocityChangeMps: number;
+  maxDiscreteAccelerationProxyMps2: number;
+  maxAbsClimbRateMps: number;
+}
+
+export interface PredictiveKinematicDiagnostics {
+  status: "discrete-diagnostic-only";
+  continuousDynamicsCertified: false;
+  raw: PredictiveDiscreteKinematicDiagnostics;
+  output: PredictiveDiscreteKinematicDiagnostics;
+}
+
+export interface PredictiveMinimumSeparationWitness {
+  separationM: number;
+  timeS: number;
+  vehiclePosition: Vec3;
+  obstacleId: string;
+  obstacleKind: "moving-sphere" | "temporary-cylinder";
+  obstaclePosition: Vec3;
+  declaredSafetyMarginM: number;
+  method: string;
+  exact: boolean;
 }
 
 export interface PredictiveRunMetrics {
@@ -107,6 +142,7 @@ export interface PredictiveRunMetrics {
   expandedStates: number;
   workUnit: "expanded-nodes" | "queue-pops" | "expanded-spacetime-states";
   minimumSeparationM: number | null;
+  minimumSeparationWitness: PredictiveMinimumSeparationWitness | null;
   safetyViolations: number;
 }
 

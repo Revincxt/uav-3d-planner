@@ -7,6 +7,9 @@ import type {
   PredictiveBundleV2,
   PredictiveEvent,
   PredictiveFrame,
+  PredictiveDiscreteKinematicDiagnostics,
+  PredictiveKinematicDiagnostics,
+  PredictiveMinimumSeparationWitness,
   PredictivePlanner,
   PredictiveProtocol,
   PredictiveRun,
@@ -485,6 +488,32 @@ function frame(
   };
 }
 
+function minimumSeparationWitness(
+  value: unknown,
+  label: string,
+): PredictiveMinimumSeparationWitness | null {
+  if (value === null) return null;
+  const item = record(value, label);
+  const obstacleKind = item.obstacleKind;
+  if (obstacleKind !== "moving-sphere" && obstacleKind !== "temporary-cylinder") {
+    fail(`${label}.obstacleKind is unsupported`);
+  }
+  return {
+    separationM: finite(item.separationM, `${label}.separationM`),
+    timeS: nonNegative(item.timeS, `${label}.timeS`),
+    vehiclePosition: vec3(item.vehiclePosition, `${label}.vehiclePosition`),
+    obstacleId: text(item.obstacleId, `${label}.obstacleId`),
+    obstacleKind,
+    obstaclePosition: vec3(item.obstaclePosition, `${label}.obstaclePosition`),
+    declaredSafetyMarginM: nonNegative(
+      item.declaredSafetyMarginM,
+      `${label}.declaredSafetyMarginM`,
+    ),
+    method: text(item.method, `${label}.method`),
+    exact: boolean(item.exact, `${label}.exact`),
+  };
+}
+
 function metrics(value: unknown, label: string): PredictiveRunMetrics {
   const item = record(value, label);
   return {
@@ -513,7 +542,11 @@ function metrics(value: unknown, label: string): PredictiveRunMetrics {
     minimumSeparationM:
       item.minimumSeparationM === null
         ? null
-        : nonNegative(item.minimumSeparationM, `${label}.minimumSeparationM`),
+        : finite(item.minimumSeparationM, `${label}.minimumSeparationM`),
+    minimumSeparationWitness: minimumSeparationWitness(
+      item.minimumSeparationWitness,
+      `${label}.minimumSeparationWitness`,
+    ),
     safetyViolations: nonNegativeInteger(item.safetyViolations, `${label}.safetyViolations`),
   };
 }
@@ -525,12 +558,83 @@ function turnAngle(value: unknown, label: string): number | null {
   return parsed;
 }
 
+function discreteKinematicDiagnostics(
+  value: unknown,
+  label: string,
+): PredictiveDiscreteKinematicDiagnostics {
+  const item = record(value, label);
+  if (item.status !== "discrete-diagnostic-only") {
+    fail(`${label}.status must be discrete-diagnostic-only`);
+  }
+  if (item.continuousDynamicsCertified !== false) {
+    fail(`${label}.continuousDynamicsCertified must remain false`);
+  }
+  const parsed: PredictiveDiscreteKinematicDiagnostics = {
+    status: "discrete-diagnostic-only",
+    continuousDynamicsCertified: false,
+    segmentCount: nonNegativeInteger(item.segmentCount, `${label}.segmentCount`),
+    movementSegmentCount: nonNegativeInteger(
+      item.movementSegmentCount,
+      `${label}.movementSegmentCount`,
+    ),
+    reversalCount: nonNegativeInteger(item.reversalCount, `${label}.reversalCount`),
+    reversalThresholdDeg: positive(
+      item.reversalThresholdDeg,
+      `${label}.reversalThresholdDeg`,
+    ),
+    maxSpeedMps: nonNegative(item.maxSpeedMps, `${label}.maxSpeedMps`),
+    maxDiscreteVelocityChangeMps: nonNegative(
+      item.maxDiscreteVelocityChangeMps,
+      `${label}.maxDiscreteVelocityChangeMps`,
+    ),
+    maxDiscreteAccelerationProxyMps2: nonNegative(
+      item.maxDiscreteAccelerationProxyMps2,
+      `${label}.maxDiscreteAccelerationProxyMps2`,
+    ),
+    maxAbsClimbRateMps: nonNegative(
+      item.maxAbsClimbRateMps,
+      `${label}.maxAbsClimbRateMps`,
+    ),
+  };
+  if (parsed.reversalThresholdDeg > 180 + TOLERANCE) {
+    fail(`${label}.reversalThresholdDeg cannot exceed 180 degrees`);
+  }
+  if (parsed.movementSegmentCount > parsed.segmentCount) {
+    fail(`${label}.movementSegmentCount cannot exceed segmentCount`);
+  }
+  if (parsed.reversalCount > Math.max(0, parsed.movementSegmentCount - 1)) {
+    fail(`${label}.reversalCount is inconsistent with movementSegmentCount`);
+  }
+  return parsed;
+}
+
+function kinematicDiagnostics(value: unknown, label: string): PredictiveKinematicDiagnostics {
+  const item = record(value, label);
+  if (item.status !== "discrete-diagnostic-only") {
+    fail(`${label}.status must be discrete-diagnostic-only`);
+  }
+  if (item.continuousDynamicsCertified !== false) {
+    fail(`${label}.continuousDynamicsCertified must remain false`);
+  }
+  return {
+    status: "discrete-diagnostic-only",
+    continuousDynamicsCertified: false,
+    raw: discreteKinematicDiagnostics(item.raw, `${label}.raw`),
+    output: discreteKinematicDiagnostics(item.output, `${label}.output`),
+  };
+}
+
 function smoothing(value: unknown, label: string): PredictiveSmoothing {
   const item = record(value, label);
   const parsed: PredictiveSmoothing = {
     method: text(item.method, `${label}.method`),
     applied: boolean(item.applied, `${label}.applied`),
     certified: boolean(item.certified, `${label}.certified`),
+    collisionCertified: boolean(item.collisionCertified, `${label}.collisionCertified`),
+    collisionCertificationScope:
+      item.collisionCertificationScope === "dense-piecewise-linear-space-time-path"
+        ? item.collisionCertificationScope
+        : fail(`${label}.collisionCertificationScope is unsupported`),
     rawWaypointCount: positiveInteger(item.rawWaypointCount, `${label}.rawWaypointCount`),
     outputWaypointCount: positiveInteger(
       item.outputWaypointCount,
@@ -557,7 +661,14 @@ function smoothing(value: unknown, label: string): PredictiveSmoothing {
       item.maxTurnAngleAfterDeg,
       `${label}.maxTurnAngleAfterDeg`,
     ),
+    kinematicDiagnostics: kinematicDiagnostics(
+      item.kinematicDiagnostics,
+      `${label}.kinematicDiagnostics`,
+    ),
   };
+  if (parsed.collisionCertified !== parsed.certified) {
+    fail(`${label}.collisionCertified must agree with certified`);
+  }
   if (parsed.applied && !parsed.certified) {
     fail(`${label} applied output must be certified`);
   }
@@ -579,6 +690,12 @@ function smoothing(value: unknown, label: string): PredictiveSmoothing {
     parsed.maxTurnAngleAfterDeg > parsed.maxTurnAngleBeforeDeg + 1e-5
   ) {
     fail(`${label} cannot increase the maximum turn angle`);
+  }
+  if (
+    parsed.kinematicDiagnostics.raw.segmentCount !== parsed.rawWaypointCount - 1 ||
+    parsed.kinematicDiagnostics.output.segmentCount !== parsed.outputWaypointCount - 1
+  ) {
+    fail(`${label}.kinematicDiagnostics segment counts disagree with waypoint counts`);
   }
   return parsed;
 }
@@ -659,6 +776,87 @@ function run(
   }
 
   const parsedMetrics = metrics(item.metrics, `${label}.metrics`);
+  const separationWitness = parsedMetrics.minimumSeparationWitness;
+  if ((parsedMetrics.minimumSeparationM === null) !== (separationWitness === null)) {
+    fail(`${label}.metrics minimum separation and witness must be present together`);
+  }
+  if (separationWitness !== null) {
+    if (
+      !sameNumber(parsedMetrics.minimumSeparationM!, separationWitness.separationM) ||
+      !sameNumber(
+        separationWitness.declaredSafetyMarginM,
+        scenario.constraints.safetyMarginM,
+      )
+    ) {
+      fail(`${label}.metrics minimum-separation witness is inconsistent`);
+    }
+    if (
+      separationWitness.timeS > parsedTimedPath.at(-1)!.timeS + TOLERANCE ||
+      !pointInBounds(separationWitness.vehiclePosition, scenario.bounds) ||
+      !pointInBounds(separationWitness.obstaclePosition, scenario.bounds) ||
+      !samePoint(
+        separationWitness.vehiclePosition,
+        timedPosition(parsedTimedPath, separationWitness.timeS),
+      )
+    ) {
+      fail(`${label}.metrics minimum-separation witness is outside the executed trajectory`);
+    }
+    const witnessSurfaceDistance = Math.hypot(
+      separationWitness.vehiclePosition[0] - separationWitness.obstaclePosition[0],
+      separationWitness.vehiclePosition[1] - separationWitness.obstaclePosition[1],
+      separationWitness.vehiclePosition[2] - separationWitness.obstaclePosition[2],
+    );
+    if (
+      !sameNumber(
+        separationWitness.separationM,
+        witnessSurfaceDistance - scenario.constraints.vehicleRadiusM,
+      )
+    ) {
+      fail(`${label}.metrics minimum-separation witness geometry is inconsistent`);
+    }
+    if (separationWitness.obstacleKind === "moving-sphere") {
+      const definition = scenario.movingSpheres.find(
+        (sphere) => sphere.id === separationWitness.obstacleId,
+      );
+      const center = definition && movingPosition(definition, separationWitness.timeS);
+      if (
+        definition === undefined ||
+        center === undefined ||
+        !separationWitness.exact ||
+        !sameNumber(
+          Math.hypot(
+            separationWitness.obstaclePosition[0] - center[0],
+            separationWitness.obstaclePosition[1] - center[1],
+            separationWitness.obstaclePosition[2] - center[2],
+          ),
+          definition.radiusM,
+        ) ||
+        !sameNumber(
+          Math.hypot(
+            separationWitness.vehiclePosition[0] - center[0],
+            separationWitness.vehiclePosition[1] - center[1],
+            separationWitness.vehiclePosition[2] - center[2],
+          ),
+          witnessSurfaceDistance + definition.radiusM,
+        )
+      ) {
+        fail(`${label}.metrics moving-sphere witness is inconsistent`);
+      }
+    } else if (
+      separationWitness.exact ||
+      !scenario.temporaryNoFlyZones.some(
+        (zone) => zone.id === separationWitness.obstacleId,
+      )
+    ) {
+      fail(`${label}.metrics temporary-cylinder witness is inconsistent`);
+    }
+    if (
+      parsedMetrics.safetyViolations === 0 &&
+      separationWitness.separationM + TOLERANCE < scenario.constraints.safetyMarginM
+    ) {
+      fail(`${label}.metrics safe run violates its declared dynamic safety margin`);
+    }
+  }
   const expectedWorkUnit = planner.id === "space-time-astar-4d"
     ? "expanded-spacetime-states"
     : planner.id === "dstar-lite-reset-3d" || planner.id === "dstar-lite-reuse-3d"

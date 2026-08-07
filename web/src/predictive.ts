@@ -84,6 +84,11 @@ function formatPosition(point: Vec3): string {
   return `${point[0].toFixed(1)}, ${point[1].toFixed(1)}, ${point[2].toFixed(1)} m`;
 }
 
+function formatStatus(status: PredictiveRun["status"]): string {
+  if (status === "no-path") return "No path";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
 function setDefinitionRows(host: HTMLElement, rows: Array<[string, string]>): void {
   host.replaceChildren(
     ...rows.map(([term, description]) => {
@@ -436,12 +441,13 @@ function renderComparison(
     tableRow.tabIndex = 0;
     tableRow.setAttribute("aria-current", String(row.plannerId === selectedPlannerId));
     tableRow.setAttribute("aria-label", `Inspect ${row.plannerLabel}`);
+    tableRow.dataset.information = row.predictive ? "complete-schedule" : "snapshot";
     const planner = document.createElement("th");
     planner.scope = "row";
     planner.textContent = row.plannerLabel;
     const values = [
       row.predictive ? "Complete schedule" : "Current snapshot",
-      row.status,
+      formatStatus(row.status),
       formatNumber(row.arrivalTimeS),
       formatNumber(row.waitTimeS),
       formatNumber(row.executedPathLengthM),
@@ -474,6 +480,8 @@ function renderComparison(
 
 async function start(): Promise<void> {
   const bundle = await loadPredictiveBundle();
+  element("#study-design-count").textContent =
+    `${bundle.scenarios.length} cases × ${bundle.planners.length} conditions`;
   const scenarioSelect = element<HTMLSelectElement>("#scenario-select");
   const plannerSelect = element<HTMLSelectElement>("#planner-select");
   const timeline = element<HTMLInputElement>("#timeline");
@@ -600,6 +608,7 @@ async function start(): Promise<void> {
 
     timeline.value = String(currentTimeS);
     timelineValue.value = `${currentTimeS.toFixed(1)} s`;
+    element("#viewer-time-value").textContent = `${currentTimeS.toFixed(1)} s`;
     viewer?.setTime(currentTimeS);
     updateEventAxis(currentTimeS);
     updateChartCursor(element("#altitude-chart"), currentTimeS, position[2], "m");
@@ -677,14 +686,62 @@ async function start(): Promise<void> {
 
   const renderRunEvidence = (): void => {
     const smoothing = currentRun.smoothing;
+    const metrics = currentRun.metrics;
+    const diagnostics = smoothing.kinematicDiagnostics;
+    const separationWitness = metrics.minimumSeparationWitness;
+    const planner = bundle.planners.find((candidate) => candidate.id === currentRun.plannerId);
     const status = element("#run-status");
-    status.textContent = currentRun.status;
+    status.textContent = formatStatus(currentRun.status);
     status.className = `run-status ${currentRun.status === "success" ? "is-success" : "is-failed"}`;
+    element("#case-information").textContent = currentRun.predictive
+      ? "Complete deterministic schedule"
+      : "Current conservative snapshot";
+    element("#case-mission").textContent =
+      `${planner?.label ?? currentRun.plannerId} · ${formatStatus(currentRun.status)}`;
+
+    const outcome = element("#metric-outcome");
+    outcome.textContent = formatStatus(currentRun.status);
+    outcome.className = metrics.success ? "metric-positive" : "metric-negative";
+    element("#metric-arrival").textContent =
+      metrics.arrivalTimeS === null ? "—" : `${metrics.arrivalTimeS.toFixed(1)} s`;
+    element("#metric-wait").textContent = `${metrics.waitTimeS.toFixed(1)} s`;
+    element("#metric-path").textContent = `${metrics.executedPathLengthM.toFixed(1)} m`;
+    const safety = element("#metric-safety");
+    safety.textContent =
+      metrics.safetyViolations === 0
+        ? metrics.minimumSeparationWitness === null
+          ? "0 violations"
+          : `0 violations · ${metrics.minimumSeparationWitness.separationM.toFixed(2)} m min`
+        : `${metrics.safetyViolations.toLocaleString()} violations`;
+    safety.className = metrics.safetyViolations === 0 ? "metric-positive" : "metric-negative";
     setDefinitionRows(element("#smoothing-meta"), [
       ["Method", smoothing.method],
-      ["Certificate", smoothing.certified ? "Passed" : "Unavailable"],
+      [
+        "Collision audit",
+        smoothing.collisionCertified ? "Passed · dense space–time polyline" : "Unavailable",
+      ],
+      [
+        "Minimum dynamic separation",
+        separationWitness === null
+          ? "Not recorded"
+          : `${separationWitness.separationM.toFixed(2)} m at ${separationWitness.timeS.toFixed(2)} s · ` +
+            `${separationWitness.exact ? "exact" : "approximate"} witness · ${separationWitness.obstacleId}`,
+      ],
       ["Waypoints", `${smoothing.rawWaypointCount} → ${smoothing.outputWaypointCount}`],
-      ["Rounded corners", smoothing.roundedCornerCount.toLocaleString()],
+      [
+        "Reversals",
+        `${diagnostics.raw.reversalCount} → ${diagnostics.output.reversalCount}`,
+      ],
+      [
+        "Acceleration proxy",
+        `${diagnostics.raw.maxDiscreteAccelerationProxyMps2.toFixed(1)} → ` +
+          `${diagnostics.output.maxDiscreteAccelerationProxyMps2.toFixed(1)} m/s²`,
+      ],
+      [
+        "Maximum |climb rate|",
+        `${diagnostics.raw.maxAbsClimbRateMps.toFixed(1)} → ` +
+          `${diagnostics.output.maxAbsClimbRateMps.toFixed(1)} m/s`,
+      ],
       [
         "Turn radius",
         smoothing.appliedTurnRadiusM === null ? "Fallback" : `${smoothing.appliedTurnRadiusM.toFixed(1)} m`,
@@ -695,8 +752,8 @@ async function start(): Promise<void> {
       ],
     ]);
     element("#smoothing-note").textContent = smoothing.applied
-      ? "The selected execution polyline was rounded and independently certified against the full space–time schedule before export."
-      : "No rounded candidate passed the declared contract, or no corner required rounding; the certified fallback is shown.";
+      ? "The rounded dense polyline passed the declared collision audit. Reversal, acceleration-proxy, and climb-rate values are discrete diagnostics only; they do not certify continuous dynamics, jerk, attitude, or control feasibility."
+      : "The certified raw fallback is shown. Reversal, acceleration-proxy, and climb-rate values are discrete diagnostics only; continuous dynamics remain uncertified.";
   };
 
   const updateRun = (plannerId: string, shouldAnnounce = true): void => {
@@ -746,6 +803,10 @@ async function start(): Promise<void> {
       scenario.runs[0]!;
     currentTimeS = 0;
     element("#scenario-description").textContent = scenario.description;
+    element("#case-geometry").textContent =
+      `${scenario.environment.buildingCount} buildings · ` +
+      `${scenario.staticNoFlyZones.length + scenario.temporaryNoFlyZones.length} restricted volumes · ` +
+      `${scenario.movingSpheres.length} moving hazards`;
     setDefinitionRows(element("#scenario-meta"), [
       ["District", scenario.environment.district],
       ["Street pattern", scenario.environment.streetPattern],

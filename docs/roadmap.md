@@ -68,6 +68,23 @@ Total stationary time includes separately labelled endpoint time-lattice alignme
 The v0.5 public bundle remains non-confirmatory and is not pooled with v0.4. Rounded output is a
 dense piecewise-linear geometric path, not a kinodynamic or minimum-snap trajectory.
 
+## v0.6 — extended-city diagnostics and study interface (current)
+
+- ten outcome-independent predictive scenarios and a fixed 40-run four-condition matrix;
+- `braided-skyway` and `harbor-switchback`, each with 20 unequal-height buildings, one static
+  no-fly volume, two temporary restrictions, and two moving hazards;
+- goal-aware multi-anchor D* Lite endpoint handling to reduce avoidable connector reversals;
+- dynamic closest-approach witnesses, with exact relative-motion results for moving spheres and an
+  explicitly approximate deterministic search for temporary cylinders;
+- raw/output discrete kinematic diagnostics for reversal count, velocity change, acceleration proxy,
+  and climb rate, without claiming continuous-dynamics feasibility;
+- a reorganized predictive study interface that keeps scenario selection, recorded evidence,
+  trajectory inspection, diagnostics, and provenance distinct.
+
+The v0.6 cohort remains curated, non-preregistered, and non-confirmatory. It includes the v0.5 cases
+as a historical subset, so v0.5 and v0.6 rows are not independent observations. Collision
+certification continues to cover the dense piecewise-linear space-time path only.
+
 ## Later, deliberately separate
 
 - kinodynamic planning and vehicle attitude constraints;

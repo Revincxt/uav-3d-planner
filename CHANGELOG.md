@@ -2,6 +2,36 @@
 
 All notable changes are documented here. The project follows Semantic Versioning.
 
+## [0.6.0] - 2026-08-07
+
+### Added
+
+- Two outcome-independent extended-city diagnostic scenarios: `braided-skyway` and
+  `harbor-switchback`. Each contains 20 unequal-height buildings, one static no-fly volume, two
+  temporary restrictions, and two moving hazards.
+- Dynamic closest-approach witnesses for every predictive run. Moving-sphere separation is exact
+  under the declared piecewise-linear model; temporary-cylinder separation is labelled as a
+  deterministic approximate search.
+- Raw and output discrete kinematic diagnostics covering reversals, velocity change, acceleration
+  proxy, climb rate, and maximum segment-average speed.
+- An explicit v0.6 model/UI plan and a reorganized predictive study interface.
+
+### Changed
+
+- The predictive matrix now contains ten scenarios by four planner conditions, for 40 deterministic
+  non-confirmatory missions.
+- D* Lite endpoint handling now evaluates multiple visible start and goal anchors with a
+  goal-aware, non-backtracking preference while retaining reset/reuse comparability.
+- Predictive records distinguish dense-piecewise-linear collision certification from descriptive
+  kinematic diagnostics and carry the closest-approach method and exactness flag.
+
+### Interpretation boundary
+
+- The added velocity-change and acceleration-proxy values do not certify continuous acceleration,
+  attitude, curvature, jerk, or vehicle dynamics.
+- The v0.6 cohort contains the v0.5 cases as a historical subset; results from the two releases must
+  not be pooled as independent scenarios.
+
 ## [0.5.0] - 2026-08-05
 
 ### Added

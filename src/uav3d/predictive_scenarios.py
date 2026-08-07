@@ -1,4 +1,4 @@
-"""Deterministic v0.5 urban scenarios for predictive space-time planning.
+"""Deterministic v0.6 urban scenarios for predictive space-time planning.
 
 The registry is deliberately independent of every planner and mission outcome. A scenario is
 accepted from construction, geometry, schedule, and endpoint contracts only.
@@ -18,12 +18,14 @@ from uav3d.dynamic import (
 )
 from uav3d.dynamic_collision import point_is_free_at_time
 from uav3d.predictive_city import (
+    BRAIDED_TOWERS,
     CALIBRATION_BLOCKS,
     CIVIC_COURTYARDS,
     MERGING_CANYONS,
     ORTHOGONAL_GRID,
     ROOFTOP_TOWERS,
     STAGGERED_MARKET,
+    SWITCHBACK_DOCKS,
     TERRACED_HEIGHTS,
     TRANSIT_BOULEVARD,
     make_city_scene,
@@ -53,8 +55,8 @@ def _metadata(
     street_pattern: str,
 ) -> dict[str, Any]:
     return {
-        "study": "predictive-space-time-v0.5",
-        "dataset": "predictive-urban-v0.5",
+        "study": "predictive-space-time-v0.6",
+        "dataset": "predictive-urban-v0.6",
         "cohort": cohort,
         "event_family": event_family,
         "case_id": case_id,
@@ -416,6 +418,174 @@ def _rooftop_transfer() -> DynamicScenario:
     )
 
 
+def _braided_skyway() -> DynamicScenario:
+    district = "biomedical skyway district"
+    street_pattern = "four offset tower bands connected by braided east-west lanes"
+    scene = make_city_scene(
+        "braided-skyway-static",
+        district=district,
+        street_pattern=street_pattern,
+        start=(4.0, 20.0, 8.0),
+        goal=(100.0, 68.0, 40.0),
+        footprints=BRAIDED_TOWERS,
+        heights=(
+            24,
+            40,
+            56,
+            32,
+            48,
+            44,
+            28,
+            52,
+            36,
+            20,
+            32,
+            56,
+            24,
+            48,
+            40,
+            52,
+            36,
+            44,
+            20,
+            56,
+        ),
+        static_zones=(Cylinder("skyway-hospital-nfz", (52.0, 44.0), 6.0, 0.0, 48.0),),
+    )
+    metadata = _metadata(
+        "diagnostic",
+        "braided-altitude-gates",
+        5109,
+        "Two altitude-selective gates change in opposite phases while traffic crosses separate "
+        "braided lanes, requiring an early choice between a low western passage and a high eastern "
+        "approach.",
+        district=district,
+        street_pattern=street_pattern,
+    )
+    metadata.update(
+        {
+            "complexity_tier": "extended-city",
+            "decision_axes": ["route-commitment", "altitude-selection", "traffic-timing"],
+        }
+    )
+    return DynamicScenario(
+        "braided-skyway",
+        "Braided biomedical skyway",
+        scene,
+        temporary_cylinders=(
+            TemporaryCylinder("skyway-low-west-gate", (28.0, 44.0), 5.0, 0.0, 28.0, 3.0, 14.0),
+            TemporaryCylinder("skyway-high-east-gate", (76.0, 68.0), 5.0, 28.0, 58.0, 7.0, 18.0),
+        ),
+        moving_spheres=(
+            MovingSphere(
+                "skyway-low-crossing",
+                3.0,
+                (
+                    (0.0, (4.0, 44.0, 16.0)),
+                    (6.0, (52.0, 44.0, 16.0)),
+                    (12.0, (100.0, 44.0, 16.0)),
+                    (22.0, (100.0, 84.0, 56.0)),
+                ),
+            ),
+            MovingSphere(
+                "skyway-high-crossing",
+                3.0,
+                (
+                    (0.0, (100.0, 20.0, 36.0)),
+                    (6.0, (52.0, 20.0, 36.0)),
+                    (12.0, (4.0, 20.0, 36.0)),
+                    (22.0, (4.0, 84.0, 56.0)),
+                ),
+            ),
+        ),
+        metadata=metadata,
+    )
+
+
+def _harbor_switchback() -> DynamicScenario:
+    district = "autonomous harbor district"
+    street_pattern = "five offset dock bands forming alternating low and rooftop switchbacks"
+    scene = make_city_scene(
+        "harbor-switchback-static",
+        district=district,
+        street_pattern=street_pattern,
+        start=(4.0, 76.0, 8.0),
+        goal=(100.0, 16.0, 44.0),
+        footprints=SWITCHBACK_DOCKS,
+        heights=(
+            20,
+            44,
+            28,
+            52,
+            36,
+            24,
+            56,
+            32,
+            48,
+            20,
+            40,
+            56,
+            28,
+            52,
+            24,
+            44,
+            32,
+            56,
+            36,
+            48,
+        ),
+        static_zones=(Cylinder("harbor-control-nfz", (52.0, 44.0), 7.0, 0.0, 52.0),),
+    )
+    metadata = _metadata(
+        "diagnostic",
+        "harbor-switchback-windows",
+        5110,
+        "Alternating dock bands, opposing low and high closures, and two lateral traffic streams "
+        "force a choice between committing to the long low switchback and climbing above central "
+        "piers before the upper window closes.",
+        district=district,
+        street_pattern=street_pattern,
+    )
+    metadata.update(
+        {
+            "complexity_tier": "extended-city",
+            "decision_axes": ["switchback-selection", "climb-timing", "opposing-traffic"],
+        }
+    )
+    return DynamicScenario(
+        "harbor-switchback",
+        "Autonomous harbor switchback",
+        scene,
+        temporary_cylinders=(
+            TemporaryCylinder("harbor-low-west-lock", (24.0, 56.0), 5.0, 0.0, 32.0, 0.0, 10.0),
+            TemporaryCylinder("harbor-high-east-lock", (80.0, 32.0), 5.0, 28.0, 58.0, 8.0, 20.0),
+        ),
+        moving_spheres=(
+            MovingSphere(
+                "harbor-channel-crossing",
+                3.5,
+                (
+                    (0.0, (4.0, 36.0, 16.0)),
+                    (6.0, (52.0, 36.0, 16.0)),
+                    (12.0, (100.0, 36.0, 16.0)),
+                    (22.0, (100.0, 84.0, 56.0)),
+                ),
+            ),
+            MovingSphere(
+                "harbor-rooftop-crossing",
+                3.0,
+                (
+                    (0.0, (100.0, 76.0, 32.0)),
+                    (6.0, (52.0, 76.0, 32.0)),
+                    (12.0, (4.0, 76.0, 32.0)),
+                    (22.0, (4.0, 4.0, 56.0)),
+                ),
+            ),
+        ),
+        metadata=metadata,
+    )
+
+
 _SCENARIO_SPECS: tuple[_ScenarioSpec, ...] = (
     _ScenarioSpec(
         "wait-then-straight",
@@ -445,6 +615,20 @@ _SCENARIO_SPECS: tuple[_ScenarioSpec, ...] = (
     ),
     _ScenarioSpec("urban-canyon-merge", "demo", "urban-canyon-merge", 5107, _urban_canyon_merge),
     _ScenarioSpec("rooftop-transfer", "demo", "rooftop-transfer", 5108, _rooftop_transfer),
+    _ScenarioSpec(
+        "braided-skyway",
+        "diagnostic",
+        "braided-altitude-gates",
+        5109,
+        _braided_skyway,
+    ),
+    _ScenarioSpec(
+        "harbor-switchback",
+        "diagnostic",
+        "harbor-switchback-windows",
+        5110,
+        _harbor_switchback,
+    ),
 )
 
 
@@ -476,8 +660,8 @@ def _validate_scenario_contract(spec: _ScenarioSpec, scenario: DynamicScenario) 
         raise ValueError(f"predictive scenario ID mismatch for {spec.scenario_id}")
     metadata = scenario.metadata
     expected = {
-        "study": "predictive-space-time-v0.5",
-        "dataset": "predictive-urban-v0.5",
+        "study": "predictive-space-time-v0.6",
+        "dataset": "predictive-urban-v0.6",
         "cohort": spec.cohort,
         "event_family": spec.event_family,
         "case_id": spec.case_id,
@@ -498,6 +682,16 @@ def _validate_scenario_contract(spec: _ScenarioSpec, scenario: DynamicScenario) 
         or hazard_count < 2
     ):
         raise ValueError(f"predictive urban complexity contract failed for {spec.scenario_id}")
+    if metadata.get("complexity_tier") == "extended-city":
+        decision_axes = metadata.get("decision_axes")
+        if (
+            not 18 <= len(scenario.static_scene.buildings) <= 22
+            or not scenario.static_scene.no_fly_zones
+            or hazard_count < 3
+            or not isinstance(decision_axes, list)
+            or len(decision_axes) < 3
+        ):
+            raise ValueError(f"extended predictive-city contract failed for {spec.scenario_id}")
     if not point_is_free_at_time(scenario, scenario.static_scene.start, 0.0):
         raise ValueError(f"predictive start is occupied at time zero for {spec.scenario_id}")
     if not point_is_free_at_time(scenario, scenario.static_scene.goal, 0.0):
@@ -544,10 +738,10 @@ def build_predictive_cohort() -> tuple[tuple[DynamicScenario, ...], dict[str, ob
 
     manifest: dict[str, object] = {
         "schema_version": "predictive-scenario-manifest-v2",
-        "dataset_id": "predictive-urban-v0.5",
+        "dataset_id": "predictive-urban-v0.6",
         "selection": {
             "acceptance_rule": (
-                "valid constructor output satisfying the v0.5 urban scenario contract"
+                "valid constructor output satisfying the v0.6 urban scenario contract"
             ),
             "planner_outcomes_consulted": False,
             "cohort_assignment_basis": "curated non-confirmatory roles in this source revision",

@@ -18,7 +18,11 @@ from uav3d.dynamic import (
     dynamic_scenario_fingerprint,
     load_builtin_dynamic_scenario,
 )
-from uav3d.dynamic_collision import point_is_free_at_time, spacetime_segment_is_free
+from uav3d.dynamic_collision import (
+    minimum_dynamic_separation,
+    point_is_free_at_time,
+    spacetime_segment_is_free,
+)
 from uav3d.dynamic_study import (
     DOWNLOAD_ARTIFACTS as DYNAMIC_DOWNLOADS,
 )
@@ -71,6 +75,8 @@ PREDICTIVE_SCENARIO_IDS = (
     "vertical-time-window",
     "urban-canyon-merge",
     "rooftop-transfer",
+    "braided-skyway",
+    "harbor-switchback",
 )
 PREDICTIVE_PLANNER_IDS = (
     "repeated-astar-3d",
@@ -682,6 +688,60 @@ def _finite_smoothing_number(smoothing: dict[str, Any], key: str) -> float:
     return parsed
 
 
+def _audit_kinematic_diagnostics(scenario_id: str, value: object) -> None:
+    if not isinstance(value, dict):
+        raise ValueError(f"predictive kinematic diagnostics are missing: {scenario_id}")
+    if (
+        value.get("status") != "discrete-diagnostic-only"
+        or value.get("continuousDynamicsCertified") is not False
+    ):
+        raise ValueError(f"predictive kinematic scope is overstated: {scenario_id}")
+
+    integer_fields = ("segmentCount", "movementSegmentCount", "reversalCount")
+    numeric_fields = (
+        "reversalThresholdDeg",
+        "maxSpeedMps",
+        "maxDiscreteVelocityChangeMps",
+        "maxDiscreteAccelerationProxyMps2",
+        "maxAbsClimbRateMps",
+    )
+    for path_kind in ("raw", "output"):
+        diagnostics = value.get(path_kind)
+        if not isinstance(diagnostics, dict):
+            raise ValueError(
+                f"predictive {path_kind} kinematic diagnostics are missing: {scenario_id}"
+            )
+        if (
+            diagnostics.get("status") != "discrete-diagnostic-only"
+            or diagnostics.get("continuousDynamicsCertified") is not False
+        ):
+            raise ValueError(f"predictive {path_kind} kinematic scope is overstated: {scenario_id}")
+        for key in integer_fields:
+            item = diagnostics.get(key)
+            if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+                raise ValueError(
+                    f"predictive {path_kind} kinematic {key} is invalid: {scenario_id}"
+                )
+        if diagnostics["movementSegmentCount"] > diagnostics["segmentCount"]:
+            raise ValueError(
+                f"predictive {path_kind} movement count exceeds segments: {scenario_id}"
+            )
+        for key in numeric_fields:
+            item = diagnostics.get(key)
+            if isinstance(item, bool) or not isinstance(item, (int, float)):
+                raise ValueError(
+                    f"predictive {path_kind} kinematic {key} is not numeric: {scenario_id}"
+                )
+            parsed = float(item)
+            if not math.isfinite(parsed) or parsed < 0.0:
+                raise ValueError(
+                    f"predictive {path_kind} kinematic {key} is invalid: {scenario_id}"
+                )
+        threshold = float(diagnostics["reversalThresholdDeg"])
+        if threshold <= 0.0 or threshold > 180.0:
+            raise ValueError(f"predictive {path_kind} reversal threshold is invalid: {scenario_id}")
+
+
 def _audit_predictive_smoothing(
     scenario_id: str,
     raw_path: list[tuple[float, Point3]],
@@ -695,6 +755,12 @@ def _audit_predictive_smoothing(
     certified = value.get("certified")
     if not isinstance(method, str) or not isinstance(applied, bool) or certified is not True:
         raise ValueError(f"predictive smoothing status is invalid: {scenario_id}")
+    if (
+        value.get("collisionCertified") is not True
+        or value.get("collisionCertificationScope") != "dense-piecewise-linear-space-time-path"
+    ):
+        raise ValueError(f"predictive collision-certification scope is invalid: {scenario_id}")
+    _audit_kinematic_diagnostics(scenario_id, value.get("kinematicDiagnostics"))
     raw_count = value.get("rawWaypointCount")
     output_count = value.get("outputWaypointCount")
     rounded_count = value.get("roundedCornerCount")
@@ -865,6 +931,52 @@ def _audit_predictive_execution(
     ):
         raise ValueError(f"predictive direct-distance mismatch: {scenario_id}")
 
+    separation = minimum_dynamic_separation(scenario, timed_path)
+    recorded_separation = metrics.get("minimumSeparationM")
+    recorded_witness = metrics.get("minimumSeparationWitness")
+    if separation is None:
+        if recorded_separation is not None or recorded_witness is not None:
+            raise ValueError(f"predictive separation diagnostic is spurious: {scenario_id}")
+    else:
+        if (
+            isinstance(recorded_separation, bool)
+            or not isinstance(recorded_separation, (int, float))
+            or not math.isfinite(float(recorded_separation))
+            or not math.isclose(
+                float(recorded_separation),
+                separation.separation_m,
+                rel_tol=1e-10,
+                abs_tol=1e-8,
+            )
+            or not isinstance(recorded_witness, dict)
+        ):
+            raise ValueError(f"predictive minimum separation mismatch: {scenario_id}")
+        expected_text = {
+            "obstacleId": separation.obstacle_id,
+            "obstacleKind": separation.obstacle_kind,
+            "method": separation.method,
+        }
+        if any(recorded_witness.get(key) != expected for key, expected in expected_text.items()):
+            raise ValueError(f"predictive separation witness identity mismatch: {scenario_id}")
+        if recorded_witness.get("exact") is not separation.exact:
+            raise ValueError(f"predictive separation witness exactness mismatch: {scenario_id}")
+        expected_numbers = {
+            "separationM": separation.separation_m,
+            "timeS": separation.time_s,
+            "declaredSafetyMarginM": separation.declared_safety_margin_m,
+        }
+        for key, expected in expected_numbers.items():
+            item = recorded_witness.get(key)
+            if (
+                isinstance(item, bool)
+                or not isinstance(item, (int, float))
+                or not math.isfinite(float(item))
+                or not math.isclose(float(item), expected, rel_tol=1e-10, abs_tol=1e-8)
+            ):
+                raise ValueError(f"predictive separation witness {key} mismatch: {scenario_id}")
+        if float(recorded_separation) < separation.declared_safety_margin_m - 1e-8:
+            raise ValueError(f"predictive minimum separation violates safety margin: {scenario_id}")
+
     success = metrics.get("success")
     failure_reason = metrics.get("failureReason")
     if not isinstance(success, bool) or failure_reason != run.get("failureReason"):
@@ -935,19 +1047,22 @@ def _audit_predictive() -> int:
             "src/uav3d/predictive_scenarios.py",
             "src/uav3d/predictive_smoothing.py",
             "src/uav3d/predictive_study.py",
+            "src/uav3d/dynamic_collision.py",
+            "src/uav3d/kinematics.py",
+            "src/uav3d/planners/dstar_lite.py",
             "src/uav3d/planners/space_time_astar.py",
         ),
         label="predictive",
     )
-    if _package_version_at(source_commit) != "0.5.0":
-        raise ValueError("predictive sourceCommit must identify the v0.5.0 implementation")
+    if _package_version_at(source_commit) != "0.6.0":
+        raise ValueError("predictive sourceCommit must identify the v0.6.0 implementation")
 
     protocol = bundle.get("protocol")
     scenarios = bundle.get("scenarios")
     if not isinstance(protocol, dict) or not isinstance(scenarios, list):
         raise ValueError("predictive protocol and scenarios must be structured objects")
-    if protocol.get("id") != "predictive-space-time-v2":
-        raise ValueError("predictive protocol must use predictive-space-time-v2")
+    if protocol.get("id") != "predictive-space-time-v3":
+        raise ValueError("predictive protocol must use predictive-space-time-v3")
     cruise_speed_value = protocol.get("cruiseSpeedMps")
     if (
         isinstance(cruise_speed_value, bool)
@@ -1017,22 +1132,22 @@ def _audit_predictive() -> int:
     ):
         raise ValueError("predictive scenario manifest contains planner-outcome selection fields")
     if (
-        manifest.get("requested") != 8
-        or manifest.get("accepted") != 8
+        manifest.get("requested") != 10
+        or manifest.get("accepted") != 10
         or manifest.get("rejected") != 0
-        or manifest.get("acceptedByCohort") != {"calibration": 1, "demo": 3, "diagnostic": 4}
-        or manifest.get("scenarioCount") != 8
-        or manifest.get("runCount") != 32
+        or manifest.get("acceptedByCohort") != {"calibration": 1, "demo": 3, "diagnostic": 6}
+        or manifest.get("scenarioCount") != 10
+        or manifest.get("runCount") != 40
         or not isinstance(manifest_scenarios, list)
     ):
-        raise ValueError("predictive scenario manifest counts disagree with the fixed v0.5 cohort")
+        raise ValueError("predictive scenario manifest counts disagree with the fixed v0.6 cohort")
     manifest_scenario_ids: list[str] = []
     for record in manifest_scenarios:
         if not isinstance(record, dict) or record.get("selected") is not True:
             raise ValueError("predictive manifest scenario entry is invalid or unselected")
         manifest_scenario_ids.append(str(record.get("id", "")))
     if tuple(manifest_scenario_ids) != PREDICTIVE_SCENARIO_IDS:
-        raise ValueError("predictive manifest scenario IDs differ from the fixed v0.5 cohort")
+        raise ValueError("predictive manifest scenario IDs differ from the fixed v0.6 cohort")
 
     expected, expected_manifest = build_predictive_bundle(
         source_commit=source_commit,
@@ -1044,7 +1159,7 @@ def _audit_predictive() -> int:
     )
     if difference is not None:
         raise ValueError(
-            "committed predictive bundle differs from 32 deterministic reruns: " + difference
+            "committed predictive bundle differs from 40 deterministic reruns: " + difference
         )
 
     if manifest != expected_manifest:
@@ -1109,8 +1224,8 @@ def _audit_predictive() -> int:
             audited += 1
         if tuple(planner_ids) != PREDICTIVE_PLANNER_IDS:
             raise ValueError(f"predictive planner order or membership mismatch: {scenario_id}")
-    if tuple(scenario_ids) != PREDICTIVE_SCENARIO_IDS or audited != 32 or len(run_ids) != 32:
-        raise ValueError("predictive bundle must contain exactly eight scenarios by four planners")
+    if tuple(scenario_ids) != PREDICTIVE_SCENARIO_IDS or audited != 40 or len(run_ids) != 40:
+        raise ValueError("predictive bundle must contain exactly ten scenarios by four planners")
     return audited
 
 

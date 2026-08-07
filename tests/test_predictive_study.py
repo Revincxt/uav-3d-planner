@@ -43,7 +43,7 @@ def test_predictive_serialization_absorbs_platform_float_drift() -> None:
 
 @pytest.fixture(scope="module")
 def fixed_study() -> list[tuple[DynamicScenario, list[PredictiveEpisode]]]:
-    """Run the expensive 32-condition matrix once for this module."""
+    """Run the expensive 40-condition matrix once for this module."""
 
     return run_predictive_study()
 
@@ -58,13 +58,13 @@ def fixed_bundle(
         return build_predictive_bundle(source_commit=SOURCE_COMMIT, generated_at=GENERATED_AT)
 
 
-def test_fixed_study_covers_eight_scenarios_by_four_planners(
+def test_fixed_study_covers_ten_scenarios_by_four_planners(
     fixed_study: list[tuple[DynamicScenario, list[PredictiveEpisode]]],
 ) -> None:
     study = fixed_study
 
-    assert len(study) == 8
-    assert sum(len(episodes) for _, episodes in study) == 32
+    assert len(study) == 10
+    assert sum(len(episodes) for _, episodes in study) == 40
     for scenario, episodes in study:
         assert tuple(episode.planner_id for episode in episodes) == PREDICTIVE_ALGORITHMS
         for episode in episodes:
@@ -72,6 +72,11 @@ def test_fixed_study_covers_eight_scenarios_by_four_planners(
             assert episode.predictive == (episode.planner_id == "space-time-astar-4d")
             assert episode.metrics.success
             assert episode.metrics.safety_violations == 0
+            assert episode.metrics.minimum_separation_m is not None
+            assert episode.metrics.minimum_separation_witness is not None
+            assert (
+                episode.metrics.minimum_separation_m >= scenario.static_scene.safety_margin - 1e-7
+            )
             assert episode.raw_timed_path.is_safe(scenario)
             assert episode.timed_path.is_safe(scenario)
             assert episode.smoothing.certified
@@ -159,13 +164,13 @@ def test_bundle_v2_and_run_ids_are_exactly_reproducible(
 
     assert bundle["schemaVersion"] == 2
     assert manifest["schemaVersion"] == 2
-    assert manifest["datasetId"] == "predictive-complex-city-v0.5"
+    assert manifest["datasetId"] == "predictive-complex-city-v0.6"
     assert bundle["verificationStatus"] == VERIFICATION_STATUS
     assert manifest["requested"] == manifest["accepted"] + manifest["rejected"]
     run_ids: set[str] = set()
     protocol = bundle["protocol"]
     assert isinstance(protocol, dict)
-    assert protocol["id"] == "predictive-space-time-v2"
+    assert protocol["id"] == "predictive-space-time-v3"
     assert "certified" in str(protocol["trajectoryPostprocessor"])
     scenarios = bundle["scenarios"]
     assert isinstance(scenarios, list)
@@ -196,7 +201,7 @@ def test_bundle_v2_and_run_ids_are_exactly_reproducible(
             )
             assert expected not in run_ids
             run_ids.add(expected)
-    assert len(run_ids) == 32
+    assert len(run_ids) == 40
 
 
 def test_bundle_exports_raw_certified_paths_and_linear_size_frames(
@@ -225,9 +230,51 @@ def test_bundle_exports_raw_certified_paths_and_linear_size_frames(
             assert isinstance(frames, list)
             assert isinstance(metrics, dict)
             assert smoothing["certified"] is True
+            assert smoothing["collisionCertified"] is True
+            assert smoothing["collisionCertificationScope"] == (
+                "dense-piecewise-linear-space-time-path"
+            )
+            kinematics = smoothing["kinematicDiagnostics"]
+            assert isinstance(kinematics, dict)
+            assert kinematics["continuousDynamicsCertified"] is False
+            for path_kind in ("raw", "output"):
+                path_diagnostics = kinematics[path_kind]
+                assert isinstance(path_diagnostics, dict)
+                assert set(path_diagnostics) == {
+                    "status",
+                    "continuousDynamicsCertified",
+                    "segmentCount",
+                    "movementSegmentCount",
+                    "reversalCount",
+                    "reversalThresholdDeg",
+                    "maxSpeedMps",
+                    "maxDiscreteVelocityChangeMps",
+                    "maxDiscreteAccelerationProxyMps2",
+                    "maxAbsClimbRateMps",
+                }
+                assert path_diagnostics["continuousDynamicsCertified"] is False
+                assert int(path_diagnostics["reversalCount"]) >= 0
+                assert float(path_diagnostics["maxDiscreteVelocityChangeMps"]) >= 0.0
+                assert float(path_diagnostics["maxDiscreteAccelerationProxyMps2"]) >= 0.0
+                assert float(path_diagnostics["maxAbsClimbRateMps"]) >= 0.0
             assert smoothing["rawWaypointCount"] == len(raw_path)
             assert smoothing["outputWaypointCount"] == len(timed_path)
             assert metrics["safetyViolations"] == 0
+            assert metrics["minimumSeparationM"] is not None
+            witness = metrics["minimumSeparationWitness"]
+            assert isinstance(witness, dict)
+            assert set(witness) == {
+                "separationM",
+                "timeS",
+                "vehiclePosition",
+                "obstacleId",
+                "obstacleKind",
+                "obstaclePosition",
+                "declaredSafetyMarginM",
+                "method",
+                "exact",
+            }
+            assert witness["obstacleKind"] in {"moving-sphere", "temporary-cylinder"}
             assert raw_path[0] == timed_path[0]
             assert raw_path[-1] == timed_path[-1]
             for angle_field in ("maxTurnAngleBeforeDeg", "maxTurnAngleAfterDeg"):
@@ -276,12 +323,21 @@ def test_records_csv_projection_is_complete(
     bundle, _ = fixed_bundle
     rows = predictive_record_rows(bundle)
 
-    assert len(rows) == 32
+    assert len(rows) == 40
     assert all(tuple(row) == RECORD_FIELDS for row in rows)
     assert {row["planner_id"] for row in rows} == set(PREDICTIVE_ALGORITHMS)
-    assert sum(row["success"] == "true" for row in rows) == 32
+    assert sum(row["success"] == "true" for row in rows) == 40
     assert all(row["safety_violations"] == "0" for row in rows)
     assert all(row["smoothing_certified"] == "true" for row in rows)
+    assert all(float(row["minimum_dynamic_separation_m"]) > 0 for row in rows)
+    assert all(row["minimum_separation_obstacle_id"] for row in rows)
+    assert all(row["minimum_separation_obstacle_kind"] for row in rows)
+    assert all(row["minimum_separation_exact"] in {"true", "false"} for row in rows)
+    assert all(int(row["raw_reversal_count"]) >= 0 for row in rows)
+    assert all(int(row["output_reversal_count"]) >= 0 for row in rows)
+    assert all(float(row["output_max_discrete_velocity_change_mps"]) >= 0 for row in rows)
+    assert all(float(row["output_max_discrete_acceleration_proxy_mps2"]) >= 0 for row in rows)
+    assert all(float(row["output_max_abs_climb_rate_mps"]) >= 0 for row in rows)
     assert all(int(row["raw_waypoint_count"]) > 0 for row in rows)
     assert all(int(row["waypoint_count"]) > 0 for row in rows)
 
@@ -353,5 +409,5 @@ def test_predictive_cli_help_describes_v05_city_and_certified_smoothing(
 
     assert exit_info.value.code == 0
     help_text = capsys.readouterr().out
-    assert "v0.5 complex-city" in help_text
+    assert "v0.6 complex-city" in help_text
     assert "certified" in help_text

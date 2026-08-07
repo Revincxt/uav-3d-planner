@@ -99,7 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="uav3d",
         description=(
-            "Reproducible static, dynamic, and v0.5 complex-city predictive benchmark for 3D "
+            "Reproducible static, dynamic, and v0.6 complex-city predictive benchmark for 3D "
             "UAV path planning with collision-certified trajectory smoothing."
         ),
     )
@@ -221,14 +221,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     predictive_parser = commands.add_parser(
         "predictive",
-        help="Inspect or run the v0.5 complex-city predictive space-time study.",
+        help="Inspect or run the v0.6 complex-city predictive space-time study.",
         description=(
-            "Inspect or run the fixed v0.5 complex-city study. Every safe raw trajectory passes "
+            "Inspect or run the fixed v0.6 complex-city study. Every safe raw trajectory passes "
             "through the common wait-preserving, collision-certified smoothing stage."
         ),
     )
     predictive_commands = predictive_parser.add_subparsers(dest="predictive_command", required=True)
-    predictive_commands.add_parser("list", help="List the eight v0.5 complex-city scenarios.")
+    predictive_commands.add_parser("list", help="List the ten v0.6 complex-city scenarios.")
     predictive_plan_parser = predictive_commands.add_parser(
         "plan",
         help="Run one planner and export its raw and certified-smoothed timed paths.",
@@ -241,9 +241,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     predictive_export_parser = commands.add_parser(
         "export-predictive",
-        help="Export the v0.5 complex-city protocol with certified trajectory smoothing.",
+        help="Export the v0.6 complex-city protocol with certified trajectory smoothing.",
         description=(
-            "Run all eight v0.5 complex-city scenarios with four planners and export raw paths, "
+            "Run all ten v0.6 complex-city scenarios with four planners and export raw paths, "
             "collision-certified smoothed paths, metrics, and compact replay frames."
         ),
     )

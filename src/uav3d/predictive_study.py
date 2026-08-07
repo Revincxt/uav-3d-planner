@@ -1,4 +1,4 @@
-"""Fixed v0.5 protocol for complex-city predictive planning demonstrations."""
+"""Fixed v0.6 protocol for complex-city predictive planning demonstrations."""
 
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ from itertools import pairwise
 from pathlib import Path
 
 from uav3d.dynamic import DynamicScenario, dynamic_scenario_fingerprint
+from uav3d.dynamic_collision import DynamicSeparationWitness, minimum_dynamic_separation
 from uav3d.geometry import Point3, almost_equal, distance, polyline_length
+from uav3d.kinematics import DiscreteKinematicDiagnostics, diagnose_timed_path_kinematics
 from uav3d.planners.space_time_astar import SpaceTimeAStar3D, SpaceTimeAStarConfig
 from uav3d.predictive import TimedPath, TimedWaypoint
 from uav3d.predictive_scenarios import build_predictive_cohort, load_predictive_scenario
@@ -24,7 +26,7 @@ from uav3d.predictive_smoothing import (
 )
 from uav3d.replanning import DynamicFrame, DynamicRun, simulate_replanning
 
-PROTOCOL_ID = "predictive-space-time-v2"
+PROTOCOL_ID = "predictive-space-time-v3"
 VERIFICATION_STATUS = "PREDICTIVE_DEMO_NON_CONFIRMATORY"
 # Eleven decimal places remain far below the spatial and temporal resolution of the
 # protocol while absorbing platform-level libm drift observed in the twelfth place.
@@ -93,6 +95,11 @@ RECORD_FIELDS = (
     "replans",
     "expanded_states",
     "work_unit",
+    "minimum_dynamic_separation_m",
+    "minimum_separation_time_s",
+    "minimum_separation_obstacle_id",
+    "minimum_separation_obstacle_kind",
+    "minimum_separation_exact",
     "safety_violations",
     "raw_waypoint_count",
     "waypoint_count",
@@ -103,6 +110,11 @@ RECORD_FIELDS = (
     "applied_turn_radius_m",
     "max_turn_before_deg",
     "max_turn_after_deg",
+    "raw_reversal_count",
+    "output_reversal_count",
+    "output_max_discrete_velocity_change_mps",
+    "output_max_discrete_acceleration_proxy_mps2",
+    "output_max_abs_climb_rate_mps",
     "parameters_json",
 )
 
@@ -121,6 +133,7 @@ class PredictiveEpisodeMetrics:
     expanded_states: int
     work_unit: str
     minimum_separation_m: float | None
+    minimum_separation_witness: DynamicSeparationWitness | None
     safety_violations: int
 
     def to_dict(self) -> dict[str, object]:
@@ -137,6 +150,11 @@ class PredictiveEpisodeMetrics:
             "expanded_states": self.expanded_states,
             "work_unit": self.work_unit,
             "minimum_separation_m": self.minimum_separation_m,
+            "minimum_separation_witness": (
+                self.minimum_separation_witness.to_dict()
+                if self.minimum_separation_witness is not None
+                else None
+            ),
             "safety_violations": self.safety_violations,
         }
 
@@ -313,6 +331,8 @@ def _postprocess_trajectory(
         sample_spacing_m=SMOOTHING_SAMPLE_SPACING_M,
         max_turn_before_deg=0.0,
         max_turn_after_deg=0.0,
+        raw_kinematics=diagnose_timed_path_kinematics(raw_timed_path),
+        output_kinematics=diagnose_timed_path_kinematics(raw_timed_path),
     )
 
 
@@ -341,6 +361,7 @@ def _reactive_episode(
     safe = smoothing.certified and timed_path.is_safe(scenario)
     direct = distance(scenario.static_scene.start, scenario.static_scene.goal)
     length = polyline_length(timed_path.positions)
+    separation_witness = minimum_dynamic_separation(scenario, timed_path.timed_points)
     success = run.metrics.success and safe
     arrival = timed_path.arrival_time_s if success else None
     metrics = PredictiveEpisodeMetrics(
@@ -357,7 +378,10 @@ def _reactive_episode(
         replans=run.metrics.replans,
         expanded_states=run.metrics.total_planning_work,
         work_unit=WORK_UNITS[planner_id],
-        minimum_separation_m=None,
+        minimum_separation_m=(
+            separation_witness.separation_m if separation_witness is not None else None
+        ),
+        minimum_separation_witness=separation_witness,
         safety_violations=run.metrics.collision_count + (0 if safe else 1),
     )
     parameters: dict[str, float | int] = {
@@ -403,6 +427,7 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
     trajectory_safe = smoothing.certified and timed_path.is_safe(scenario)
     direct = distance(scenario.static_scene.start, scenario.static_scene.goal)
     length = polyline_length(timed_path.positions)
+    separation_witness = minimum_dynamic_separation(scenario, timed_path.timed_points)
     success = result.success and trajectory_safe
     metrics = PredictiveEpisodeMetrics(
         success=success,
@@ -416,7 +441,10 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
         replans=1,
         expanded_states=result.expanded_spacetime_states,
         work_unit=WORK_UNITS[result.algorithm],
-        minimum_separation_m=None,
+        minimum_separation_m=(
+            separation_witness.separation_m if separation_witness is not None else None
+        ),
+        minimum_separation_witness=separation_witness,
         safety_violations=0 if trajectory_safe else 1,
     )
     parameters: dict[str, float | int] = {
@@ -612,6 +640,41 @@ def _run_status(episode: PredictiveEpisode) -> str:
     return "no-path"
 
 
+def _export_separation_witness(witness: DynamicSeparationWitness) -> dict[str, object]:
+    """Serialize an internal witness using the public bundle's camelCase vocabulary."""
+
+    return {
+        "separationM": witness.separation_m,
+        "timeS": witness.time_s,
+        "vehiclePosition": list(witness.vehicle_position),
+        "obstacleId": witness.obstacle_id,
+        "obstacleKind": witness.obstacle_kind,
+        "obstaclePosition": list(witness.obstacle_position),
+        "declaredSafetyMarginM": witness.declared_safety_margin_m,
+        "method": witness.method,
+        "exact": witness.exact,
+    }
+
+
+def _export_kinematic_diagnostics(
+    diagnostics: DiscreteKinematicDiagnostics,
+) -> dict[str, object]:
+    """Serialize finite-difference diagnostics without changing their internal API."""
+
+    return {
+        "status": "discrete-diagnostic-only",
+        "continuousDynamicsCertified": False,
+        "segmentCount": diagnostics.segment_count,
+        "movementSegmentCount": diagnostics.movement_segment_count,
+        "reversalCount": diagnostics.reversal_count,
+        "reversalThresholdDeg": diagnostics.reversal_threshold_deg,
+        "maxSpeedMps": diagnostics.max_speed_mps,
+        "maxDiscreteVelocityChangeMps": diagnostics.max_discrete_velocity_change_mps,
+        "maxDiscreteAccelerationProxyMps2": (diagnostics.max_discrete_acceleration_proxy_mps2),
+        "maxAbsClimbRateMps": diagnostics.max_abs_climb_rate_mps,
+    }
+
+
 def _export_metrics(episode: PredictiveEpisode) -> dict[str, object]:
     metrics = episode.metrics
     return {
@@ -629,6 +692,11 @@ def _export_metrics(episode: PredictiveEpisode) -> dict[str, object]:
         "expandedStates": metrics.expanded_states,
         "workUnit": metrics.work_unit,
         "minimumSeparationM": metrics.minimum_separation_m,
+        "minimumSeparationWitness": (
+            _export_separation_witness(metrics.minimum_separation_witness)
+            if metrics.minimum_separation_witness is not None
+            else None
+        ),
         "safetyViolations": metrics.safety_violations,
     }
 
@@ -660,6 +728,8 @@ def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[s
             "method": smoothing.method,
             "applied": smoothing.applied,
             "certified": smoothing.certified,
+            "collisionCertified": smoothing.collision_certified,
+            "collisionCertificationScope": "dense-piecewise-linear-space-time-path",
             "rawWaypointCount": smoothing.raw_waypoint_count,
             "outputWaypointCount": smoothing.output_waypoint_count,
             "roundedCornerCount": smoothing.rounded_corners,
@@ -668,6 +738,12 @@ def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[s
             "sampleSpacingM": smoothing.sample_spacing_m,
             "maxTurnAngleBeforeDeg": smoothing.max_turn_before_deg,
             "maxTurnAngleAfterDeg": smoothing.max_turn_after_deg,
+            "kinematicDiagnostics": {
+                "status": "discrete-diagnostic-only",
+                "continuousDynamicsCertified": False,
+                "raw": _export_kinematic_diagnostics(smoothing.raw_kinematics),
+                "output": _export_kinematic_diagnostics(smoothing.output_kinematics),
+            },
         },
         "waitIntervals": _wait_intervals(episode),
         "metrics": _export_metrics(episode),
@@ -762,7 +838,7 @@ def _scenario_manifest(
     _, cohort_manifest = build_predictive_cohort()
     return {
         "schemaVersion": 2,
-        "datasetId": "predictive-complex-city-v0.5",
+        "datasetId": "predictive-complex-city-v0.6",
         "sourceCommit": source_commit,
         "generatedAt": generated_at,
         "protocolId": PROTOCOL_ID,
@@ -857,6 +933,16 @@ def predictive_record_rows(bundle: dict[str, object]) -> list[dict[str, str]]:
                 raise TypeError("predictive run metrics, paths, or smoothing have invalid types")
             if not isinstance(parameters, dict):
                 raise TypeError("predictive run parameters must be an object")
+            separation_witness = metrics.get("minimumSeparationWitness")
+            if separation_witness is not None and not isinstance(separation_witness, dict):
+                raise TypeError("predictive minimum-separation witness must be an object or null")
+            kinematic_diagnostics = smoothing.get("kinematicDiagnostics")
+            if not isinstance(kinematic_diagnostics, dict):
+                raise TypeError("predictive kinematic diagnostics must be an object")
+            raw_kinematics = kinematic_diagnostics.get("raw")
+            output_kinematics = kinematic_diagnostics.get("output")
+            if not isinstance(raw_kinematics, dict) or not isinstance(output_kinematics, dict):
+                raise TypeError("predictive raw/output kinematic diagnostics must be objects")
             rows.append(
                 {
                     "source_commit": str(bundle["sourceCommit"]),
@@ -882,6 +968,25 @@ def predictive_record_rows(bundle: dict[str, object]) -> list[dict[str, str]]:
                     "replans": str(metrics["replans"]),
                     "expanded_states": str(metrics["expandedStates"]),
                     "work_unit": str(metrics["workUnit"]),
+                    "minimum_dynamic_separation_m": _csv_scalar(metrics["minimumSeparationM"]),
+                    "minimum_separation_time_s": (
+                        ""
+                        if separation_witness is None
+                        else _csv_scalar(separation_witness["timeS"])
+                    ),
+                    "minimum_separation_obstacle_id": (
+                        "" if separation_witness is None else str(separation_witness["obstacleId"])
+                    ),
+                    "minimum_separation_obstacle_kind": (
+                        ""
+                        if separation_witness is None
+                        else str(separation_witness["obstacleKind"])
+                    ),
+                    "minimum_separation_exact": (
+                        ""
+                        if separation_witness is None
+                        else str(separation_witness["exact"]).lower()
+                    ),
                     "safety_violations": str(metrics["safetyViolations"]),
                     "raw_waypoint_count": str(len(raw_timed_path)),
                     "waypoint_count": str(len(timed_path)),
@@ -892,6 +997,17 @@ def predictive_record_rows(bundle: dict[str, object]) -> list[dict[str, str]]:
                     "applied_turn_radius_m": _csv_scalar(smoothing["appliedTurnRadiusM"]),
                     "max_turn_before_deg": _csv_scalar(smoothing["maxTurnAngleBeforeDeg"]),
                     "max_turn_after_deg": _csv_scalar(smoothing["maxTurnAngleAfterDeg"]),
+                    "raw_reversal_count": str(raw_kinematics["reversalCount"]),
+                    "output_reversal_count": str(output_kinematics["reversalCount"]),
+                    "output_max_discrete_velocity_change_mps": _csv_scalar(
+                        output_kinematics["maxDiscreteVelocityChangeMps"]
+                    ),
+                    "output_max_discrete_acceleration_proxy_mps2": _csv_scalar(
+                        output_kinematics["maxDiscreteAccelerationProxyMps2"]
+                    ),
+                    "output_max_abs_climb_rate_mps": _csv_scalar(
+                        output_kinematics["maxAbsClimbRateMps"]
+                    ),
                     "parameters_json": json.dumps(
                         parameters, sort_keys=True, separators=(",", ":")
                     ),
@@ -925,7 +1041,7 @@ def artifact_reference(path: Path) -> dict[str, str | int]:
 
 
 def export_predictive_study(output_dir: Path, *, source_commit: str) -> dict[str, object]:
-    """Execute the v0.5 protocol and write its self-describing public data bundle."""
+    """Execute the v0.6 protocol and write its self-describing public data bundle."""
 
     bundle, manifest = build_predictive_bundle(source_commit=source_commit)
     output_dir.mkdir(parents=True, exist_ok=True)

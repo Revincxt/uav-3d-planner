@@ -5,7 +5,9 @@ from itertools import pairwise
 
 import pytest
 
-from uav3d.dynamic import DynamicScenario, MovingSphere
+from uav3d.dynamic import DynamicScenario, MovingSphere, TemporaryCylinder
+from uav3d.dynamic_collision import minimum_dynamic_separation
+from uav3d.kinematics import diagnose_timed_path_kinematics
 from uav3d.predictive import TimedPath, TimedWaypoint
 from uav3d.predictive_smoothing import smooth_predictive_timed_path
 from uav3d.scene import AABB, Bounds3D, Scene
@@ -17,6 +19,7 @@ def _scenario(
     goal: tuple[float, float, float] = (12.0, 12.0, 5.0),
     buildings: tuple[AABB, ...] = (),
     moving_spheres: tuple[MovingSphere, ...] = (),
+    temporary_cylinders: tuple[TemporaryCylinder, ...] = (),
 ) -> DynamicScenario:
     scene = Scene(
         "smoothing-scene",
@@ -32,6 +35,7 @@ def _scenario(
         "smoothing-dynamic",
         "Smoothing dynamic",
         scene,
+        temporary_cylinders=temporary_cylinders,
         moving_spheres=moving_spheres,
     )
 
@@ -176,6 +180,97 @@ def test_smoothing_is_deterministic() -> None:
 
     assert first == second
     assert first.to_dict() == second.to_dict()
+
+
+def test_u_turn_is_retained_but_reported_as_a_discrete_reversal() -> None:
+    raw = TimedPath(
+        (
+            TimedWaypoint(0.0, (4.0, 4.0, 5.0), "start"),
+            TimedWaypoint(2.0, (12.0, 4.0, 5.0), "move"),
+            TimedWaypoint(4.0, (6.0, 4.0, 5.0), "move"),
+        )
+    )
+    scenario = _scenario(start=raw.start, goal=raw.goal)
+
+    result = smooth_predictive_timed_path(
+        scenario,
+        raw,
+        requested_radius_m=3.0,
+        sample_spacing_m=0.25,
+        max_speed_mps=4.0,
+    )
+
+    assert result.method == "raw-no-roundable-corners"
+    assert result.collision_certified
+    assert result.timed_path == raw
+    assert result.raw_kinematics.reversal_count == 1
+    assert result.output_kinematics.reversal_count == 1
+    assert result.output_kinematics.max_discrete_velocity_change_mps == pytest.approx(7.0)
+    assert result.output_kinematics.max_discrete_acceleration_proxy_mps2 == pytest.approx(3.5)
+    assert result.output_kinematics.max_abs_climb_rate_mps == 0.0
+    payload = result.to_dict()
+    assert payload["collision_certified"] is True
+    kinematics = payload["kinematic_diagnostics"]
+    assert isinstance(kinematics, dict)
+    assert kinematics["continuous_dynamics_certified"] is False
+
+
+def test_discrete_kinematic_diagnostics_report_climb_and_velocity_change() -> None:
+    path = TimedPath(
+        (
+            TimedWaypoint(0.0, (4.0, 4.0, 4.0), "start"),
+            TimedWaypoint(2.0, (8.0, 4.0, 8.0), "move"),
+            TimedWaypoint(4.0, (12.0, 4.0, 8.0), "move"),
+        )
+    )
+
+    diagnostics = diagnose_timed_path_kinematics(path)
+
+    assert diagnostics.reversal_count == 0
+    assert diagnostics.max_abs_climb_rate_mps == pytest.approx(2.0)
+    assert diagnostics.max_discrete_velocity_change_mps == pytest.approx(2.0)
+    assert diagnostics.max_discrete_acceleration_proxy_mps2 == pytest.approx(1.0)
+    assert diagnostics.to_dict()["continuous_dynamics_certified"] is False
+
+
+def test_dynamic_separation_reports_exact_moving_sphere_witness() -> None:
+    position = (8.0, 8.0, 5.0)
+    sphere = MovingSphere("parallel-traffic", 1.0, ((0.0, position), (2.0, position)))
+    path = TimedPath(
+        (
+            TimedWaypoint(0.0, (4.0, 4.0, 5.0), "start"),
+            TimedWaypoint(2.0, (12.0, 4.0, 5.0), "move"),
+        )
+    )
+    scenario = _scenario(start=path.start, goal=path.goal, moving_spheres=(sphere,))
+
+    witness = minimum_dynamic_separation(scenario, path.timed_points)
+
+    assert witness is not None
+    assert witness.exact
+    assert witness.obstacle_kind == "moving-sphere"
+    assert witness.time_s == pytest.approx(1.0)
+    assert witness.vehicle_position == pytest.approx((8.0, 4.0, 5.0))
+    assert witness.separation_m == pytest.approx(3.0)
+
+
+def test_dynamic_separation_labels_temporary_cylinder_search_as_approximate() -> None:
+    zone = TemporaryCylinder("temporary", (8.0, 8.0), 1.0, 0.0, 10.0, 0.0, 2.0)
+    path = TimedPath(
+        (
+            TimedWaypoint(0.0, (4.0, 4.0, 5.0), "start"),
+            TimedWaypoint(2.0, (12.0, 4.0, 5.0), "move"),
+        )
+    )
+    scenario = _scenario(start=path.start, goal=path.goal, temporary_cylinders=(zone,))
+
+    witness = minimum_dynamic_separation(scenario, path.timed_points)
+
+    assert witness is not None
+    assert not witness.exact
+    assert witness.obstacle_kind == "temporary-cylinder"
+    assert witness.time_s == pytest.approx(1.0, abs=1e-6)
+    assert witness.separation_m == pytest.approx(3.0, abs=1e-9)
 
 
 @pytest.mark.parametrize(
