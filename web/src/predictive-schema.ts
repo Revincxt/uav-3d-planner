@@ -42,6 +42,13 @@ export interface PredictiveProtocol {
   reactiveMaxWorkPerReplan: number;
   predictiveMaxExpandedStatesPerMission: number;
   trajectoryPostprocessor: string;
+  executionEnvelope: PredictiveExecutionEnvelope;
+  continuousDynamicsCertified: false;
+  metricDomains: {
+    plannerMetrics: string;
+    geometryMetrics: string;
+    executionMetrics: string;
+  };
 }
 
 export interface TimedWaypoint {
@@ -95,6 +102,49 @@ export interface PredictiveSmoothing {
   maxTurnAngleBeforeDeg: number | null;
   maxTurnAngleAfterDeg: number | null;
   kinematicDiagnostics: PredictiveKinematicDiagnostics;
+  execution: PredictiveExecutionEvidence;
+}
+
+export interface PredictiveExecutionEnvelope {
+  model: "discrete-segment-average-envelope-v1";
+  maxSpeedMps: number;
+  maxAbsClimbRateMps: number;
+  maxDiscreteAccelerationProxyMps2: number;
+  reversalThresholdDeg: number;
+  allowReversals: boolean;
+  maxExecutionTimeS: number;
+  continuousDynamicsCertified: false;
+}
+
+export type PredictiveExecutionStatus =
+  | "not-evaluated"
+  | "qualified"
+  | "reversal-not-allowed"
+  | "execution-time-limit-exceeded"
+  | "time-parameterization-did-not-converge"
+  | "dynamic-collision-after-retiming";
+
+export interface PredictiveExecutionQualification {
+  status: "qualified" | "not-qualified";
+  qualified: boolean;
+  continuousDynamicsCertified: false;
+  diagnostics: PredictiveDiscreteKinematicDiagnostics;
+  boundaryAwareMaxDiscreteAccelerationProxyMps2: number;
+  violations: string[];
+}
+
+export interface PredictiveExecutionEvidence {
+  status: PredictiveExecutionStatus;
+  qualified: boolean;
+  collisionCertified: boolean;
+  collisionCertificationScope: "dense-piecewise-linear-space-time-path";
+  continuousDynamicsCertified: false;
+  envelope: PredictiveExecutionEnvelope;
+  qualification: PredictiveExecutionQualification | null;
+  timingIterations: number;
+  originalDurationS: number | null;
+  candidateDurationS: number | null;
+  addedDurationS: number | null;
 }
 
 export interface PredictiveDiscreteKinematicDiagnostics {
@@ -154,11 +204,16 @@ export interface PredictiveRun {
   failureReason: string | null;
   parameters: Record<string, number>;
   rawTimedPath: TimedWaypoint[];
-  timedPath: TimedWaypoint[];
+  geometryTimedPath: TimedWaypoint[];
+  executionTimedPath: TimedWaypoint[] | null;
   smoothing: PredictiveSmoothing;
-  waitIntervals: WaitInterval[];
-  metrics: PredictiveRunMetrics;
-  frames: PredictiveFrame[];
+  geometryWaitIntervals: WaitInterval[];
+  executionWaitIntervals: WaitInterval[] | null;
+  plannerMetrics: PredictiveRunMetrics;
+  geometryMetrics: PredictiveRunMetrics;
+  executionMetrics: PredictiveRunMetrics | null;
+  geometryFrames: PredictiveFrame[];
+  executionFrames: PredictiveFrame[] | null;
 }
 
 export interface PredictiveScenario {
@@ -187,8 +242,8 @@ export interface PredictiveScenario {
   runs: PredictiveRun[];
 }
 
-export interface PredictiveBundleV2 {
-  schemaVersion: 2;
+export interface PredictiveBundleV3 {
+  schemaVersion: 3;
   generatedAt: string;
   sourceCommit: string;
   verificationStatus: "PREDICTIVE_DEMO_NON_CONFIRMATORY";
@@ -201,4 +256,4 @@ export interface PredictiveBundleV2 {
   };
 }
 
-export type PredictivePathMode = "raw" | "certified";
+export type PredictivePathMode = "raw" | "geometry" | "execution";

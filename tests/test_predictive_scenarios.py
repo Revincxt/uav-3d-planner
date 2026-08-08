@@ -130,11 +130,11 @@ def test_city_complexity_geometry_ids_and_time_zero_endpoints() -> None:
             assert _xy_distance_to_segment(sphere.keyframes[-1][1], scene.start, scene.goal) >= 12.0
 
 
-def test_cohort_manifest_is_v05_geometry_only_and_outcome_independent() -> None:
+def test_cohort_manifest_is_v07_geometry_only_and_outcome_independent() -> None:
     scenarios, manifest = build_predictive_cohort()
     assert tuple(scenario.scenario_id for scenario in scenarios) == EXPECTED_IDS
     assert manifest["schema_version"] == "predictive-scenario-manifest-v2"
-    assert manifest["dataset_id"] == "predictive-urban-v0.6"
+    assert manifest["dataset_id"] == "predictive-execution-envelope-v0.7"
     assert manifest["requested"] == manifest["accepted"] + manifest["rejected"]
     assert (manifest["requested"], manifest["accepted"], manifest["rejected"]) == (10, 10, 0)
     assert manifest["accepted_by_cohort"] == {"calibration": 1, "demo": 3, "diagnostic": 6}
@@ -230,18 +230,20 @@ def test_extended_city_hazards_encode_distinct_altitude_decisions() -> None:
     assert harbor.moving_spheres[1].position_at(6.0) == (52.0, 76.0, 32.0)
 
 
-def test_every_scenario_declares_v05_urban_metadata() -> None:
+def test_every_scenario_declares_v07_urban_metadata() -> None:
     case_ids: set[int] = set()
     for scenario_id in EXPECTED_IDS:
         scenario = load_predictive_scenario(scenario_id)
-        assert scenario.metadata["study"] == "predictive-space-time-v0.6"
-        assert scenario.metadata["dataset"] == "predictive-urban-v0.6"
+        assert scenario.metadata["study"] == "predictive-space-time-v0.7"
+        assert scenario.metadata["dataset"] == "predictive-execution-envelope-v0.7"
         assert scenario.metadata["forecast_required"] is True
         assert scenario.metadata["selection_basis"] == "validated-scenario-construction-only"
         assert scenario.metadata["planner_outcome_filtering"] == "forbidden"
         assert scenario.metadata["decision_contract"]
         assert scenario.metadata["district"]
         assert scenario.metadata["street_pattern"]
+        # The physical scene retains its v0.6 provenance while the wrapper identifies the
+        # v0.7 execution-envelope study that reuses it unchanged.
         assert scenario.static_scene.metadata["dataset"] == "predictive-urban-v0.6"
         case_ids.add(int(scenario.metadata["case_id"]))
     assert case_ids == set(range(5101, 5111))

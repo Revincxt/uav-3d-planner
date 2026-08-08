@@ -11,23 +11,39 @@ jerk claim.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import pairwise
+from typing import Literal
 
 from uav3d.dynamic import DynamicScenario
 from uav3d.geometry import Point3, add, distance, dot, lerp, scale, subtract
-from uav3d.kinematics import DiscreteKinematicDiagnostics, diagnose_timed_path_kinematics
+from uav3d.kinematics import (
+    DiscreteExecutionEnvelope,
+    DiscreteExecutionQualification,
+    DiscreteKinematicDiagnostics,
+    diagnose_timed_path_kinematics,
+)
 from uav3d.predictive import TimedPath, TimedWaypoint
+from uav3d.trajectory_timing import TrajectoryTimingResult, retime_timed_path
 
 _GEOMETRY_EPSILON = 1e-9
 _MIN_TURN_RADIANS = math.radians(1.0)
 _MAX_TURN_RADIANS = math.radians(175.0)
 _TRIM_FRACTION = 0.45
 
+ExecutionCandidateStatus = Literal[
+    "not-evaluated",
+    "qualified",
+    "reversal-not-allowed",
+    "execution-time-limit-exceeded",
+    "time-parameterization-did-not-converge",
+    "dynamic-collision-after-retiming",
+]
+
 
 @dataclass(frozen=True, slots=True)
 class PredictiveSmoothingResult:
-    """A certified dense-polyline result and honest smoothing metadata."""
+    """A collision-certified geometry candidate plus an optional execution candidate."""
 
     timed_path: TimedPath
     method: str
@@ -43,6 +59,28 @@ class PredictiveSmoothingResult:
     max_turn_after_deg: float
     raw_kinematics: DiscreteKinematicDiagnostics
     output_kinematics: DiscreteKinematicDiagnostics
+    execution_candidate: TimedPath | None = None
+    execution_status: ExecutionCandidateStatus = "not-evaluated"
+    execution_collision_certified: bool = False
+    execution_envelope: DiscreteExecutionEnvelope = field(default_factory=DiscreteExecutionEnvelope)
+    execution_qualification: DiscreteExecutionQualification | None = None
+    execution_timing_iterations: int = 0
+    execution_original_duration_s: float | None = None
+    execution_candidate_duration_s: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.execution_timing_iterations < 0:
+            raise ValueError("execution timing iterations must be non-negative")
+        if self.execution_status == "qualified":
+            if (
+                self.execution_candidate is None
+                or not self.execution_collision_certified
+                or self.execution_qualification is None
+                or not self.execution_qualification.qualified
+            ):
+                raise ValueError("qualified execution status requires a certified candidate")
+        elif self.execution_candidate is not None:
+            raise ValueError("failed execution status must not expose an execution candidate")
 
     @property
     def collision_certified(self) -> bool:
@@ -50,9 +88,23 @@ class PredictiveSmoothingResult:
 
         return self.certified
 
+    @property
+    def geometry_candidate(self) -> TimedPath:
+        """Compatibility-safe explicit name for ``timed_path``."""
+
+        return self.timed_path
+
+    @property
+    def execution_qualified(self) -> bool:
+        return self.execution_status == "qualified"
+
     def to_dict(self) -> dict[str, object]:
         return {
             "timed_path": self.timed_path.to_dict(),
+            "geometry_candidate": self.geometry_candidate.to_dict(),
+            "execution_candidate": (
+                self.execution_candidate.to_dict() if self.execution_candidate is not None else None
+            ),
             "method": self.method,
             "applied": self.applied,
             "certified": self.certified,
@@ -72,7 +124,55 @@ class PredictiveSmoothingResult:
                 "raw": self.raw_kinematics.to_dict(),
                 "output": self.output_kinematics.to_dict(),
             },
+            "execution": {
+                "status": self.execution_status,
+                "qualified": self.execution_qualified,
+                "collision_certified": self.execution_collision_certified,
+                "continuous_dynamics_certified": False,
+                "envelope": self.execution_envelope.to_dict(),
+                "qualification": (
+                    self.execution_qualification.to_dict()
+                    if self.execution_qualification is not None
+                    else None
+                ),
+                "timing_iterations": self.execution_timing_iterations,
+                "original_duration_s": self.execution_original_duration_s,
+                "candidate_duration_s": self.execution_candidate_duration_s,
+                "added_duration_s": (
+                    None
+                    if self.execution_original_duration_s is None
+                    or self.execution_candidate_duration_s is None
+                    else self.execution_candidate_duration_s - self.execution_original_duration_s
+                ),
+            },
         }
+
+
+@dataclass(frozen=True, slots=True)
+class _ExecutionEvaluation:
+    candidate: TimedPath | None
+    status: ExecutionCandidateStatus
+    collision_certified: bool
+    timing: TrajectoryTimingResult
+
+
+def _evaluate_execution_candidate(
+    scenario: DynamicScenario,
+    geometry_candidate: TimedPath,
+    envelope: DiscreteExecutionEnvelope,
+) -> _ExecutionEvaluation:
+    timing = retime_timed_path(geometry_candidate, envelope)
+    candidate = timing.timed_path
+    if candidate is None:
+        return _ExecutionEvaluation(None, timing.status, False, timing)
+    if not candidate.is_safe(scenario):
+        return _ExecutionEvaluation(
+            None,
+            "dynamic-collision-after-retiming",
+            False,
+            timing,
+        )
+    return _ExecutionEvaluation(candidate, "qualified", True, timing)
 
 
 @dataclass(frozen=True, slots=True)
@@ -322,6 +422,7 @@ def smooth_predictive_timed_path(
     requested_radius_m: float = 6.0,
     sample_spacing_m: float = 0.5,
     max_speed_mps: float = 8.0,
+    execution_envelope: DiscreteExecutionEnvelope | None = None,
 ) -> PredictiveSmoothingResult:
     """Round movement blocks and return only an exactly audited dense linear trajectory.
 
@@ -343,6 +444,7 @@ def smooth_predictive_timed_path(
     if not _within_speed_limit(raw_path, max_speed_mps):
         raise ValueError("raw_path exceeds max_speed_mps and cannot be a certified fallback")
 
+    envelope = execution_envelope or DiscreteExecutionEnvelope(max_speed_mps=max_speed_mps)
     max_turn_before = _max_turn_degrees(raw_path)
     raw_kinematics = diagnose_timed_path_kinematics(raw_path)
     saw_roundable_corner = False
@@ -359,6 +461,7 @@ def smooth_predictive_timed_path(
         saw_roundable_corner = True
         if not _within_speed_limit(candidate, max_speed_mps) or not candidate.is_safe(scenario):
             continue
+        execution = _evaluate_execution_candidate(scenario, candidate, envelope)
         return PredictiveSmoothingResult(
             timed_path=candidate,
             method="sampled-circular-fillet",
@@ -374,9 +477,18 @@ def smooth_predictive_timed_path(
             max_turn_after_deg=_max_turn_degrees(candidate),
             raw_kinematics=raw_kinematics,
             output_kinematics=diagnose_timed_path_kinematics(candidate),
+            execution_candidate=execution.candidate,
+            execution_status=execution.status,
+            execution_collision_certified=execution.collision_certified,
+            execution_envelope=envelope,
+            execution_qualification=execution.timing.qualification,
+            execution_timing_iterations=execution.timing.iterations,
+            execution_original_duration_s=execution.timing.original_duration_s,
+            execution_candidate_duration_s=execution.timing.candidate_duration_s,
         )
 
     method = "raw-fallback" if saw_roundable_corner else "raw-no-roundable-corners"
+    execution = _evaluate_execution_candidate(scenario, raw_path, envelope)
     return PredictiveSmoothingResult(
         timed_path=raw_path,
         method=method,
@@ -392,7 +504,19 @@ def smooth_predictive_timed_path(
         max_turn_after_deg=max_turn_before,
         raw_kinematics=raw_kinematics,
         output_kinematics=raw_kinematics,
+        execution_candidate=execution.candidate,
+        execution_status=execution.status,
+        execution_collision_certified=execution.collision_certified,
+        execution_envelope=envelope,
+        execution_qualification=execution.timing.qualification,
+        execution_timing_iterations=execution.timing.iterations,
+        execution_original_duration_s=execution.timing.original_duration_s,
+        execution_candidate_duration_s=execution.timing.candidate_duration_s,
     )
 
 
-__all__ = ["PredictiveSmoothingResult", "smooth_predictive_timed_path"]
+__all__ = [
+    "ExecutionCandidateStatus",
+    "PredictiveSmoothingResult",
+    "smooth_predictive_timed_path",
+]

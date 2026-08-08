@@ -2,12 +2,12 @@ cff-version: 1.2.0
 message: "If you use this software in academic work, please cite it as below."
 title: "UAV 3D Planner Lab"
 type: software
-version: 0.6.0
-date-released: 2026-08-07
+version: 0.7.0
+date-released: 2026-08-08
 authors:
   - name: Revincxt
-repository-code: "https://github.com/Revincxt/uav-3d-planner-lab"
-url: "https://revincxt.github.io/uav-3d-planner-lab/"
+repository-code: "https://github.com/Revincxt/uav-3d-planner"
+url: "https://revincxt.github.io/uav-3d-planner/"
 license: MIT
 keywords:
   - UAV

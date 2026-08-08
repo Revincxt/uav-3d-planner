@@ -235,9 +235,7 @@ class DStarLite3D:
             and old.safety_margin == scene.safety_margin
         )
 
-    def _visible_goal_terminal_costs(
-        self, scene: Scene, grid: VoxelGrid
-    ) -> dict[GridIndex, float]:
+    def _visible_goal_terminal_costs(self, scene: Scene, grid: VoxelGrid) -> dict[GridIndex, float]:
         """Return every visible goal anchor and its exact-endpoint connector cost."""
 
         return {
@@ -283,9 +281,7 @@ class DStarLite3D:
             return None
         return min(
             candidates,
-            key=lambda anchor: self._start_anchor_key(
-                scene, grid, anchor, goal_terminal_costs
-            ),
+            key=lambda anchor: self._start_anchor_key(scene, grid, anchor, goal_terminal_costs),
         )
 
     def _anchor_parameters(self) -> dict[str, Scalar]:

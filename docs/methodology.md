@@ -6,10 +6,10 @@ This repository establishes a reproducible static-planning baseline. Each experi
 
 The benchmark is intended for algorithm study. It is not a certified motion planner, flight controller, or operational risk assessment.
 
-Version 0.3 preserves this static baseline and adds a separate dynamic-replanning experiment. The
-dynamic experiment does not introduce attitude, acceleration, wind, sensing uncertainty, or a flight
-controller; it studies how geometric planners respond when known exclusion geometry changes over a
-deterministic simulation clock.
+Version 0.3 preserves this static baseline and adds a separate dynamic-replanning experiment.
+Version 0.7 extends the predictive track with a frozen discrete execution envelope while retaining
+the planner, geometry, and collision models used by the v0.6 cohort. Neither extension introduces a
+flight controller, continuous vehicle dynamics, wind, or sensing uncertainty.
 
 ## Shared collision world
 
@@ -175,12 +175,10 @@ usage. Re-running the same source revision and protocol must reproduce the non-t
 
 ## Predictive space-time protocol
 
-Version 0.6 retains the complete-forecast experiment and shared certified trajectory post-processor
-from v0.5, then adds two extended-city diagnostic cases and two descriptive measurement families:
-dynamic closest-approach witnesses and discrete waypoint-level kinematics. A `TimedPath` carries a
-strictly increasing timestamp at every exact endpoint, grid waypoint, and stationary interval.
-Equal-position segments must be explicit `wait` actions; raw moving segments use the declared cruise
-speed and certified rounded segments do not exceed it.
+Version 0.7 freezes the v0.6 predictive cohort and planner configurations, then separates planner
+output, geometric post-processing, and an optional retimed execution candidate. A `TimedPath`
+carries a strictly increasing timestamp at every exact endpoint, grid waypoint, and stationary
+interval. Equal-position segments must be explicit `wait` actions.
 
 The predictive baseline searches states `(v, k)`, where `v` is a free spatial voxel and `k` is a
 discrete time layer. The frozen public configuration uses a `4 m` spatial lattice, `0.5 s` time
@@ -209,30 +207,105 @@ one-shot versus periodic planning, safety-gate behavior, and budget scope. It th
 two complete information-and-control protocols rather than a pure causal estimate of forecast
 value.
 
-The ten predictive scenarios are accepted by construction and metadata validation before any
-planner is invoked. One calibration, three demonstration, and six curated diagnostic labels are
-identified by semantic fingerprints. Seven non-calibration scenes contain 14–16 unequal-height
-buildings; `braided-skyway` and `harbor-switchback` each contain 20 buildings, one static no-fly
-volume, two altitude-selective temporary restrictions, and two moving hazards. The cases were not
-preregistered in an earlier immutable revision, so the public page treats all 40 runs as
-non-confirmatory examples rather than held-out evidence. Version 0.6 contains the v0.5 cases as a
-historical subset; records from both releases are not pooled as independent scenarios, and neither
-cohort is pooled with v0.4.
+### Frozen study matrix and analysis unit
 
-Predictive outcomes include success, failure reason, arrival time, movement time, total stationary
-time, executed length, path excess, replans, algorithm-specific work, safety violations, and a
-dynamic minimum-separation witness. Total stationary time contains both forecast-aware waiting and
-short connector-to-layer alignment waits; the interval records distinguish those reasons. Expanded
-spatial nodes, D* Lite queue pops, and expanded space-time states are not interchangeable measures of
-equal effort. The 240,000 cap applies to each reactive replanning call but to the complete Space-Time
-A* mission search, so cumulative reactive work may exceed that number.
+Version 0.7 uses the same ten v0.6 scenarios and four planner conditions, for 40 deterministic
+planner-condition records. There are no outcome-dependent additions or removals. The scenario is
+the independent unit (`n = 10`); the four conditions are paired within scenario. Planner-condition
+rows, playback frames, waits, and replanning epochs are repeated or nested observations, not
+additional independent samples.
+
+The ten scenarios are accepted by construction and metadata validation before any planner is
+invoked. One calibration, three demonstration, and six curated diagnostic labels are identified by
+semantic fingerprints. Seven non-calibration scenes contain 14–16 unequal-height buildings;
+`braided-skyway` and `harbor-switchback` each contain 20 buildings, one static no-fly volume, two
+altitude-selective temporary restrictions, and two moving hazards. The cases were not preregistered
+in an earlier immutable revision, so the 40 records remain non-confirmatory diagnostic evidence.
+Version 0.6 is a paired historical baseline and must not be pooled with v0.7 as an independent
+cohort; v0.5 and v0.4 rows likewise do not add independent scenarios.
+
+The frozen public identifiers are schema version `3`, protocol
+`predictive-space-time-v4`, and dataset `predictive-execution-envelope-v0.7`. All execution-envelope
+thresholds are declared before regeneration. The number of qualified execution candidates is an
+observed result, not a release gate or a parameter-tuning target.
+
+Expanded spatial nodes, D* Lite queue pops, and expanded space-time states remain
+algorithm-specific work indicators rather than interchangeable measures of equal effort. The
+240,000 cap applies to each reactive replanning call but to the complete Space-Time A* mission
+search, so cumulative reactive work may exceed that number.
+
+### Three evidence layers
+
+Each successful planner record retains three explicitly named domains:
+
+1. `rawTimedPath` is the direct planner or online-policy result. `plannerMetrics` is computed only
+   from this path and contains the planner success/failure outcome, raw arrival and wait time, raw
+   length and path excess, replans, algorithm-specific work, safety audit, and raw
+   closest-approach witness.
+2. `geometryTimedPath` is the common downstream geometric candidate under the original timing.
+   `geometryMetrics` is recomputed from this candidate. Geometry changes are never attributed to
+   the planner.
+3. `executionTimedPath` is an optional duration-only retiming of the geometry candidate.
+   `executionMetrics` exists only for a published execution candidate and is never substituted for
+   planner-domain results.
+
+The geometry stage divides a path at each wait, proposes sampled three-dimensional circular fillets
+for eligible movement corners, and deterministically tries radius scales of `1.0`, `0.75`, `0.5`,
+and `0.25` from a requested `6 m`. Samples are spaced no farther than `0.5 m`; intermediate
+timestamps are assigned by cumulative chord length while each movement block keeps its original
+departure and arrival time. A candidate must pass the continuous space-time collision predicate;
+otherwise the stage records an explicit certified raw-geometry fallback. The output is a dense
+piecewise-linear path, not an analytic spline or curvature certificate.
+
+### Discrete execution envelope and retiming
+
+The optional execution candidate is evaluated against this frozen waypoint-level envelope:
+
+| Quantity | Limit |
+| --- | ---: |
+| Segment-average speed | `8 m/s` |
+| Absolute segment-average climb or descent rate | `3 m/s` |
+| Boundary-aware discrete acceleration proxy | `4 m/s²` |
+| Reversal threshold | `150°` |
+| Allowed non-zero-speed reversals | `0` |
+| Maximum candidate arrival time | `90 s` |
+
+The acceleration proxy uses changes between segment-average velocity vectors. Consecutive movement
+segments use the time between their segment midpoints; every movement block begins and ends at a
+zero-speed boundary. Waits also delimit movement blocks, and their duration is not counted as extra
+braking time. This boundary-aware definition exposes abrupt start, stop, and move-to-wait changes
+that an interior-only finite difference could omit or dilute.
+
+Retiming is deterministic and keeps the geometry and action sequence fixed. It may only increase
+movement-segment durations; it preserves each explicit wait duration, although later absolute
+timestamps may move. Speed and climb constraints are applied first, followed by finite local
+duration-growth sweeps for the acceleration proxy. A reversal at or above `150°` is not repaired by
+time dilation because slowing cannot change direction geometry. Failure records an explicit status
+and leaves `executionTimedPath` null; it never silently promotes a geometry path to an execution-
+qualified result.
+
+Every non-null retimed candidate is subjected to the complete continuous space-time collision audit
+again. This second audit is required because delayed timestamps change the positions and activation
+states of dynamic obstacles. Qualification therefore requires both the discrete envelope and the
+post-retiming collision verdict within the `90 s` limit.
+
+Passing this envelope is not continuous-dynamics feasibility or flight certification. The model does
+not bound continuous acceleration, curvature, attitude, thrust, jerk, actuator response, minimum
+snap, wind response, or tracking error, and it does not establish regulatory or operational safety.
+
+In the committed v0.7 bundle, 5 of 40 candidates qualify. Thirty-four fail the frozen 90 s limit
+and one fails the repeated dynamic collision audit after its timestamps are delayed. These counts
+are reported descriptively within the ten paired scenarios; they were not used to alter the
+envelope, select scenarios, or rank planner families.
 
 ### Dynamic minimum-separation diagnostic
 
-`minimumSeparationM` is physical surface-to-surface separation after subtracting the spherical
-vehicle radius; the declared safety margin remains a separate threshold. The associated witness
-records time, vehicle position, nearest obstacle-surface position, obstacle identity and kind,
-method, declared margin, and whether the closest-approach calculation is exact.
+Each metric domain may carry its own `minimumSeparationM` and witness. Separation is physical
+surface-to-surface distance after subtracting the spherical vehicle radius; the declared safety
+margin remains a separate threshold. The associated witness records time, vehicle position,
+nearest obstacle-surface position, obstacle identity and kind, method, declared margin, and whether
+the closest-approach calculation is exact. A geometry or execution witness must not be presented as
+the planner-path witness.
 
 For a moving sphere, closest approach is exact under the declared piecewise-linear vehicle and
 obstacle motion model. For an active temporary cylinder, the implementation uses a deterministic
@@ -240,34 +313,15 @@ one-dimensional convex distance search and records `exact = false`. This diagnos
 of collision certification: it describes the closest recorded approach but does not certify
 continuous vehicle dynamics, forecast validity, or operational risk.
 
-### Certified predictive trajectory post-processing
+Python independently reruns all 40 public missions and collision-audits raw, geometry, and every
+non-null execution path against the declared dynamic schedule. It also checks JSON, CSV,
+scenario-manifest identities, run IDs, source ancestry, required generator files, byte sizes, and
+SHA-256 digests. The Web build independently validates structural, numeric, temporal, evidence-layer,
+and digest invariants; it does not reimplement collision geometry. Public floats are rounded to 11
+decimal places only at the serialization boundary.
 
-The v0.6 exporter preserves the planner/simulator output as `rawTimedPath`. It then divides that
-path at every wait, proposes sampled three-dimensional circular fillets for eligible movement
-corners, and deterministically tries turn-radius scales of `1.0`, `0.75`, `0.5`, and `0.25` from a
-requested `6 m`. Samples are spaced no farther than `0.5 m`; each movement block keeps its original
-departure and arrival times, with intermediate timestamps assigned by cumulative chord length.
-
-A candidate is published as `timedPath` only if its speed remains at or below `8 m/s` and every
-dense linear segment passes the same continuous space-time predicate used for execution. Otherwise
-the exporter records an explicit certified raw fallback. This is a common downstream geometric
-operation, so its shorter or smoother-looking line is not attributed to the planner. Certification
-applies only to the dense piecewise-linear path; it is not a claim of continuous curvature,
-aircraft attitude feasibility, acceleration bounds, minimum snap, or bounded jerk.
-
-Every raw and output path also carries discrete kinematic diagnostics computed from segment-average
-velocities. They report movement/segment counts, reversals at the declared 150-degree threshold,
-maximum segment-average speed, maximum adjacent velocity-vector change, a finite-difference
-acceleration proxy, and maximum absolute climb rate. Waits are hard boundaries for reversal
-counting. These values detect abrupt waypoint motion; they do not establish continuous
-acceleration, attitude, curvature, jerk, actuator, or flight-envelope feasibility.
-
-Python independently reruns all 40 public missions, collision-audits both raw and certified paths
-against the declared dynamic schedule, and checks JSON, CSV, scenario-manifest identities, run IDs,
-source ancestry, required generator files, byte sizes, and SHA-256 digests. The Web build
-independently validates structural, numeric, temporal, and digest invariants; it does not reimplement
-collision geometry. Public floats are rounded to 11 decimal places only at the serialization
-boundary.
+The complete frozen design and release criteria are recorded in the
+[v0.7 execution-envelope experiment plan](v0.7-execution-envelope-plan.md).
 
 ## Experiment identity
 

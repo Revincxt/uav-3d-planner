@@ -68,7 +68,7 @@ Total stationary time includes separately labelled endpoint time-lattice alignme
 The v0.5 public bundle remains non-confirmatory and is not pooled with v0.4. Rounded output is a
 dense piecewise-linear geometric path, not a kinodynamic or minimum-snap trajectory.
 
-## v0.6 — extended-city diagnostics and study interface (current)
+## v0.6 — extended-city diagnostics and study interface (released)
 
 - ten outcome-independent predictive scenarios and a fixed 40-run four-condition matrix;
 - `braided-skyway` and `harbor-switchback`, each with 20 unequal-height buildings, one static
@@ -84,6 +84,25 @@ dense piecewise-linear geometric path, not a kinodynamic or minimum-snap traject
 The v0.6 cohort remains curated, non-preregistered, and non-confirmatory. It includes the v0.5 cases
 as a historical subset, so v0.5 and v0.6 rows are not independent observations. Collision
 certification continues to cover the dense piecewise-linear space-time path only.
+
+## v0.7 — discrete execution-envelope audit (current)
+
+- the v0.6 ten-scenario by four-condition matrix remains frozen, with no outcome-based additions;
+- planner output, a collision-audited geometry candidate, and an optional retimed execution
+  candidate are retained as three separate evidence layers;
+- a deterministic time reparameterizer may only extend local movement durations, preserves wait
+  durations, and re-audits the changed timestamps against the dynamic schedule;
+- a declared benchmark envelope limits segment-average speed, climb/descent rate,
+  adjacent-segment acceleration proxy, reversals, and mission time;
+- planner-domain metrics are computed only from the raw path, so downstream geometry and timing
+  changes cannot be attributed to a planner;
+- execution qualification has explicit failure states and is never inferred from collision
+  certification alone;
+- the predictive figure renders and can jump directly to the closest-approach witness.
+
+The v0.7 envelope is a deliberately limited discrete diagnostic, not a kinodynamic model or flight
+certificate. The qualified count is reported as an outcome and is not used to tune thresholds or
+accept the release.
 
 ## Later, deliberately separate
 

@@ -445,9 +445,7 @@ def minimum_dynamic_separation(
     candidates: list[DynamicSeparationWitness] = []
     for start_time, a, end_time, b in segments:
         candidates.extend(
-            _moving_sphere_separation_witness(
-                scenario, sphere, a, b, start_time, end_time
-            )
+            _moving_sphere_separation_witness(scenario, sphere, a, b, start_time, end_time)
             for sphere in scenario.moving_spheres
         )
         for zone in scenario.temporary_cylinders:
