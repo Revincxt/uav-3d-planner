@@ -31,6 +31,10 @@ VERIFICATION_STATUS = "PREDICTIVE_DEMO_NON_CONFIRMATORY"
 # Eleven decimal places remain far below the spatial and temporal resolution of the
 # protocol while absorbing platform-level libm drift observed in the twelfth place.
 SERIALIZATION_DECIMAL_PLACES = 11
+# Kinematic diagnostics involve square-root and division chains whose accumulated
+# platform-level libm drift can reach the ninth decimal place.  Eight places keep
+# values stable across CPython builds while preserving ample diagnostic precision.
+KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES = 8
 
 TIME_STEP_S = 1.0
 REPLAN_INTERVAL_S = 4.0
@@ -661,17 +665,20 @@ def _export_kinematic_diagnostics(
 ) -> dict[str, object]:
     """Serialize finite-difference diagnostics without changing their internal API."""
 
+    def _rd(value: float) -> float:
+        return round(value, KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES)
+
     return {
         "status": "discrete-diagnostic-only",
         "continuousDynamicsCertified": False,
         "segmentCount": diagnostics.segment_count,
         "movementSegmentCount": diagnostics.movement_segment_count,
         "reversalCount": diagnostics.reversal_count,
-        "reversalThresholdDeg": diagnostics.reversal_threshold_deg,
-        "maxSpeedMps": diagnostics.max_speed_mps,
-        "maxDiscreteVelocityChangeMps": diagnostics.max_discrete_velocity_change_mps,
-        "maxDiscreteAccelerationProxyMps2": (diagnostics.max_discrete_acceleration_proxy_mps2),
-        "maxAbsClimbRateMps": diagnostics.max_abs_climb_rate_mps,
+        "reversalThresholdDeg": _rd(diagnostics.reversal_threshold_deg),
+        "maxSpeedMps": _rd(diagnostics.max_speed_mps),
+        "maxDiscreteVelocityChangeMps": _rd(diagnostics.max_discrete_velocity_change_mps),
+        "maxDiscreteAccelerationProxyMps2": _rd(diagnostics.max_discrete_acceleration_proxy_mps2),
+        "maxAbsClimbRateMps": _rd(diagnostics.max_abs_climb_rate_mps),
     }
 
 
@@ -1070,6 +1077,7 @@ __all__ = [
     "PREDICTION_HORIZON_S",
     "PREDICTIVE_ALGORITHMS",
     "PREDICTIVE_FLAGS",
+    "KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES",
     "PROTOCOL_ID",
     "RECORD_FIELDS",
     "REPLAN_INTERVAL_S",
