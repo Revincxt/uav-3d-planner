@@ -28,6 +28,8 @@ All notable changes are documented here. The project follows Semantic Versioning
 
 ### Interpretation boundary
 
+- Under the frozen envelope, 5/40 candidates qualify; 34 exceed the 90 s limit and one fails the
+  repeated dynamic collision audit after retiming.
 - `executionQualified` means only that the recorded dense piecewise-linear candidate passed the
   declared discrete envelope and collision audit. It does not certify continuous vehicle dynamics,
   attitude, thrust, curvature, jerk, wind response, or operational safety.

@@ -293,6 +293,11 @@ Passing this envelope is not continuous-dynamics feasibility or flight certifica
 not bound continuous acceleration, curvature, attitude, thrust, jerk, actuator response, minimum
 snap, wind response, or tracking error, and it does not establish regulatory or operational safety.
 
+In the committed v0.7 bundle, 5 of 40 candidates qualify. Thirty-four fail the frozen 90 s limit
+and one fails the repeated dynamic collision audit after its timestamps are delayed. These counts
+are reported descriptively within the ten paired scenarios; they were not used to alter the
+envelope, select scenarios, or rank planner families.
+
 ### Dynamic minimum-separation diagnostic
 
 Each metric domain may carry its own `minimumSeparationM` and witness. Separation is physical

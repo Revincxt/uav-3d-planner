@@ -540,6 +540,10 @@ async function start(): Promise<void> {
   const bundle = await loadPredictiveBundle();
   element("#study-design-count").textContent =
     `${bundle.scenarios.length} cases × ${bundle.planners.length} conditions`;
+  const recordedRuns = bundle.scenarios.flatMap((scenario) => scenario.runs);
+  const qualifiedRuns = recordedRuns.filter((run) => run.smoothing.execution.qualified).length;
+  element("#study-evidence-count").textContent =
+    `${qualifiedRuns}/${recordedRuns.length} execution-qualified`;
   const scenarioSelect = element<HTMLSelectElement>("#scenario-select");
   const plannerSelect = element<HTMLSelectElement>("#planner-select");
   const timeline = element<HTMLInputElement>("#timeline");

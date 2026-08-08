@@ -44,28 +44,33 @@ smoother: it replays committed records that Python regenerates and independently
 
 <p align="center"><sub>Study design. Planner families are compared within explicit information, discretization, execution, and work-budget contracts.</sub></p>
 
-## Recorded v0.6 baseline evidence
+## Recorded evidence in v0.7
 
 | Scope | Recorded result |
 | --- | ---: |
 | Curated deterministic missions | **10** — 1 calibration case + 9 complex city cases |
 | Planner conditions per mission | **4** |
-| Completed recorded runs | **40 / 40** |
-| Safety violations in the declared continuous space–time audit | **0** |
+| Successful raw planner records | **40 / 40** |
 | Runs accepting sampled circular-fillet rounding | **34 / 40** |
-| Runs retaining a certified execution polyline | **40 / 40** |
-| Runs carrying a dynamic closest-approach witness | **40 / 40** |
+| Collision-certified geometry candidates | **40 / 40** |
+| Discrete-envelope-qualified execution candidates | **5 / 40** |
+| Rejected by the frozen 90 s execution limit | **34 / 40** |
+| Rejected by the post-retiming dynamic collision audit | **1 / 40** |
+| Raw / geometry closest-approach witnesses | **40 / 40** in each domain |
 
 Seven non-calibration maps contain 14–16 unequal-height buildings; the new `braided-skyway` and
 `harbor-switchback` diagnostics each contain 20. Every complex case has at least one static no-fly
 zone and two time-dependent hazards, while the two extended cases each carry four. The raw timed
 path is retained for every run. Rounding is a common downstream operation—not a property attributed
-to any planner—and falls back to the certified raw polyline if a candidate fails the audit.
+to any planner—and falls back to the certified raw polyline if a candidate fails the audit. The
+five qualified execution candidates comprise one repeated-A*, one reset-D*, one reuse-D*, and two
+Space-Time-A* records; these are descriptive counts within ten paired scenarios, not an algorithm
+ranking.
 
-> These are historical v0.6 baseline results, retained until the v0.7 bundle is regenerated. They
-> must not be read as v0.7 execution-envelope qualification counts. “0 violations” describes the
-> fixed v0.6 records under the declared geometry and deterministic schedule; it is not a general
-> safety claim or flight certification.
+> Qualification is deliberately fail-closed and uses thresholds frozen before regeneration. The
+> 5/40 count is an observed result, not a release gate. It is not a general safety claim, continuous-
+> dynamics guarantee, or flight certification. The v0.6 records remain a paired historical
+> baseline and are not pooled with v0.7 as independent observations.
 
 ## Frozen v0.7 study contract
 
