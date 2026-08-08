@@ -2,7 +2,7 @@ import "./predictive.css";
 
 import { buildPredictiveComparisonRows, loadPredictiveBundle } from "./predictive-data";
 import type {
-  PredictiveBundleV2,
+  PredictiveBundleV3,
   PredictiveEvent,
   PredictiveFrame,
   PredictivePathMode,
@@ -12,6 +12,8 @@ import type {
   Vec3,
 } from "./predictive-schema";
 import {
+  isMinimumSeparationEvidenceTime,
+  minimumSeparationEvidence,
   PredictiveViewer,
   type ViewPreset,
   type ViewerLayer,
@@ -67,14 +69,38 @@ function timedPosition(waypoints: TimedWaypoint[], timeS: number): Vec3 {
 }
 
 function selectedPath(run: PredictiveRun, mode: PredictivePathMode): TimedWaypoint[] {
-  return mode === "raw" ? run.rawTimedPath : run.timedPath;
+  if (mode === "raw") return run.rawTimedPath;
+  if (mode === "execution" && run.executionTimedPath !== null) return run.executionTimedPath;
+  return run.geometryTimedPath;
+}
+
+function selectedMetrics(run: PredictiveRun, mode: PredictivePathMode) {
+  if (mode === "raw") return run.plannerMetrics;
+  if (mode === "execution" && run.executionMetrics !== null) return run.executionMetrics;
+  return run.geometryMetrics;
+}
+
+function selectedWaitIntervals(run: PredictiveRun, mode: PredictivePathMode) {
+  if (mode === "execution" && run.executionWaitIntervals !== null) {
+    return run.executionWaitIntervals;
+  }
+  return run.geometryWaitIntervals;
+}
+
+function selectedFrames(run: PredictiveRun, mode: PredictivePathMode): PredictiveFrame[] {
+  if (mode === "execution" && run.executionFrames !== null) return run.executionFrames;
+  return run.geometryFrames;
+}
+
+function defaultPathMode(run: PredictiveRun): PredictivePathMode {
+  return run.executionTimedPath === null ? "geometry" : "execution";
 }
 
 function formatNumber(value: number | null, digits = 1): string {
   return value === null ? "—" : value.toFixed(digits);
 }
 
-function formatWorkUnit(unit: PredictiveRun["metrics"]["workUnit"]): string {
+function formatWorkUnit(unit: PredictiveRun["plannerMetrics"]["workUnit"]): string {
   if (unit === "expanded-nodes") return "nodes";
   if (unit === "queue-pops") return "queue pops";
   return "space–time states";
@@ -103,15 +129,22 @@ function setDefinitionRows(host: HTMLElement, rows: Array<[string, string]>): vo
   );
 }
 
-function visibleEvents(run: PredictiveRun): Array<{ frame: PredictiveFrame; index: number }> {
-  return run.frames
+function visibleEvents(
+  run: PredictiveRun,
+  mode: PredictivePathMode,
+): Array<{ frame: PredictiveFrame; index: number }> {
+  return selectedFrames(run, mode)
     .map((frame, index) => ({ frame, index }))
     .filter(({ frame }) => frame.event !== null && frame.event.kind !== "none");
 }
 
-function mostRecentEvent(run: PredictiveRun, timeS: number): PredictiveFrame | null {
+function mostRecentEvent(
+  run: PredictiveRun,
+  mode: PredictivePathMode,
+  timeS: number,
+): PredictiveFrame | null {
   return (
-    [...visibleEvents(run)]
+    [...visibleEvents(run, mode)]
       .reverse()
       .find(({ frame }) => frame.timeS <= timeS + EPSILON)?.frame ?? null
   );
@@ -154,25 +187,35 @@ function sampledValue(samples: TurnSample[], timeS: number): number {
   return nearest.angleDeg;
 }
 
-function renderEventAxis(run: PredictiveRun, duration: number, timeS: number): void {
+function renderEventAxis(
+  run: PredictiveRun,
+  mode: PredictivePathMode,
+  duration: number,
+  timeS: number,
+): void {
   const host = element<HTMLDivElement>("#event-axis");
   const width = Math.max(300, Math.round(host.clientWidth || 760));
   const height = 42;
   const margin = 10;
   const axisY = 14;
   const x = (value: number): number => margin + (value / Math.max(duration, 1)) * (width - margin * 2);
-  const events = visibleEvents(run).filter(({ frame }) => frame.timeS <= duration + EPSILON);
+  const events = visibleEvents(run, mode).filter(({ frame }) => frame.timeS <= duration + EPSILON);
+  const witness = selectedMetrics(run, mode).minimumSeparationWitness;
+  const visibleWitness = witness !== null && witness.timeS <= duration + EPSILON ? witness : null;
 
   const svg = svgElement("svg", {
     viewBox: `0 0 ${width} ${height}`,
     role: "img",
-    "aria-label": `${events.length} recorded events over ${duration.toFixed(1)} seconds`,
+    "aria-label":
+      `${events.length} recorded events over ${duration.toFixed(1)} seconds` +
+      (visibleWitness === null ? "; closest-approach witness unavailable" : "; closest-approach witness marked"),
   });
   const title = svgElement("title");
   title.textContent = "Recorded event positions";
   const desc = svgElement("desc");
   desc.textContent =
-    "Marks locate planning, restriction, waiting, prediction, failure, and arrival events. The blue rule is continuous replay time.";
+    "Marks locate planning, restriction, waiting, prediction, failure, and arrival events. " +
+    "The brown witness rule locates minimum separation; dashed means approximate. The blue rule is continuous replay time.";
   svg.append(title, desc);
   svg.append(
     svgElement("line", {
@@ -197,6 +240,23 @@ function renderEventAxis(run: PredictiveRun, duration: number, timeS: number): v
     tickTitle.textContent = `${frame.timeS.toFixed(1)} s — ${frame.event!.label}`;
     tick.append(tickTitle);
     svg.append(tick);
+  }
+
+  if (visibleWitness !== null) {
+    const witnessTick = svgElement("line", {
+      x1: String(x(visibleWitness.timeS)),
+      x2: String(x(visibleWitness.timeS)),
+      y1: "2",
+      y2: "27",
+      class: `witness-tick ${visibleWitness.exact ? "is-exact" : "is-approximate"}`,
+      "data-witness-time": String(visibleWitness.timeS),
+    });
+    const witnessTitle = svgElement("title");
+    witnessTitle.textContent =
+      `${visibleWitness.timeS.toFixed(2)} s — ${visibleWitness.separationM.toFixed(2)} m ` +
+      `${visibleWitness.exact ? "exact" : "approximate"} minimum-separation witness`;
+    witnessTick.append(witnessTitle);
+    svg.append(witnessTick);
   }
 
   svg.append(
@@ -242,7 +302,7 @@ function renderLineChart(
   yMin: number,
   yMax: number,
   yLabel: string,
-  waits: PredictiveRun["waitIntervals"],
+  waits: PredictiveRun["geometryWaitIntervals"],
 ): void {
   const width = Math.max(320, Math.round(host.clientWidth || 620));
   const height = 220;
@@ -429,7 +489,7 @@ function updateChartCursor(host: HTMLElement, timeS: number, value: number, suff
 }
 
 function renderComparison(
-  bundle: PredictiveBundleV2,
+  bundle: PredictiveBundleV3,
   scenario: PredictiveScenario,
   selectedPlannerId: string,
   onSelect: (plannerId: string) => void,
@@ -451,11 +511,9 @@ function renderComparison(
       formatNumber(row.arrivalTimeS),
       formatNumber(row.waitTimeS),
       formatNumber(row.executedPathLengthM),
-      row.smoothingCertified
-        ? row.smoothingApplied
-          ? "Certified rounded"
-          : "Certified fallback"
-        : "Not certified",
+      row.executionQualified
+        ? "Qualified · collision audited"
+        : row.executionStatus.replaceAll("-", " "),
       row.maxTurnAngleAfterDeg === null ? "—" : `${row.maxTurnAngleAfterDeg.toFixed(1)}°`,
       `${row.safetyViolations.toLocaleString()} violations`,
       `${row.expandedStates.toLocaleString()} ${formatWorkUnit(row.workUnit)}`,
@@ -489,6 +547,7 @@ async function start(): Promise<void> {
   const previous = element<HTMLButtonElement>("#previous-frame");
   const next = element<HTMLButtonElement>("#next-frame");
   const playPause = element<HTMLButtonElement>("#play-pause");
+  const jumpToWitness = element<HTMLButtonElement>("#jump-to-witness");
   const viewerHost = element<HTMLDivElement>("#predictive-viewer");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let viewer: PredictiveViewer | null = null;
@@ -517,7 +576,16 @@ async function start(): Promise<void> {
     currentScenario.runs.find((run) => run.plannerId === preferredPlanner?.id) ??
     currentScenario.runs.find((run) => bundle.planners.find((planner) => planner.id === run.plannerId)?.predictive) ??
     currentScenario.runs[0]!;
-  let pathMode: PredictivePathMode = query.get("path") === "raw" ? "raw" : "certified";
+  const requestedPathMode = query.get("path");
+  let pathMode: PredictivePathMode =
+    requestedPathMode === "raw" ||
+    requestedPathMode === "geometry" ||
+    requestedPathMode === "execution"
+      ? requestedPathMode
+      : defaultPathMode(currentRun);
+  if (pathMode === "execution" && currentRun.executionTimedPath === null) {
+    pathMode = "geometry";
+  }
   const requestedInitialTimeS = Math.max(0, Number(query.get("time")) || 0);
   let currentTimeS = requestedInitialTimeS;
   let playbackSpeed = 1;
@@ -547,7 +615,13 @@ async function start(): Promise<void> {
     parameters.set("scenario", currentScenario.id);
     parameters.set("planner", currentRun.plannerId);
     parameters.set("path", pathMode);
-    parameters.set("time", currentTimeS.toFixed(2));
+    const evidence = minimumSeparationEvidence(currentScenario, currentRun, pathMode);
+    parameters.set(
+      "time",
+      isMinimumSeparationEvidenceTime(evidence, currentTimeS)
+        ? String(evidence!.witness.timeS)
+        : currentTimeS.toFixed(2),
+    );
     window.history.replaceState(null, "", `${window.location.pathname}?${parameters}${window.location.hash}`);
   };
 
@@ -562,7 +636,7 @@ async function start(): Promise<void> {
     const turnHost = element<HTMLDivElement>("#turn-chart");
     const altitudeData = path.map((waypoint) => ({ timeS: waypoint.timeS, value: waypoint.position[2] }));
     const rawAltitude =
-      pathMode === "certified" && currentRun.smoothing.applied
+      pathMode !== "raw" && currentRun.smoothing.applied
         ? raw.map((waypoint) => ({ timeS: waypoint.timeS, value: waypoint.position[2] }))
         : null;
     renderLineChart(
@@ -573,10 +647,10 @@ async function start(): Promise<void> {
       currentScenario.bounds.min[2],
       currentScenario.bounds.max[2],
       "Altitude (m)",
-      currentRun.waitIntervals,
+      selectedWaitIntervals(currentRun, pathMode),
     );
     const activeTurns = turnSamples(path);
-    const rawTurns = pathMode === "certified" && currentRun.smoothing.applied ? turnSamples(raw) : null;
+    const rawTurns = pathMode !== "raw" && currentRun.smoothing.applied ? turnSamples(raw) : null;
     const maximumTurn = Math.max(
       30,
       ...activeTurns.map((sample) => sample.angleDeg),
@@ -600,16 +674,33 @@ async function start(): Promise<void> {
     currentTimeS = Math.max(0, Math.min(timeS, total));
     const path = currentPath();
     const position = timedPosition(path, currentTimeS);
-    const events = visibleEvents(currentRun).filter(({ frame }) => frame.timeS <= total + EPSILON);
-    const event = mostRecentEvent(currentRun, currentTimeS);
+    const events = visibleEvents(currentRun, pathMode).filter(
+      ({ frame }) => frame.timeS <= total + EPSILON,
+    );
+    const event = mostRecentEvent(currentRun, pathMode, currentTimeS);
     const activeZones = currentScenario.temporaryNoFlyZones.filter(
       (zone) => zone.activeFromS <= currentTimeS && currentTimeS < zone.activeUntilS,
     );
+    const evidence = minimumSeparationEvidence(currentScenario, currentRun, pathMode);
+    const witnessIsVisible = isMinimumSeparationEvidenceTime(evidence, currentTimeS);
+    const witnessReadout = element<HTMLDivElement>("#viewer-witness-readout");
 
     timeline.value = String(currentTimeS);
-    timelineValue.value = `${currentTimeS.toFixed(1)} s`;
-    element("#viewer-time-value").textContent = `${currentTimeS.toFixed(1)} s`;
+    timelineValue.value = `${currentTimeS.toFixed(2)} s`;
+    element("#viewer-time-value").textContent = `${currentTimeS.toFixed(2)} s`;
     viewer?.setTime(currentTimeS);
+    witnessReadout.hidden = !witnessIsVisible;
+    if (witnessIsVisible && evidence !== null) {
+      const { witness } = evidence;
+      witnessReadout.dataset.quality = witness.exact ? "exact" : "approximate";
+      element("#viewer-witness-value").textContent =
+        `${witness.separationM.toFixed(2)} m surface separation`;
+      element("#viewer-witness-detail").textContent =
+        `${witness.exact ? "Exact · solid connector" : "Approximate · dashed connector"}; ` +
+        `sphere = vehicle center, diamond = obstacle surface, wire shell = ` +
+        `${evidence.safetyEnvelopeRadiusM.toFixed(2)} m safety envelope. Surface separation ` +
+        "subtracts the vehicle radius from the connector span.";
+    }
     updateEventAxis(currentTimeS);
     updateChartCursor(element("#altitude-chart"), currentTimeS, position[2], "m");
     updateChartCursor(
@@ -618,23 +709,40 @@ async function start(): Promise<void> {
       sampledValue(turnSamples(path), currentTimeS),
       "°",
     );
-    setDefinitionRows(element("#current-meta"), [
+    const currentRows: Array<[string, string]> = [
       ["Mission time", `${currentTimeS.toFixed(2)} s`],
       ["ENU position", formatPosition(position)],
       ["Altitude", `${position[2].toFixed(1)} m`],
       ["Active restrictions", activeZones.length.toLocaleString()],
       ["Moving hazards", currentScenario.movingSpheres.length.toLocaleString()],
-    ]);
+    ];
+    if (witnessIsVisible && evidence !== null) {
+      currentRows.push([
+        "Evidence layer",
+        `${evidence.witness.exact ? "Exact" : "Approximate"} closest approach`,
+      ]);
+    }
+    setDefinitionRows(element("#current-meta"), currentRows);
     element("#current-event").textContent = event?.event
       ? `Most recent event · ${event.timeS.toFixed(1)} s — ${event.event.label}`
       : "No recorded event has occurred yet.";
     element("#frame-summary").textContent =
       `${currentTimeS.toFixed(1)} s of ${total.toFixed(1)} s · ` +
-      `${position[2].toFixed(1)} m altitude · ${pathMode === "raw" ? "raw planner geometry" : "certified execution"}`;
+      `${position[2].toFixed(1)} m altitude · ` +
+      (pathMode === "raw"
+        ? "raw planner output"
+        : pathMode === "geometry"
+          ? "collision-certified geometry candidate"
+          : "discrete-envelope-qualified execution candidate");
     element("#canvas-summary").textContent =
       `${currentScenario.label}. At ${currentTimeS.toFixed(1)} seconds the vehicle is at ` +
       `${formatPosition(position)}. ${activeZones.length} temporary restrictions are active and ` +
-      `${currentScenario.movingSpheres.length} moving hazards are shown.`;
+      `${currentScenario.movingSpheres.length} moving hazards are shown.` +
+      (witnessIsVisible && evidence !== null
+        ? ` The ${evidence.witness.exact ? "exact" : "approximate"} closest-approach evidence layer ` +
+          `shows ${evidence.witness.separationM.toFixed(2)} metres of surface separation to ` +
+          `${evidence.witness.obstacleId}.`
+        : "");
     previous.disabled = !events.some(({ frame }) => frame.timeS < currentTimeS - EPSILON);
     next.disabled = !events.some(({ frame }) => frame.timeS > currentTimeS + EPSILON);
     if (shouldAnnounce) announce(`Showing ${currentTimeS.toFixed(1)} seconds`);
@@ -674,7 +782,8 @@ async function start(): Promise<void> {
     document.querySelectorAll<HTMLButtonElement>("[data-path-mode]").forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.pathMode === pathMode));
       button.disabled =
-        button.dataset.pathMode === "certified" && !currentRun.smoothing.certified;
+        (button.dataset.pathMode === "geometry" && !currentRun.smoothing.certified) ||
+        (button.dataset.pathMode === "execution" && currentRun.executionTimedPath === null);
     });
     const rawLayer = element<HTMLInputElement>("[data-layer='raw']");
     rawLayer.disabled = pathMode === "raw" || !currentRun.smoothing.applied;
@@ -686,9 +795,11 @@ async function start(): Promise<void> {
 
   const renderRunEvidence = (): void => {
     const smoothing = currentRun.smoothing;
-    const metrics = currentRun.metrics;
+    const metrics = currentRun.plannerMetrics;
+    const layerMetrics = selectedMetrics(currentRun, pathMode);
     const diagnostics = smoothing.kinematicDiagnostics;
-    const separationWitness = metrics.minimumSeparationWitness;
+    const separationWitness = layerMetrics.minimumSeparationWitness;
+    const evidence = minimumSeparationEvidence(currentScenario, currentRun, pathMode);
     const planner = bundle.planners.find((candidate) => candidate.id === currentRun.plannerId);
     const status = element("#run-status");
     status.textContent = formatStatus(currentRun.status);
@@ -714,7 +825,64 @@ async function start(): Promise<void> {
           : `0 violations · ${metrics.minimumSeparationWitness.separationM.toFixed(2)} m min`
         : `${metrics.safetyViolations.toLocaleString()} violations`;
     safety.className = metrics.safetyViolations === 0 ? "metric-positive" : "metric-negative";
+
+    const witnessQuality = element<HTMLSpanElement>("#witness-quality");
+    if (evidence === null) {
+      witnessQuality.textContent = "Unavailable";
+      witnessQuality.className = "witness-quality is-unavailable";
+      element("#witness-summary").textContent =
+        "No minimum-separation witness was recorded for this condition.";
+      setDefinitionRows(element("#witness-meta"), [
+        ["Status", "Unavailable"],
+        ["Interpretation", "No spatial witness can be displayed"],
+      ]);
+      jumpToWitness.disabled = true;
+      jumpToWitness.textContent = "Closest approach unavailable";
+      jumpToWitness.removeAttribute("data-witness-time");
+      jumpToWitness.setAttribute("aria-label", "Closest approach unavailable for this condition");
+    } else {
+      const { witness } = evidence;
+      const evidenceKind = witness.exact ? "Exact" : "Approximate";
+      witnessQuality.textContent = evidenceKind;
+      witnessQuality.className =
+        `witness-quality ${witness.exact ? "is-exact" : "is-approximate"}`;
+      element("#witness-summary").textContent =
+        `${witness.separationM.toFixed(2)} m physical surface separation at ` +
+        `${witness.timeS.toFixed(2)} s. The recorded witness is ` +
+        `${witness.exact ? "exact" : "approximate"}; it does not alter the independent collision verdict.`;
+      setDefinitionRows(element("#witness-meta"), [
+        ["Obstacle", `${witness.obstacleId} · ${witness.obstacleKind.replace("-", " ")}`],
+        ["Vehicle center", formatPosition(witness.vehiclePosition)],
+        ["Obstacle surface", formatPosition(witness.obstaclePosition)],
+        ["Declared margin", `${witness.declaredSafetyMarginM.toFixed(2)} m`],
+        [
+          "Safety envelope",
+          `${currentScenario.constraints.vehicleRadiusM.toFixed(2)} + ` +
+            `${witness.declaredSafetyMarginM.toFixed(2)} = ` +
+            `${evidence.safetyEnvelopeRadiusM.toFixed(2)} m radius`,
+        ],
+        [
+          "Connector",
+          `${witness.exact ? "Solid · exact" : "Dashed · approximate"} · ${witness.method}`,
+        ],
+      ]);
+      jumpToWitness.disabled = false;
+      jumpToWitness.textContent = "Jump to closest approach";
+      jumpToWitness.dataset.witnessTime = String(witness.timeS);
+      jumpToWitness.setAttribute(
+        "aria-label",
+        `Jump to closest approach at ${witness.timeS.toFixed(2)} seconds; ${evidenceKind.toLowerCase()} witness`,
+      );
+    }
     setDefinitionRows(element("#smoothing-meta"), [
+      [
+        "Evidence layer",
+        pathMode === "raw"
+          ? "Raw planner output"
+          : pathMode === "geometry"
+            ? "Collision-certified geometry candidate"
+            : "Qualified execution candidate",
+      ],
       ["Method", smoothing.method],
       [
         "Collision audit",
@@ -738,6 +906,18 @@ async function start(): Promise<void> {
           `${diagnostics.output.maxDiscreteAccelerationProxyMps2.toFixed(1)} m/s²`,
       ],
       [
+        "Execution qualification",
+        smoothing.execution.qualified
+          ? `Qualified · +${formatNumber(smoothing.execution.addedDurationS, 2)} s`
+          : `Not qualified · ${smoothing.execution.status.replaceAll("-", " ")}`,
+      ],
+      [
+        "Declared envelope",
+        `${smoothing.execution.envelope.maxSpeedMps.toFixed(0)} m/s speed · ` +
+          `${smoothing.execution.envelope.maxAbsClimbRateMps.toFixed(0)} m/s climb · ` +
+          `${smoothing.execution.envelope.maxDiscreteAccelerationProxyMps2.toFixed(0)} m/s² proxy`,
+      ],
+      [
         "Maximum |climb rate|",
         `${diagnostics.raw.maxAbsClimbRateMps.toFixed(1)} → ` +
           `${diagnostics.output.maxAbsClimbRateMps.toFixed(1)} m/s`,
@@ -751,9 +931,10 @@ async function start(): Promise<void> {
         `${formatNumber(smoothing.maxTurnAngleBeforeDeg)}° → ${formatNumber(smoothing.maxTurnAngleAfterDeg)}°`,
       ],
     ]);
-    element("#smoothing-note").textContent = smoothing.applied
-      ? "The rounded dense polyline passed the declared collision audit. Reversal, acceleration-proxy, and climb-rate values are discrete diagnostics only; they do not certify continuous dynamics, jerk, attitude, or control feasibility."
-      : "The certified raw fallback is shown. Reversal, acceleration-proxy, and climb-rate values are discrete diagnostics only; continuous dynamics remain uncertified.";
+    element("#smoothing-note").textContent =
+      `${smoothing.applied ? "The rounded dense polyline passed the declared collision audit." : "The collision-certified raw fallback is the geometry candidate."} ` +
+      `${smoothing.execution.qualified ? "A separately retimed candidate also passed the declared discrete envelope and a repeated space–time collision audit." : "No execution candidate is published for this run."} ` +
+      "These finite-difference checks do not certify continuous dynamics, jerk, attitude, thrust, or control feasibility.";
   };
 
   const updateRun = (plannerId: string, shouldAnnounce = true): void => {
@@ -762,7 +943,10 @@ async function start(): Promise<void> {
     if (!run) throw new Error(`Missing ${plannerId} run in ${currentScenario.id}`);
     currentRun = run;
     plannerSelect.value = plannerId;
-    if (pathMode === "certified" && !currentRun.smoothing.certified) pathMode = "raw";
+    if (pathMode === "execution" && currentRun.executionTimedPath === null) {
+      pathMode = "geometry";
+    }
+    if (pathMode === "geometry" && !currentRun.smoothing.certified) pathMode = "raw";
     currentTimeS = Math.min(currentTimeS, duration());
     timeline.max = String(duration());
     viewer?.setRun(run);
@@ -772,7 +956,7 @@ async function start(): Promise<void> {
     renderComparison(bundle, currentScenario, plannerId, (selectedPlannerId) => {
       updateRun(selectedPlannerId);
     });
-    renderEventAxis(currentRun, duration(), currentTimeS);
+    renderEventAxis(currentRun, pathMode, duration(), currentTimeS);
     renderCharts();
     renderTime(currentTimeS);
     updateUrl(true);
@@ -836,6 +1020,17 @@ async function start(): Promise<void> {
 
   scenarioSelect.addEventListener("change", () => updateScenario(scenarioSelect.value));
   plannerSelect.addEventListener("change", () => updateRun(plannerSelect.value));
+  jumpToWitness.addEventListener("click", () => {
+    const witness = selectedMetrics(currentRun, pathMode).minimumSeparationWitness;
+    if (witness === null) return;
+    setPlaying(false);
+    renderTime(witness.timeS);
+    updateUrl(true);
+    announce(
+      `Closest approach at ${witness.timeS.toFixed(2)} seconds; ` +
+        `${witness.separationM.toFixed(2)} metres; ${witness.exact ? "exact" : "approximate"} witness`,
+    );
+  });
   timeline.addEventListener("input", () => {
     setPlaying(false);
     renderTime(Number(timeline.value), true);
@@ -843,14 +1038,14 @@ async function start(): Promise<void> {
   });
   previous.addEventListener("click", () => {
     setPlaying(false);
-    const target = [...visibleEvents(currentRun)]
+    const target = [...visibleEvents(currentRun, pathMode)]
       .reverse()
       .find(({ frame }) => frame.timeS < currentTimeS - EPSILON);
     if (target) renderTime(target.frame.timeS, true);
   });
   next.addEventListener("click", () => {
     setPlaying(false);
-    const target = visibleEvents(currentRun).find(
+    const target = visibleEvents(currentRun, pathMode).find(
       ({ frame }) => frame.timeS > currentTimeS + EPSILON,
     );
     if (target) renderTime(target.frame.timeS, true);
@@ -866,15 +1061,17 @@ async function start(): Promise<void> {
   document.querySelectorAll<HTMLButtonElement>("[data-path-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       const mode = button.dataset.pathMode;
-      if (mode !== "raw" && mode !== "certified") return;
-      if (mode === "certified" && !currentRun.smoothing.certified) return;
+      if (mode !== "raw" && mode !== "geometry" && mode !== "execution") return;
+      if (mode === "geometry" && !currentRun.smoothing.certified) return;
+      if (mode === "execution" && currentRun.executionTimedPath === null) return;
       setPlaying(false);
       pathMode = mode;
       viewer?.setPathMode(pathMode);
       currentTimeS = Math.min(currentTimeS, duration());
       timeline.max = String(duration());
       syncPathControls();
-      renderEventAxis(currentRun, duration(), currentTimeS);
+      renderRunEvidence();
+      renderEventAxis(currentRun, pathMode, duration(), currentTimeS);
       renderCharts();
       renderTime(currentTimeS, true);
       updateUrl(true);
@@ -939,7 +1136,7 @@ async function start(): Promise<void> {
     }
   });
 
-  const commitUrl = `https://github.com/Revincxt/uav-3d-planner-lab/commit/${bundle.sourceCommit}`;
+  const commitUrl = `https://github.com/Revincxt/uav-3d-planner/commit/${bundle.sourceCommit}`;
   const provenance = element("#provenance");
   const sourceLink = document.createElement("a");
   sourceLink.href = commitUrl;
@@ -954,13 +1151,16 @@ async function start(): Promise<void> {
   );
   const method = document.createElement("p");
   method.textContent =
-    "Raw planner paths remain available beside the exported execution trajectory. The browser draws only exported polyline samples; trajectory rounding and continuous space–time certification occur in Python. Frames store event evidence, while vehicle and moving-hazard positions are interpolated continuously from the declared timed paths and keyframes.";
+    "Raw planner output, the collision-certified geometry candidate, and the optional discrete-envelope-qualified execution candidate are separate evidence layers. The browser draws only exported polyline samples. Frames store event anchors; vehicle and moving-hazard positions are interpolated from declared timed paths and keyframes.";
   const protocol = document.createElement("p");
   protocol.textContent =
     `Protocol ${bundle.protocol.id}: ${bundle.protocol.timeResolutionS} s search-time resolution, ` +
     `${bundle.protocol.resolutionM} m spatial grid, ${bundle.protocol.cruiseSpeedMps} m/s cruise speed, ` +
     `${bundle.protocol.planningHorizonS} s planning horizon, and trajectory post-processor ` +
-    `${bundle.protocol.trajectoryPostprocessor}. Work budgets retain planner-specific units.`;
+    `${bundle.protocol.trajectoryPostprocessor}. The execution envelope declares ` +
+    `${bundle.protocol.executionEnvelope.maxAbsClimbRateMps} m/s climb and ` +
+    `${bundle.protocol.executionEnvelope.maxDiscreteAccelerationProxyMps2} m/s² finite-difference ` +
+    "acceleration-proxy limits; it is not a continuous-dynamics certificate. Work budgets retain planner-specific units.";
   const downloads = document.createElement("p");
   downloads.append(document.createTextNode("Download: "));
   const recordsLink = document.createElement("a");
@@ -992,7 +1192,7 @@ async function start(): Promise<void> {
   element("#load-state").remove();
 
   altitudeResizeObserver = new ResizeObserver(() => {
-    renderEventAxis(currentRun, duration(), currentTimeS);
+    renderEventAxis(currentRun, pathMode, duration(), currentTimeS);
     renderCharts();
     renderTime(currentTimeS);
   });

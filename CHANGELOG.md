@@ -2,6 +2,37 @@
 
 All notable changes are documented here. The project follows Semantic Versioning.
 
+## [0.7.0] - 2026-08-08
+
+### Added
+
+- A frozen, explicitly non-physical discrete execution envelope for segment-average speed,
+  climb/descent rate, adjacent-segment acceleration proxy, reversals, and mission time.
+- Deterministic local time reparameterization that never accelerates the recorded path, preserves
+  wait durations, treats movement boundaries as zero-speed conditions, and re-runs the continuous
+  space-time audit after timestamps change.
+- Explicit geometry-candidate and optional execution-candidate evidence, including qualification
+  status and fail-closed reasons when retiming cannot satisfy the declared contract.
+- A three-dimensional closest-approach witness layer with a direct timeline jump and redundant
+  exact/approximate method encoding.
+- An ARS-compatible v0.7 experiment plan that freezes the 10-scenario by 4-condition matrix before
+  execution-candidate outcomes are observed.
+
+### Changed
+
+- Predictive records use schema v3 and protocol `predictive-space-time-v4`.
+- Planner metrics are computed exclusively from `rawTimedPath`; geometry and execution-candidate
+  metrics are reported separately so common post-processing cannot be credited to a planner.
+- The predictive study keeps the v0.6 scenario and planner matrix unchanged, making v0.7 an
+  execution-layer audit rather than a larger but confounded map collection.
+
+### Interpretation boundary
+
+- `executionQualified` means only that the recorded dense piecewise-linear candidate passed the
+  declared discrete envelope and collision audit. It does not certify continuous vehicle dynamics,
+  attitude, thrust, curvature, jerk, wind response, or operational safety.
+- The number of qualified candidates is an observed result, not a release acceptance threshold.
+
 ## [0.6.0] - 2026-08-07
 
 ### Added
@@ -147,8 +178,8 @@ All notable changes are documented here. The project follows Semantic Versioning
 - Academic Three.js comparison page with recorded raw and smoothed trajectories.
 - Python and web tests, package build verification, GitHub Actions CI, and Pages deployment.
 
-[0.1.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.1.0
-[0.2.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.2.0
-[0.3.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.3.0
-[0.4.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.4.0
-[0.5.0]: https://github.com/Revincxt/uav-3d-planner-lab/releases/tag/v0.5.0
+[0.1.0]: https://github.com/Revincxt/uav-3d-planner/releases/tag/v0.1.0
+[0.2.0]: https://github.com/Revincxt/uav-3d-planner/releases/tag/v0.2.0
+[0.3.0]: https://github.com/Revincxt/uav-3d-planner/releases/tag/v0.3.0
+[0.4.0]: https://github.com/Revincxt/uav-3d-planner/releases/tag/v0.4.0
+[0.5.0]: https://github.com/Revincxt/uav-3d-planner/releases/tag/v0.5.0

@@ -1,4 +1,4 @@
-"""Deterministic v0.6 urban scenarios for predictive space-time planning.
+"""Deterministic urban cohort reused by the v0.7 execution-envelope study.
 
 The registry is deliberately independent of every planner and mission outcome. A scenario is
 accepted from construction, geometry, schedule, and endpoint contracts only.
@@ -55,8 +55,8 @@ def _metadata(
     street_pattern: str,
 ) -> dict[str, Any]:
     return {
-        "study": "predictive-space-time-v0.6",
-        "dataset": "predictive-urban-v0.6",
+        "study": "predictive-space-time-v0.7",
+        "dataset": "predictive-execution-envelope-v0.7",
         "cohort": cohort,
         "event_family": event_family,
         "case_id": case_id,
@@ -660,8 +660,8 @@ def _validate_scenario_contract(spec: _ScenarioSpec, scenario: DynamicScenario) 
         raise ValueError(f"predictive scenario ID mismatch for {spec.scenario_id}")
     metadata = scenario.metadata
     expected = {
-        "study": "predictive-space-time-v0.6",
-        "dataset": "predictive-urban-v0.6",
+        "study": "predictive-space-time-v0.7",
+        "dataset": "predictive-execution-envelope-v0.7",
         "cohort": spec.cohort,
         "event_family": spec.event_family,
         "case_id": spec.case_id,
@@ -738,7 +738,7 @@ def build_predictive_cohort() -> tuple[tuple[DynamicScenario, ...], dict[str, ob
 
     manifest: dict[str, object] = {
         "schema_version": "predictive-scenario-manifest-v2",
-        "dataset_id": "predictive-urban-v0.6",
+        "dataset_id": "predictive-execution-envelope-v0.7",
         "selection": {
             "acceptance_rule": (
                 "valid constructor output satisfying the v0.6 urban scenario contract"

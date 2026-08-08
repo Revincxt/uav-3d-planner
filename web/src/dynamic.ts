@@ -283,7 +283,7 @@ async function start(): Promise<void> {
     });
   });
 
-  const commitUrl = `https://github.com/Revincxt/uav-3d-planner-lab/commit/${bundle.sourceCommit}`;
+  const commitUrl = `https://github.com/Revincxt/uav-3d-planner/commit/${bundle.sourceCommit}`;
   const provenance = element("#provenance");
   const sourceLink = document.createElement("a");
   sourceLink.href = commitUrl;

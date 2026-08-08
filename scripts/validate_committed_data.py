@@ -688,15 +688,19 @@ def _finite_smoothing_number(smoothing: dict[str, Any], key: str) -> float:
     return parsed
 
 
-def _audit_kinematic_diagnostics(scenario_id: str, value: object) -> None:
+def _audit_discrete_kinematic_diagnostic(
+    scenario_id: str,
+    value: object,
+    *,
+    path_kind: str,
+) -> dict[str, Any]:
     if not isinstance(value, dict):
-        raise ValueError(f"predictive kinematic diagnostics are missing: {scenario_id}")
+        raise ValueError(f"predictive {path_kind} kinematic diagnostics are missing: {scenario_id}")
     if (
         value.get("status") != "discrete-diagnostic-only"
         or value.get("continuousDynamicsCertified") is not False
     ):
-        raise ValueError(f"predictive kinematic scope is overstated: {scenario_id}")
-
+        raise ValueError(f"predictive {path_kind} kinematic scope is overstated: {scenario_id}")
     integer_fields = ("segmentCount", "movementSegmentCount", "reversalCount")
     numeric_fields = (
         "reversalThresholdDeg",
@@ -705,41 +709,198 @@ def _audit_kinematic_diagnostics(scenario_id: str, value: object) -> None:
         "maxDiscreteAccelerationProxyMps2",
         "maxAbsClimbRateMps",
     )
+    for key in integer_fields:
+        item = value.get(key)
+        if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+            raise ValueError(f"predictive {path_kind} kinematic {key} is invalid: {scenario_id}")
+    if value["movementSegmentCount"] > value["segmentCount"]:
+        raise ValueError(f"predictive {path_kind} movement count exceeds segments: {scenario_id}")
+    for key in numeric_fields:
+        item = value.get(key)
+        if isinstance(item, bool) or not isinstance(item, (int, float)):
+            raise ValueError(
+                f"predictive {path_kind} kinematic {key} is not numeric: {scenario_id}"
+            )
+        parsed = float(item)
+        if not math.isfinite(parsed) or parsed < 0.0:
+            raise ValueError(f"predictive {path_kind} kinematic {key} is invalid: {scenario_id}")
+    threshold = float(value["reversalThresholdDeg"])
+    if threshold <= 0.0 or threshold > 180.0:
+        raise ValueError(f"predictive {path_kind} reversal threshold is invalid: {scenario_id}")
+    return value
+
+
+def _audit_kinematic_diagnostics(scenario_id: str, value: object) -> None:
+    if not isinstance(value, dict):
+        raise ValueError(f"predictive kinematic diagnostics are missing: {scenario_id}")
+    if (
+        value.get("status") != "discrete-diagnostic-only"
+        or value.get("continuousDynamicsCertified") is not False
+    ):
+        raise ValueError(f"predictive kinematic scope is overstated: {scenario_id}")
     for path_kind in ("raw", "output"):
-        diagnostics = value.get(path_kind)
-        if not isinstance(diagnostics, dict):
-            raise ValueError(
-                f"predictive {path_kind} kinematic diagnostics are missing: {scenario_id}"
-            )
+        _audit_discrete_kinematic_diagnostic(
+            scenario_id,
+            value.get(path_kind),
+            path_kind=path_kind,
+        )
+
+
+def _execution_number(
+    scenario_id: str,
+    value: dict[str, Any],
+    key: str,
+    *,
+    nullable: bool = False,
+) -> float | None:
+    item = value.get(key)
+    if nullable and item is None:
+        return None
+    if isinstance(item, bool) or not isinstance(item, (int, float)):
+        raise ValueError(f"predictive execution {key} must be numeric: {scenario_id}")
+    parsed = float(item)
+    if not math.isfinite(parsed) or parsed < 0.0:
+        raise ValueError(
+            f"predictive execution {key} must be finite and non-negative: {scenario_id}"
+        )
+    return parsed
+
+
+def _audit_execution_envelope(scenario_id: str, value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"predictive execution envelope is missing: {scenario_id}")
+    expected = {
+        "model": "discrete-segment-average-envelope-v1",
+        "maxSpeedMps": 8.0,
+        "maxAbsClimbRateMps": 3.0,
+        "maxDiscreteAccelerationProxyMps2": 4.0,
+        "reversalThresholdDeg": 150.0,
+        "allowReversals": False,
+        "maxExecutionTimeS": 90.0,
+        "continuousDynamicsCertified": False,
+    }
+    for key, expected_value in expected.items():
+        item = value.get(key)
+        if isinstance(expected_value, float):
+            if (
+                isinstance(item, bool)
+                or not isinstance(item, (int, float))
+                or not math.isclose(float(item), expected_value, rel_tol=1e-10, abs_tol=1e-8)
+            ):
+                raise ValueError(
+                    f"predictive execution envelope {key} is not frozen: {scenario_id}"
+                )
+        elif item != expected_value:
+            raise ValueError(f"predictive execution envelope {key} is invalid: {scenario_id}")
+    return value
+
+
+def _audit_execution_qualification(
+    scenario_id: str,
+    value: object,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"predictive execution qualification is invalid: {scenario_id}")
+    status = value.get("status")
+    qualified = value.get("qualified")
+    violations = value.get("violations")
+    allowed_violations = {
+        "speed-limit-exceeded",
+        "climb-rate-limit-exceeded",
+        "acceleration-proxy-limit-exceeded",
+        "reversal-not-allowed",
+        "execution-time-limit-exceeded",
+    }
+    if (
+        status not in {"qualified", "not-qualified"}
+        or not isinstance(qualified, bool)
+        or value.get("continuousDynamicsCertified") is not False
+        or not isinstance(violations, list)
+        or len(set(violations)) != len(violations)
+        or any(not isinstance(item, str) or item not in allowed_violations for item in violations)
+        or qualified is not (status == "qualified")
+        or qualified is not (len(violations) == 0)
+    ):
+        raise ValueError(f"predictive execution qualification is inconsistent: {scenario_id}")
+    _audit_discrete_kinematic_diagnostic(
+        scenario_id,
+        value.get("diagnostics"),
+        path_kind="execution qualification",
+    )
+    _execution_number(
+        scenario_id,
+        value,
+        "boundaryAwareMaxDiscreteAccelerationProxyMps2",
+    )
+    return value
+
+
+def _audit_execution_metadata(scenario_id: str, value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"predictive execution metadata is missing: {scenario_id}")
+    status = value.get("status")
+    statuses = {
+        "not-evaluated",
+        "qualified",
+        "reversal-not-allowed",
+        "execution-time-limit-exceeded",
+        "time-parameterization-did-not-converge",
+        "dynamic-collision-after-retiming",
+    }
+    qualified = value.get("qualified")
+    collision_certified = value.get("collisionCertified")
+    if (
+        status not in statuses
+        or not isinstance(qualified, bool)
+        or not isinstance(collision_certified, bool)
+        or value.get("collisionCertificationScope") != "dense-piecewise-linear-space-time-path"
+        or value.get("continuousDynamicsCertified") is not False
+    ):
+        raise ValueError(f"predictive execution status is invalid: {scenario_id}")
+    _audit_execution_envelope(scenario_id, value.get("envelope"))
+    qualification = _audit_execution_qualification(scenario_id, value.get("qualification"))
+    iterations = value.get("timingIterations")
+    if isinstance(iterations, bool) or not isinstance(iterations, int) or iterations < 0:
+        raise ValueError(f"predictive execution timingIterations is invalid: {scenario_id}")
+    durations = {
+        key: _execution_number(scenario_id, value, key, nullable=True)
+        for key in ("originalDurationS", "candidateDurationS", "addedDurationS")
+    }
+    if status == "not-evaluated":
         if (
-            diagnostics.get("status") != "discrete-diagnostic-only"
-            or diagnostics.get("continuousDynamicsCertified") is not False
+            qualified
+            or collision_certified
+            or qualification is not None
+            or iterations != 0
+            or any(item is not None for item in durations.values())
         ):
-            raise ValueError(f"predictive {path_kind} kinematic scope is overstated: {scenario_id}")
-        for key in integer_fields:
-            item = diagnostics.get(key)
-            if isinstance(item, bool) or not isinstance(item, int) or item < 0:
-                raise ValueError(
-                    f"predictive {path_kind} kinematic {key} is invalid: {scenario_id}"
-                )
-        if diagnostics["movementSegmentCount"] > diagnostics["segmentCount"]:
-            raise ValueError(
-                f"predictive {path_kind} movement count exceeds segments: {scenario_id}"
-            )
-        for key in numeric_fields:
-            item = diagnostics.get(key)
-            if isinstance(item, bool) or not isinstance(item, (int, float)):
-                raise ValueError(
-                    f"predictive {path_kind} kinematic {key} is not numeric: {scenario_id}"
-                )
-            parsed = float(item)
-            if not math.isfinite(parsed) or parsed < 0.0:
-                raise ValueError(
-                    f"predictive {path_kind} kinematic {key} is invalid: {scenario_id}"
-                )
-        threshold = float(diagnostics["reversalThresholdDeg"])
-        if threshold <= 0.0 or threshold > 180.0:
-            raise ValueError(f"predictive {path_kind} reversal threshold is invalid: {scenario_id}")
+            raise ValueError(f"predictive not-evaluated execution is inconsistent: {scenario_id}")
+        return value
+    if qualification is None or any(item is None for item in durations.values()):
+        raise ValueError(f"predictive evaluated execution lacks evidence: {scenario_id}")
+    original = durations["originalDurationS"]
+    candidate = durations["candidateDurationS"]
+    added = durations["addedDurationS"]
+    assert original is not None and candidate is not None and added is not None
+    if candidate < original - 1e-8 or not math.isclose(
+        added,
+        candidate - original,
+        rel_tol=1e-10,
+        abs_tol=1e-8,
+    ):
+        raise ValueError(f"predictive execution retiming shortened the path: {scenario_id}")
+    if status == "qualified":
+        if not qualified or not collision_certified or qualification.get("qualified") is not True:
+            raise ValueError(f"predictive qualified execution is incomplete: {scenario_id}")
+    elif qualified or collision_certified:
+        raise ValueError(f"predictive failed execution exposes a candidate: {scenario_id}")
+    elif (
+        status == "dynamic-collision-after-retiming" and qualification.get("qualified") is not True
+    ):
+        raise ValueError(f"predictive retimed collision lacks timing qualification: {scenario_id}")
+    return value
 
 
 def _audit_predictive_smoothing(
@@ -747,20 +908,26 @@ def _audit_predictive_smoothing(
     raw_path: list[tuple[float, Point3]],
     timed_path: list[tuple[float, Point3]],
     value: object,
-) -> None:
+) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"predictive run has no smoothing record: {scenario_id}")
     method = value.get("method")
     applied = value.get("applied")
     certified = value.get("certified")
-    if not isinstance(method, str) or not isinstance(applied, bool) or certified is not True:
+    if (
+        not isinstance(method, str)
+        or not isinstance(applied, bool)
+        or not isinstance(certified, bool)
+    ):
         raise ValueError(f"predictive smoothing status is invalid: {scenario_id}")
     if (
-        value.get("collisionCertified") is not True
+        value.get("collisionCertified") is not certified
         or value.get("collisionCertificationScope") != "dense-piecewise-linear-space-time-path"
+        or (applied and not certified)
     ):
         raise ValueError(f"predictive collision-certification scope is invalid: {scenario_id}")
     _audit_kinematic_diagnostics(scenario_id, value.get("kinematicDiagnostics"))
+    execution = _audit_execution_metadata(scenario_id, value.get("execution"))
     raw_count = value.get("rawWaypointCount")
     output_count = value.get("outputWaypointCount")
     rounded_count = value.get("roundedCornerCount")
@@ -802,9 +969,13 @@ def _audit_predictive_smoothing(
             or after > before + 1e-5
         ):
             raise ValueError(f"applied predictive smoothing is inconsistent: {scenario_id}")
-        return
+        return execution
 
-    if method not in {"raw-fallback", "raw-no-roundable-corners"}:
+    if method not in {
+        "raw-fallback",
+        "raw-no-roundable-corners",
+        "not-run-uncertified-raw-path",
+    }:
         raise ValueError(f"predictive smoothing fallback method is invalid: {scenario_id}")
     if (
         applied_radius is not None
@@ -814,6 +985,7 @@ def _audit_predictive_smoothing(
         or not math.isclose(before, after, rel_tol=1e-10, abs_tol=1e-8)
     ):
         raise ValueError(f"predictive smoothing fallback is inconsistent: {scenario_id}")
+    return execution
 
 
 def _audit_predictive_frames(
@@ -858,85 +1030,45 @@ def _audit_predictive_frames(
         raise ValueError(f"predictive event frames must anchor mission endpoints: {scenario_id}")
 
 
-def _audit_predictive_execution(
+def _audit_predictive_metrics(
     scenario: DynamicScenario,
-    run: dict[str, Any],
+    path: list[tuple[float, Point3]],
+    value: object,
     *,
-    cruise_speed_mps: float,
-) -> None:
+    label: str,
+    expected_success: bool,
+    expected_failure_reason: object,
+) -> dict[str, Any]:
     scenario_id = scenario.scenario_id
-    planner_id = str(run.get("plannerId", ""))
-    metrics = run.get("metrics")
-    if not isinstance(metrics, dict):
-        raise ValueError(f"predictive run has no metrics: {scenario_id}/{planner_id}")
-    raw_path = _audit_predictive_timed_path(
-        scenario,
-        planner_id,
-        run.get("rawTimedPath"),
-        label="rawTimedPath",
-        cruise_speed_mps=cruise_speed_mps,
-    )
-    timed_path = _audit_predictive_timed_path(
-        scenario,
-        planner_id,
-        run.get("timedPath"),
-        label="certified timedPath",
-        cruise_speed_mps=cruise_speed_mps,
-    )
-    if (
-        not math.isclose(raw_path[0][0], timed_path[0][0], rel_tol=0.0, abs_tol=1e-12)
-        or not math.isclose(raw_path[-1][0], timed_path[-1][0], rel_tol=1e-10, abs_tol=1e-8)
-        or not _same_point(raw_path[0][1], timed_path[0][1])
-        or not _same_point(raw_path[-1][1], timed_path[-1][1])
-    ):
-        raise ValueError(f"predictive smoothing changed path endpoints or times: {scenario_id}")
-    raw_waits = _predictive_waits(raw_path)
-    certified_waits = _predictive_waits(timed_path)
-    if len(raw_waits) != len(certified_waits) or any(
-        not math.isclose(raw_start, smooth_start, rel_tol=1e-10, abs_tol=1e-8)
-        or not math.isclose(raw_end, smooth_end, rel_tol=1e-10, abs_tol=1e-8)
-        or not _same_point(raw_position, smooth_position)
-        for (raw_start, raw_end, raw_position), (smooth_start, smooth_end, smooth_position) in zip(
-            raw_waits, certified_waits, strict=True
-        )
-    ):
-        raise ValueError(f"predictive smoothing changed a wait interval: {scenario_id}")
-    _audit_predictive_wait_records(scenario_id, run.get("waitIntervals"), certified_waits)
-    _audit_predictive_smoothing(scenario_id, raw_path, timed_path, run.get("smoothing"))
-    _audit_predictive_frames(scenario_id, run.get("frames"), timed_path)
-
-    positions = tuple(point for _, point in timed_path)
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be an object: {scenario_id}")
+    metrics = value
+    positions = tuple(point for _, point in path)
+    waits = _predictive_waits(path)
     observed_length = polyline_length(positions)
-    observed_wait = math.fsum(end_time - start_time for start_time, end_time, _ in certified_waits)
+    observed_wait = math.fsum(end_time - start_time for start_time, end_time, _ in waits)
     direct_distance = distance(scenario.static_scene.start, scenario.static_scene.goal)
-    if not math.isclose(
-        observed_length,
-        float(metrics["executedPathLengthM"]),
-        rel_tol=1e-10,
-        abs_tol=1e-8,
-    ):
-        raise ValueError(f"predictive certified-path length mismatch: {scenario_id}")
-    if not math.isclose(
-        observed_wait,
-        float(metrics["waitTimeS"]),
-        rel_tol=1e-10,
-        abs_tol=1e-8,
-    ):
-        raise ValueError(f"predictive certified-path stationary-time mismatch: {scenario_id}")
-    if not math.isclose(
-        direct_distance,
-        float(metrics["directDistanceM"]),
-        rel_tol=1e-10,
-        abs_tol=1e-8,
-    ):
-        raise ValueError(f"predictive direct-distance mismatch: {scenario_id}")
+    expected_numbers = {
+        "executedPathLengthM": observed_length,
+        "waitTimeS": observed_wait,
+        "directDistanceM": direct_distance,
+    }
+    for key, expected in expected_numbers.items():
+        item = metrics.get(key)
+        if (
+            isinstance(item, bool)
+            or not isinstance(item, (int, float))
+            or not math.isfinite(float(item))
+            or not math.isclose(float(item), expected, rel_tol=1e-10, abs_tol=1e-8)
+        ):
+            raise ValueError(f"{label} {key} disagrees with its path: {scenario_id}")
 
-    separation = minimum_dynamic_separation(scenario, timed_path)
+    separation = minimum_dynamic_separation(scenario, path)
     recorded_separation = metrics.get("minimumSeparationM")
     recorded_witness = metrics.get("minimumSeparationWitness")
     if separation is None:
         if recorded_separation is not None or recorded_witness is not None:
-            raise ValueError(f"predictive separation diagnostic is spurious: {scenario_id}")
+            raise ValueError(f"{label} separation diagnostic is spurious: {scenario_id}")
     else:
         if (
             isinstance(recorded_separation, bool)
@@ -950,22 +1082,22 @@ def _audit_predictive_execution(
             )
             or not isinstance(recorded_witness, dict)
         ):
-            raise ValueError(f"predictive minimum separation mismatch: {scenario_id}")
+            raise ValueError(f"{label} minimum separation mismatch: {scenario_id}")
         expected_text = {
             "obstacleId": separation.obstacle_id,
             "obstacleKind": separation.obstacle_kind,
             "method": separation.method,
         }
         if any(recorded_witness.get(key) != expected for key, expected in expected_text.items()):
-            raise ValueError(f"predictive separation witness identity mismatch: {scenario_id}")
+            raise ValueError(f"{label} separation witness identity mismatch: {scenario_id}")
         if recorded_witness.get("exact") is not separation.exact:
-            raise ValueError(f"predictive separation witness exactness mismatch: {scenario_id}")
-        expected_numbers = {
+            raise ValueError(f"{label} separation witness exactness mismatch: {scenario_id}")
+        witness_numbers = {
             "separationM": separation.separation_m,
             "timeS": separation.time_s,
             "declaredSafetyMarginM": separation.declared_safety_margin_m,
         }
-        for key, expected in expected_numbers.items():
+        for key, expected in witness_numbers.items():
             item = recorded_witness.get(key)
             absolute_tolerance = 1e-6 if key == "timeS" and not separation.exact else 1e-8
             if (
@@ -976,13 +1108,12 @@ def _audit_predictive_execution(
                     float(item), expected, rel_tol=1e-10, abs_tol=absolute_tolerance
                 )
             ):
-                raise ValueError(f"predictive separation witness {key} mismatch: {scenario_id}")
+                raise ValueError(f"{label} separation witness {key} mismatch: {scenario_id}")
         position_tolerance = 1e-8 if separation.exact else 1e-6
-        expected_positions = {
+        for key, expected in {
             "vehiclePosition": separation.vehicle_position,
             "obstaclePosition": separation.obstacle_position,
-        }
-        for key, expected in expected_positions.items():
+        }.items():
             item = recorded_witness.get(key)
             if (
                 not isinstance(item, list)
@@ -1000,46 +1131,241 @@ def _audit_predictive_execution(
                     for index, coordinate in enumerate(item)
                 )
             ):
-                raise ValueError(f"predictive separation witness {key} mismatch: {scenario_id}")
+                raise ValueError(f"{label} separation witness {key} mismatch: {scenario_id}")
         if float(recorded_separation) < separation.declared_safety_margin_m - 1e-8:
-            raise ValueError(f"predictive minimum separation violates safety margin: {scenario_id}")
+            raise ValueError(f"{label} minimum separation violates safety margin: {scenario_id}")
 
     success = metrics.get("success")
     failure_reason = metrics.get("failureReason")
-    if not isinstance(success, bool) or failure_reason != run.get("failureReason"):
-        raise ValueError(f"predictive metric status mismatch: {scenario_id}")
-    if success is not (run.get("status") == "success"):
-        raise ValueError(f"predictive success disagrees with status: {scenario_id}")
+    if success is not expected_success or failure_reason != expected_failure_reason:
+        raise ValueError(f"{label} status disagrees with its evidence layer: {scenario_id}")
     if success:
-        if failure_reason is not None or not _same_point(positions[-1], scenario.static_scene.goal):
-            raise ValueError(f"successful predictive path is incomplete: {scenario_id}")
         arrival = metrics.get("arrivalTimeS")
         travel = metrics.get("travelTimeS")
         path_excess = metrics.get("pathExcessPct")
-        if arrival is None or travel is None or path_excess is None:
-            raise ValueError(f"successful predictive run lacks metrics: {scenario_id}")
-        if not math.isclose(float(arrival), timed_path[-1][0], rel_tol=1e-10, abs_tol=1e-8):
-            raise ValueError(f"predictive arrival time mismatch: {scenario_id}")
-        if not math.isclose(
-            float(travel),
-            timed_path[-1][0] - timed_path[0][0] - observed_wait,
-            rel_tol=1e-10,
-            abs_tol=1e-8,
+        if (
+            failure_reason is not None
+            or arrival is None
+            or travel is None
+            or path_excess is None
+            or not _same_point(positions[-1], scenario.static_scene.goal)
+            or not math.isclose(float(arrival), path[-1][0], rel_tol=1e-10, abs_tol=1e-8)
+            or not math.isclose(
+                float(travel),
+                path[-1][0] - path[0][0] - observed_wait,
+                rel_tol=1e-10,
+                abs_tol=1e-8,
+            )
+            or not math.isclose(
+                float(path_excess),
+                (observed_length / direct_distance - 1.0) * 100.0,
+                rel_tol=1e-10,
+                abs_tol=1e-8,
+            )
         ):
-            raise ValueError(f"predictive movement-time mismatch: {scenario_id}")
-        if not math.isclose(
-            float(path_excess),
-            (observed_length / direct_distance - 1.0) * 100.0,
-            rel_tol=1e-10,
-            abs_tol=1e-8,
-        ):
-            raise ValueError(f"predictive path-excess mismatch: {scenario_id}")
-    elif any(
+            raise ValueError(f"{label} successful metrics are incomplete: {scenario_id}")
+    elif failure_reason is None or any(
         metrics.get(key) is not None for key in ("arrivalTimeS", "travelTimeS", "pathExcessPct")
     ):
-        raise ValueError(f"failed predictive run fabricates success metrics: {scenario_id}")
-    if int(metrics["safetyViolations"]) != 0:
-        raise ValueError(f"predictive record contains a safety violation: {scenario_id}")
+        raise ValueError(f"{label} failed metrics fabricate success values: {scenario_id}")
+    safety_violations = metrics.get("safetyViolations")
+    if isinstance(safety_violations, bool) or safety_violations != 0:
+        raise ValueError(f"{label} contains a safety violation: {scenario_id}")
+    return metrics
+
+
+def _audit_predictive_execution(
+    scenario: DynamicScenario,
+    run: dict[str, Any],
+    *,
+    cruise_speed_mps: float,
+) -> None:
+    scenario_id = scenario.scenario_id
+    planner_id = str(run.get("plannerId", ""))
+    required_fields = {
+        "rawTimedPath",
+        "geometryTimedPath",
+        "executionTimedPath",
+        "smoothing",
+        "geometryWaitIntervals",
+        "executionWaitIntervals",
+        "plannerMetrics",
+        "geometryMetrics",
+        "executionMetrics",
+        "geometryFrames",
+        "executionFrames",
+    }
+    if not required_fields.issubset(run):
+        missing = sorted(required_fields.difference(run))
+        raise ValueError(f"predictive v3 run lacks fields {missing}: {scenario_id}/{planner_id}")
+    raw_path = _audit_predictive_timed_path(
+        scenario,
+        planner_id,
+        run["rawTimedPath"],
+        label="rawTimedPath",
+        cruise_speed_mps=cruise_speed_mps,
+    )
+    geometry_path = _audit_predictive_timed_path(
+        scenario,
+        planner_id,
+        run["geometryTimedPath"],
+        label="geometryTimedPath",
+        cruise_speed_mps=cruise_speed_mps,
+    )
+    if (
+        not math.isclose(raw_path[0][0], geometry_path[0][0], rel_tol=0.0, abs_tol=1e-12)
+        or not math.isclose(raw_path[-1][0], geometry_path[-1][0], rel_tol=1e-10, abs_tol=1e-8)
+        or not _same_point(raw_path[0][1], geometry_path[0][1])
+        or not _same_point(raw_path[-1][1], geometry_path[-1][1])
+    ):
+        raise ValueError(f"predictive smoothing changed path endpoints or times: {scenario_id}")
+    raw_waits = _predictive_waits(raw_path)
+    geometry_waits = _predictive_waits(geometry_path)
+    if len(raw_waits) != len(geometry_waits) or any(
+        not math.isclose(raw_start, geometry_start, rel_tol=1e-10, abs_tol=1e-8)
+        or not math.isclose(raw_end, geometry_end, rel_tol=1e-10, abs_tol=1e-8)
+        or not _same_point(raw_position, geometry_position)
+        for (raw_start, raw_end, raw_position), (
+            geometry_start,
+            geometry_end,
+            geometry_position,
+        ) in zip(raw_waits, geometry_waits, strict=True)
+    ):
+        raise ValueError(f"predictive smoothing changed a planner wait interval: {scenario_id}")
+    _audit_predictive_wait_records(
+        scenario_id,
+        run["geometryWaitIntervals"],
+        geometry_waits,
+    )
+    execution = _audit_predictive_smoothing(
+        scenario_id,
+        raw_path,
+        geometry_path,
+        run["smoothing"],
+    )
+    _audit_predictive_frames(scenario_id, run["geometryFrames"], geometry_path)
+
+    planner_success = run.get("status") == "success"
+    planner_failure_reason = run.get("failureReason")
+    planner_metrics = _audit_predictive_metrics(
+        scenario,
+        raw_path,
+        run["plannerMetrics"],
+        label="plannerMetrics",
+        expected_success=planner_success,
+        expected_failure_reason=planner_failure_reason,
+    )
+    geometry_metrics = _audit_predictive_metrics(
+        scenario,
+        geometry_path,
+        run["geometryMetrics"],
+        label="geometryMetrics",
+        expected_success=planner_success,
+        expected_failure_reason=planner_failure_reason,
+    )
+    for key in ("replans", "expandedStates", "workUnit"):
+        if geometry_metrics.get(key) != planner_metrics.get(key):
+            raise ValueError(f"predictive geometry {key} borrows inconsistent work: {scenario_id}")
+
+    available = (
+        execution.get("status") == "qualified"
+        and execution.get("qualified") is True
+        and execution.get("collisionCertified") is True
+    )
+    execution_fields = (
+        run["executionTimedPath"],
+        run["executionWaitIntervals"],
+        run["executionMetrics"],
+        run["executionFrames"],
+    )
+    if available is not all(item is not None for item in execution_fields):
+        raise ValueError(
+            f"predictive execution evidence availability is inconsistent: {scenario_id}"
+        )
+    if not available and any(item is not None for item in execution_fields):
+        raise ValueError(f"predictive failed execution exposes candidate evidence: {scenario_id}")
+
+    original_duration = execution.get("originalDurationS")
+    if original_duration is not None and not math.isclose(
+        float(original_duration),
+        geometry_path[-1][0] - geometry_path[0][0],
+        rel_tol=1e-10,
+        abs_tol=1e-8,
+    ):
+        raise ValueError(f"predictive execution original duration mismatch: {scenario_id}")
+    qualification = execution.get("qualification")
+    if isinstance(qualification, dict):
+        diagnostics = qualification.get("diagnostics")
+        if (
+            not isinstance(diagnostics, dict)
+            or diagnostics.get("segmentCount") != len(geometry_path) - 1
+        ):
+            raise ValueError(f"predictive execution qualification count mismatch: {scenario_id}")
+
+    if not available:
+        return
+    execution_path = _audit_predictive_timed_path(
+        scenario,
+        planner_id,
+        run["executionTimedPath"],
+        label="executionTimedPath",
+        cruise_speed_mps=cruise_speed_mps,
+    )
+    if len(execution_path) != len(geometry_path):
+        raise ValueError(f"predictive retiming changed waypoint count: {scenario_id}")
+    paired_paths = zip(geometry_path, execution_path, strict=True)
+    for index, (
+        (geometry_start_time, geometry_start),
+        (execution_start_time, execution_start),
+    ) in enumerate(paired_paths):
+        if not _same_point(geometry_start, execution_start):
+            raise ValueError(f"predictive retiming changed geometry: {scenario_id}/{index}")
+        if index == 0:
+            continue
+        geometry_duration = geometry_start_time - geometry_path[index - 1][0]
+        execution_duration = execution_start_time - execution_path[index - 1][0]
+        if execution_duration < geometry_duration - 1e-8:
+            raise ValueError(f"predictive retiming shortened a segment: {scenario_id}/{index}")
+        if _same_point(geometry_start, geometry_path[index - 1][1]) and not math.isclose(
+            execution_duration,
+            geometry_duration,
+            rel_tol=1e-10,
+            abs_tol=1e-8,
+        ):
+            raise ValueError(f"predictive retiming changed a wait duration: {scenario_id}/{index}")
+    execution_waits = _predictive_waits(execution_path)
+    if not math.isclose(
+        math.fsum(end - start for start, end, _ in execution_waits),
+        math.fsum(end - start for start, end, _ in geometry_waits),
+        rel_tol=1e-10,
+        abs_tol=1e-8,
+    ):
+        raise ValueError(f"predictive retiming changed total wait duration: {scenario_id}")
+    _audit_predictive_wait_records(
+        scenario_id,
+        run["executionWaitIntervals"],
+        execution_waits,
+    )
+    _audit_predictive_frames(scenario_id, run["executionFrames"], execution_path)
+    candidate_duration = execution.get("candidateDurationS")
+    if candidate_duration is None or not math.isclose(
+        float(candidate_duration),
+        execution_path[-1][0] - execution_path[0][0],
+        rel_tol=1e-10,
+        abs_tol=1e-8,
+    ):
+        raise ValueError(f"predictive execution candidate duration mismatch: {scenario_id}")
+    execution_metrics = _audit_predictive_metrics(
+        scenario,
+        execution_path,
+        run["executionMetrics"],
+        label="executionMetrics",
+        expected_success=planner_success,
+        expected_failure_reason=planner_failure_reason,
+    )
+    for key in ("replans", "expandedStates", "workUnit"):
+        if execution_metrics.get(key) != planner_metrics.get(key):
+            raise ValueError(f"predictive execution {key} borrows inconsistent work: {scenario_id}")
 
 
 def _without_predictive_provenance(bundle: dict[str, Any]) -> dict[str, Any]:
@@ -1062,8 +1388,8 @@ def _contains_forbidden_keys(value: object, forbidden: frozenset[str]) -> bool:
 
 def _audit_predictive() -> int:
     bundle = _load_json(PUBLIC / "predictive-data.json")
-    if bundle.get("schemaVersion") != 2:
-        raise ValueError("predictive bundle must use schemaVersion 2")
+    if bundle.get("schemaVersion") != 3:
+        raise ValueError("predictive bundle must use schemaVersion 3")
     source_commit = str(bundle.get("sourceCommit", ""))
     _validate_source_ancestor(source_commit, label="predictive")
     _require_paths_at_commit(
@@ -1074,6 +1400,7 @@ def _audit_predictive() -> int:
             "src/uav3d/predictive_scenarios.py",
             "src/uav3d/predictive_smoothing.py",
             "src/uav3d/predictive_study.py",
+            "src/uav3d/trajectory_timing.py",
             "src/uav3d/dynamic_collision.py",
             "src/uav3d/kinematics.py",
             "src/uav3d/planners/dstar_lite.py",
@@ -1081,15 +1408,18 @@ def _audit_predictive() -> int:
         ),
         label="predictive",
     )
-    if _package_version_at(source_commit) != "0.6.0":
-        raise ValueError("predictive sourceCommit must identify the v0.6.0 implementation")
+    if _package_version_at(source_commit) != "0.7.0":
+        raise ValueError("predictive sourceCommit must identify the v0.7.0 implementation")
 
     protocol = bundle.get("protocol")
     scenarios = bundle.get("scenarios")
     if not isinstance(protocol, dict) or not isinstance(scenarios, list):
         raise ValueError("predictive protocol and scenarios must be structured objects")
-    if protocol.get("id") != "predictive-space-time-v3":
-        raise ValueError("predictive protocol must use predictive-space-time-v3")
+    if protocol.get("id") != "predictive-space-time-v4":
+        raise ValueError("predictive protocol must use predictive-space-time-v4")
+    if protocol.get("continuousDynamicsCertified") is not False:
+        raise ValueError("predictive protocol must not claim continuous-dynamics certification")
+    _audit_execution_envelope("protocol", protocol.get("executionEnvelope"))
     cruise_speed_value = protocol.get("cruiseSpeedMps")
     if (
         isinstance(cruise_speed_value, bool)
@@ -1149,8 +1479,12 @@ def _audit_predictive() -> int:
     manifest = _load_json(PUBLIC / PREDICTIVE_DOWNLOADS["scenarioManifest"])
     selection = manifest.get("selection")
     manifest_scenarios = manifest.get("scenarios")
-    if manifest.get("schemaVersion") != 2:
-        raise ValueError("predictive scenario manifest must use schemaVersion 2")
+    if manifest.get("schemaVersion") != 3:
+        raise ValueError("predictive scenario manifest must use schemaVersion 3")
+    if manifest.get("protocolId") != "predictive-space-time-v4":
+        raise ValueError("predictive scenario manifest must use predictive-space-time-v4")
+    if manifest.get("datasetId") != "predictive-execution-envelope-v0.7":
+        raise ValueError("predictive scenario manifest must use predictive-execution-envelope-v0.7")
     if not isinstance(selection, dict) or selection.get("planner_outcomes_consulted") is not False:
         raise ValueError("predictive scenario selection must be independent of planner outcomes")
     if _contains_forbidden_keys(
@@ -1167,14 +1501,14 @@ def _audit_predictive() -> int:
         or manifest.get("runCount") != 40
         or not isinstance(manifest_scenarios, list)
     ):
-        raise ValueError("predictive scenario manifest counts disagree with the fixed v0.6 cohort")
+        raise ValueError("predictive scenario manifest counts disagree with the fixed v0.7 cohort")
     manifest_scenario_ids: list[str] = []
     for record in manifest_scenarios:
         if not isinstance(record, dict) or record.get("selected") is not True:
             raise ValueError("predictive manifest scenario entry is invalid or unselected")
         manifest_scenario_ids.append(str(record.get("id", "")))
     if tuple(manifest_scenario_ids) != PREDICTIVE_SCENARIO_IDS:
-        raise ValueError("predictive manifest scenario IDs differ from the fixed v0.6 cohort")
+        raise ValueError("predictive manifest scenario IDs differ from the fixed v0.7 cohort")
 
     expected, expected_manifest = build_predictive_bundle(
         source_commit=source_commit,
@@ -1234,7 +1568,7 @@ def _audit_predictive() -> int:
                     f"stale or duplicate predictive run ID: {scenario_id}/{planner_id}"
                 )
             run_ids.add(run_id)
-            metrics = run.get("metrics")
+            metrics = run.get("plannerMetrics")
             if (
                 not isinstance(metrics, dict)
                 or metrics.get("workUnit") != PREDICTIVE_WORK_UNITS.get(planner_id)

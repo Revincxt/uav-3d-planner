@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Recorded comparison of reactive and predictive UAV planning in layered three-dimensional urban environments."
+      content="Recorded v0.7 comparison of UAV planning output, collision-certified geometry, and discrete-envelope-qualified execution candidates in layered urban airspace."
     />
     <title>Predictive space–time planning — UAV 3D Planner Lab</title>
   </head>
@@ -24,7 +24,8 @@
           <h1>Predictive space–time planning</h1>
           <p class="scope">
             A recorded comparison of reactive and forecast-aware trajectories in structured urban
-            airspace. Geometry, timing, and post-processing remain directly inspectable.
+            airspace. Raw planning, certified geometry, and qualified execution candidates remain
+            separately inspectable.
           </p>
         </div>
         <dl class="study-register" aria-label="Study scope">
@@ -38,7 +39,7 @@
           </div>
           <div>
             <dt>Evidence</dt>
-            <dd>Recorded, certified</dd>
+            <dd>Collision + discrete envelope</dd>
           </div>
           <div>
             <dt>Inference</dt>
@@ -99,19 +100,19 @@
 
         <dl class="result-strip" aria-label="Selected result summary">
           <div>
-            <dt>Outcome</dt>
+            <dt>Planner outcome</dt>
             <dd id="metric-outcome">—</dd>
           </div>
           <div>
-            <dt>Arrival</dt>
+            <dt>Planner arrival</dt>
             <dd id="metric-arrival">—</dd>
           </div>
           <div>
-            <dt>Stationary</dt>
+            <dt>Planner stationary</dt>
             <dd id="metric-wait">—</dd>
           </div>
           <div>
-            <dt>Path length</dt>
+            <dt>Planner path</dt>
             <dd id="metric-path">—</dd>
           </div>
           <div>
@@ -132,8 +133,11 @@
                   <span class="control-label" aria-hidden="true">Path</span>
                   <div class="segmented-control" aria-label="Trajectory geometry">
                     <button type="button" data-path-mode="raw" aria-pressed="false">Raw</button>
-                    <button type="button" data-path-mode="certified" aria-pressed="true">
-                      Certified
+                    <button type="button" data-path-mode="geometry" aria-pressed="false">
+                      Geometry
+                    </button>
+                    <button type="button" data-path-mode="execution" aria-pressed="true">
+                      Execution
                     </button>
                   </div>
                 </div>
@@ -164,6 +168,11 @@
               <div class="viewer-time" aria-hidden="true">
                 <span>Mission time</span>
                 <strong id="viewer-time-value">0.0 s</strong>
+              </div>
+              <div id="viewer-witness-readout" class="viewer-witness-readout" hidden>
+                <span>Closest-approach witness</span>
+                <strong id="viewer-witness-value">—</strong>
+                <small id="viewer-witness-detail">—</small>
               </div>
               <div class="viewer-legend" aria-label="Map legend">
                 <p>Trajectory</p>
@@ -231,7 +240,27 @@
               <dl id="current-meta" class="evidence-list"></dl>
             </section>
 
-            <section aria-labelledby="smoothing-summary-heading">
+            <section class="witness-section" aria-labelledby="witness-summary-heading">
+              <div class="witness-heading">
+                <h4 id="witness-summary-heading">Closest-approach evidence</h4>
+                <span id="witness-quality" class="witness-quality">Unavailable</span>
+              </div>
+              <p id="witness-summary" class="panel-copy">
+                No minimum-separation witness was recorded for this condition.
+              </p>
+              <dl id="witness-meta" class="evidence-list"></dl>
+              <button
+                id="jump-to-witness"
+                class="jump-to-witness"
+                type="button"
+                disabled
+                aria-describedby="witness-summary"
+              >
+                Closest approach unavailable
+              </button>
+            </section>
+
+            <section class="smoothing-section" aria-labelledby="smoothing-summary-heading">
               <h4 id="smoothing-summary-heading">Trajectory post-processing</h4>
               <dl id="smoothing-meta" class="evidence-list"></dl>
               <p id="smoothing-note" class="panel-note"></p>
@@ -287,8 +316,9 @@
         <div class="table-wrap" tabindex="0" aria-label="Scrollable planner comparison table">
           <table class="comparison-table">
             <caption>
-              Planning-work units retain algorithm-specific meanings and are not normalized across
-              conditions. Minimum separation remains unavailable unless explicitly recorded.
+              Arrival, stationary time, path length, safety, and work are raw planner-domain
+              measurements. Geometry and execution qualification are downstream evidence and are
+              never credited to a planner.
             </caption>
             <thead>
               <tr>
@@ -298,8 +328,8 @@
                 <th scope="col">Arrival (s)</th>
                 <th scope="col">Stationary (s)</th>
                 <th scope="col">Path (m)</th>
-                <th scope="col">Post-process</th>
-                <th scope="col">Peak turn</th>
+                <th scope="col">Execution gate</th>
+                <th scope="col">Geometry turn</th>
                 <th scope="col">Safety</th>
                 <th scope="col">Planning work</th>
               </tr>
