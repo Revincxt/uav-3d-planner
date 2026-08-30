@@ -12,9 +12,11 @@ import pytest
 import uav3d.predictive_study as predictive_study_module
 from uav3d.cli import main
 from uav3d.dynamic import DynamicScenario, TemporaryCylinder
+from uav3d.kinematics import DiscreteKinematicDiagnostics
 from uav3d.predictive_scenarios import load_predictive_scenario
 from uav3d.predictive_study import (
     DOWNLOAD_ARTIFACTS,
+    KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES,
     PREDICTIVE_ALGORITHMS,
     RECORD_FIELDS,
     SERIALIZATION_DECIMAL_PLACES,
@@ -39,6 +41,33 @@ def test_predictive_serialization_absorbs_platform_float_drift() -> None:
         {"times": [16.605801291068, 16.605801291067]}
     )
     assert normalized == {"times": [16.60580129107, 16.60580129107]}
+
+
+def test_kinematic_diagnostic_export_absorbs_cross_platform_libm_drift() -> None:
+    assert KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES == 8
+    common = {
+        "segment_count": 2,
+        "movement_segment_count": 2,
+        "reversal_count": 0,
+        "reversal_threshold_deg": 150.0,
+        "max_speed_mps": 8.0,
+        "max_discrete_acceleration_proxy_mps2": 4.0,
+        "max_abs_climb_rate_mps": 3.0,
+    }
+    first = DiscreteKinematicDiagnostics(
+        **common,
+        max_discrete_velocity_change_mps=666.78439775796,
+    )
+    second = DiscreteKinematicDiagnostics(
+        **common,
+        max_discrete_velocity_change_mps=666.78439775821,
+    )
+
+    first_export = predictive_study_module._export_kinematic_diagnostics(first)
+    second_export = predictive_study_module._export_kinematic_diagnostics(second)
+
+    assert first_export == second_export
+    assert first_export["maxDiscreteVelocityChangeMps"] == 666.78439776
 
 
 @pytest.fixture(scope="module")
@@ -79,6 +108,8 @@ def test_fixed_study_covers_ten_scenarios_by_four_planners(
             )
             assert episode.raw_timed_path.is_safe(scenario)
             assert episode.timed_path.is_safe(scenario)
+            assert episode.geometry_metrics.success
+            assert episode.geometry_metrics.safety_violations == 0
             assert episode.smoothing.certified
             assert episode.smoothing.raw_waypoint_count == len(episode.raw_timed_path.waypoints)
             assert episode.smoothing.output_waypoint_count == len(episode.timed_path.waypoints)
@@ -88,7 +119,20 @@ def test_fixed_study_covers_ten_scenarios_by_four_planners(
             assert episode.raw_timed_path.arrival_time_s == episode.timed_path.arrival_time_s
             assert episode.timed_path.start == scenario.static_scene.start
             assert episode.timed_path.goal == scenario.static_scene.goal
-            assert episode.metrics.arrival_time_s == episode.timed_path.arrival_time_s
+            assert episode.metrics.arrival_time_s == episode.raw_timed_path.arrival_time_s
+            assert episode.geometry_metrics.arrival_time_s == episode.timed_path.arrival_time_s
+            if episode.execution_timed_path is None:
+                assert episode.execution_metrics is None
+                assert not episode.smoothing.execution_qualified
+            else:
+                assert episode.execution_metrics is not None
+                assert episode.execution_metrics.success
+                assert episode.execution_timed_path.is_safe(scenario)
+                assert episode.smoothing.execution_qualified
+                assert episode.smoothing.execution_collision_certified
+                assert (
+                    episode.execution_timed_path.arrival_time_s >= episode.timed_path.arrival_time_s
+                )
 
 
 def test_reset_reuse_ablation_preserves_mission_contract_and_exposes_reuse(
@@ -119,12 +163,12 @@ def test_wait_events_mark_the_actual_interval_boundaries(
     predictive = next(
         run for run in calibration["runs"] if run["plannerId"] == "space-time-astar-4d"
     )
-    interval = predictive["waitIntervals"][0]
+    interval = predictive["geometryWaitIntervals"][0]
     start_event = next(
-        frame for frame in predictive["frames"] if frame["timeS"] == interval["startTimeS"]
+        frame for frame in predictive["geometryFrames"] if frame["timeS"] == interval["startTimeS"]
     )
     end_event = next(
-        frame for frame in predictive["frames"] if frame["timeS"] == interval["endTimeS"]
+        frame for frame in predictive["geometryFrames"] if frame["timeS"] == interval["endTimeS"]
     )
     assert start_event["event"]["kind"] == "wait-start"
     assert end_event["event"]["kind"] == "wait-end"
@@ -155,23 +199,27 @@ def test_predictive_episode_flags_an_initial_state_collision() -> None:
     assert episode.metrics.failure_reason == "invalid-start"
     assert episode.metrics.safety_violations == 1
     assert not episode.timed_path.is_safe(scenario)
+    assert episode.execution_timed_path is None
+    assert episode.execution_metrics is None
 
 
-def test_bundle_v2_and_run_ids_are_exactly_reproducible(
+def test_bundle_v3_and_run_ids_are_exactly_reproducible(
     fixed_bundle: tuple[dict[str, object], dict[str, object]],
 ) -> None:
     bundle, manifest = fixed_bundle
 
-    assert bundle["schemaVersion"] == 2
-    assert manifest["schemaVersion"] == 2
-    assert manifest["datasetId"] == "predictive-complex-city-v0.6"
+    assert bundle["schemaVersion"] == 3
+    assert manifest["schemaVersion"] == 3
+    assert manifest["datasetId"] == "predictive-execution-envelope-v0.7"
     assert bundle["verificationStatus"] == VERIFICATION_STATUS
     assert manifest["requested"] == manifest["accepted"] + manifest["rejected"]
     run_ids: set[str] = set()
     protocol = bundle["protocol"]
     assert isinstance(protocol, dict)
-    assert protocol["id"] == "predictive-space-time-v3"
-    assert "certified" in str(protocol["trajectoryPostprocessor"])
+    assert protocol["id"] == "predictive-space-time-v4"
+    assert protocol["continuousDynamicsCertified"] is False
+    assert protocol["executionEnvelope"]["maxDiscreteAccelerationProxyMps2"] == 4.0
+    assert "execution-envelope" in str(protocol["trajectoryPostprocessor"])
     scenarios = bundle["scenarios"]
     assert isinstance(scenarios, list)
     for scenario in scenarios:
@@ -204,7 +252,7 @@ def test_bundle_v2_and_run_ids_are_exactly_reproducible(
     assert len(run_ids) == 40
 
 
-def test_bundle_exports_raw_certified_paths_and_linear_size_frames(
+def test_bundle_exports_three_evidence_layers_and_linear_size_frames(
     fixed_bundle: tuple[dict[str, object], dict[str, object]],
 ) -> None:
     bundle, _ = fixed_bundle
@@ -220,15 +268,19 @@ def test_bundle_exports_raw_certified_paths_and_linear_size_frames(
         for run in runs:
             assert isinstance(run, dict)
             raw_path = run["rawTimedPath"]
-            timed_path = run["timedPath"]
+            timed_path = run["geometryTimedPath"]
+            execution_path = run["executionTimedPath"]
             smoothing = run["smoothing"]
-            frames = run["frames"]
-            metrics = run["metrics"]
+            frames = run["geometryFrames"]
+            planner_metrics = run["plannerMetrics"]
+            geometry_metrics = run["geometryMetrics"]
+            execution_metrics = run["executionMetrics"]
             assert isinstance(raw_path, list)
             assert isinstance(timed_path, list)
             assert isinstance(smoothing, dict)
             assert isinstance(frames, list)
-            assert isinstance(metrics, dict)
+            assert isinstance(planner_metrics, dict)
+            assert isinstance(geometry_metrics, dict)
             assert smoothing["certified"] is True
             assert smoothing["collisionCertified"] is True
             assert smoothing["collisionCertificationScope"] == (
@@ -259,9 +311,17 @@ def test_bundle_exports_raw_certified_paths_and_linear_size_frames(
                 assert float(path_diagnostics["maxAbsClimbRateMps"]) >= 0.0
             assert smoothing["rawWaypointCount"] == len(raw_path)
             assert smoothing["outputWaypointCount"] == len(timed_path)
-            assert metrics["safetyViolations"] == 0
-            assert metrics["minimumSeparationM"] is not None
-            witness = metrics["minimumSeparationWitness"]
+            execution = smoothing["execution"]
+            assert isinstance(execution, dict)
+            assert execution["continuousDynamicsCertified"] is False
+            assert execution["envelope"]["continuousDynamicsCertified"] is False
+            assert execution["envelope"]["maxSpeedMps"] == 8.0
+            assert execution["envelope"]["maxAbsClimbRateMps"] == 3.0
+            assert execution["envelope"]["maxDiscreteAccelerationProxyMps2"] == 4.0
+            assert planner_metrics["safetyViolations"] == 0
+            assert geometry_metrics["safetyViolations"] == 0
+            assert planner_metrics["minimumSeparationM"] is not None
+            witness = geometry_metrics["minimumSeparationWitness"]
             assert isinstance(witness, dict)
             assert set(witness) == {
                 "separationM",
@@ -277,15 +337,34 @@ def test_bundle_exports_raw_certified_paths_and_linear_size_frames(
             assert witness["obstacleKind"] in {"moving-sphere", "temporary-cylinder"}
             assert raw_path[0] == timed_path[0]
             assert raw_path[-1] == timed_path[-1]
+            if execution["qualified"]:
+                assert execution["status"] == "qualified"
+                assert execution["collisionCertified"] is True
+                assert isinstance(execution_path, list)
+                assert isinstance(execution_metrics, dict)
+                assert run["executionFrames"]
+                assert run["executionWaitIntervals"] is not None
+                assert [item["position"] for item in execution_path] == [
+                    item["position"] for item in timed_path
+                ]
+                assert all(
+                    candidate["timeS"] + 1e-10 >= geometry["timeS"]
+                    for geometry, candidate in zip(timed_path, execution_path, strict=True)
+                )
+            else:
+                assert execution_path is None
+                assert execution_metrics is None
+                assert run["executionFrames"] is None
+                assert run["executionWaitIntervals"] is None
             for angle_field in ("maxTurnAngleBeforeDeg", "maxTurnAngleAfterDeg"):
                 angle = smoothing[angle_field]
                 assert isinstance(angle, (int, float))
                 assert math.isfinite(angle)
                 assert 0.0 <= angle <= 180.0 + 1e-6
 
-            # Frames are semantic event anchors drawn from the certified path. The browser derives
-            # continuous motion from timedPath, so replay records do not repeat geometry or every
-            # dense smoothing sample.
+            # Frames are semantic event anchors drawn from the geometry candidate. The browser
+            # derives continuous motion from geometryTimedPath, so replay records do not repeat
+            # geometry or every dense smoothing sample.
             assert 1 <= len(frames) <= len(timed_path)
             assert frames[0]["timeS"] == timed_path[0]["timeS"]
             assert frames[-1]["timeS"] == timed_path[-1]["timeS"]
@@ -326,20 +405,27 @@ def test_records_csv_projection_is_complete(
     assert len(rows) == 40
     assert all(tuple(row) == RECORD_FIELDS for row in rows)
     assert {row["planner_id"] for row in rows} == set(PREDICTIVE_ALGORITHMS)
-    assert sum(row["success"] == "true" for row in rows) == 40
-    assert all(row["safety_violations"] == "0" for row in rows)
+    assert sum(row["planner_success"] == "true" for row in rows) == 40
+    assert all(row["planner_safety_violations"] == "0" for row in rows)
+    assert all(row["geometry_safety_violations"] == "0" for row in rows)
     assert all(row["smoothing_certified"] == "true" for row in rows)
-    assert all(float(row["minimum_dynamic_separation_m"]) > 0 for row in rows)
-    assert all(row["minimum_separation_obstacle_id"] for row in rows)
-    assert all(row["minimum_separation_obstacle_kind"] for row in rows)
-    assert all(row["minimum_separation_exact"] in {"true", "false"} for row in rows)
+    assert all(float(row["planner_minimum_separation_m"]) > 0 for row in rows)
+    assert all(row["planner_minimum_separation_obstacle_id"] for row in rows)
+    assert all(row["planner_minimum_separation_obstacle_kind"] for row in rows)
+    assert all(row["planner_minimum_separation_exact"] in {"true", "false"} for row in rows)
+    assert all(
+        row["execution_status"] == "qualified"
+        if row["execution_qualified"] == "true"
+        else not row["execution_waypoint_count"]
+        for row in rows
+    )
     assert all(int(row["raw_reversal_count"]) >= 0 for row in rows)
     assert all(int(row["output_reversal_count"]) >= 0 for row in rows)
     assert all(float(row["output_max_discrete_velocity_change_mps"]) >= 0 for row in rows)
     assert all(float(row["output_max_discrete_acceleration_proxy_mps2"]) >= 0 for row in rows)
     assert all(float(row["output_max_abs_climb_rate_mps"]) >= 0 for row in rows)
     assert all(int(row["raw_waypoint_count"]) > 0 for row in rows)
-    assert all(int(row["waypoint_count"]) > 0 for row in rows)
+    assert all(int(row["geometry_waypoint_count"]) > 0 for row in rows)
 
 
 def test_export_writes_self_describing_downloads(
@@ -392,16 +478,16 @@ def test_predictive_cli_lists_and_writes_a_timed_run(
     )
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert status == 0
-    assert payload["schema_version"] == "predictive-run-v2"
+    assert payload["schema_version"] == "predictive-run-v3"
     assert payload["planner_id"] == "space-time-astar-4d"
-    assert payload["metrics"]["success"] is True
+    assert payload["planner_metrics"]["success"] is True
     assert payload["raw_timed_path"]["waypoints"]
-    assert payload["timed_path"]["waypoints"]
+    assert payload["geometry_timed_path"]["waypoints"]
     assert payload["smoothing"]["certified"] is True
-    assert payload["timed_path"]["wait_time_s"] > 0
+    assert payload["geometry_timed_path"]["wait_time_s"] > 0
 
 
-def test_predictive_cli_help_describes_v05_city_and_certified_smoothing(
+def test_predictive_cli_help_describes_v07_evidence_layers(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exit_info:
@@ -409,5 +495,5 @@ def test_predictive_cli_help_describes_v05_city_and_certified_smoothing(
 
     assert exit_info.value.code == 0
     help_text = capsys.readouterr().out
-    assert "v0.6 complex-city" in help_text
-    assert "certified" in help_text
+    assert "v0.7" in help_text
+    assert "execution" in help_text

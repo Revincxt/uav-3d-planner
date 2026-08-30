@@ -137,64 +137,115 @@ and cross-checks the CSV and manifest.
 
 ## Predictive path and Web bundle
 
-`predictive-run-v2` contains a semantic dynamic-scenario fingerprint, one of four planner-condition
-IDs, numeric protocol parameters, a raw timestamped planner path, a certified timestamped execution
-path, smoothing diagnostics, and mission metrics. `TimedPath` timestamps must increase strictly.
-Its first action is `start`; each later segment is explicitly classified as `move` or `wait`, and
-that classification must agree with its endpoint positions.
+`predictive-run-v3` contains a semantic dynamic-scenario fingerprint, one of four planner-condition
+IDs, numeric protocol parameters, three explicitly separated evidence layers, post-processing and
+qualification diagnostics, and layer-specific metrics. Every timestamped path has strictly
+increasing times. Its first point is the exact start; equal-position segments are waits and all
+other segments are movement. Failed planner runs never acquire a fabricated downstream trajectory.
 
-`web/public/predictive-data.json` is schema version `2`, uses protocol identifier
-`predictive-space-time-v3`, and carries the verification status
-`PREDICTIVE_DEMO_NON_CONFIRMATORY`. Version 0.6 contains ten scenarios and one run for each
-condition, producing 40 deterministic mission records. The added `braided-skyway` and
-`harbor-switchback` cases are extended-city diagnostics with 20 unequal-height buildings, one
-static no-fly volume, two temporary restrictions, and two moving hazards each. The four conditions
-remain:
+`web/public/predictive-data.json` is schema version `3`, uses protocol identifier
+`predictive-space-time-v4`, dataset identifier `predictive-execution-envelope-v0.7`, and verification
+status `PREDICTIVE_DEMO_NON_CONFIRMATORY`. It deliberately reuses the fixed v0.6 matrix: ten
+scenarios and one run for each of four conditions, producing 40 paired deterministic mission
+records. The scenario is the independent unit (`n = 10`); the 40 rows, path samples, frames, waits,
+and replanning epochs are not independent samples. The four conditions remain:
 
 - repeated 3D A*;
 - D* Lite reset at every epoch;
 - D* Lite with state reuse;
 - 4D Space-Time A* with the complete deterministic schedule.
 
-Every run exports `rawTimedPath` and `timedPath`. The former is the direct planner/simulator output;
-the latter is either a common sampled circular-fillet polyline that passed the continuous
-space-time audit or an explicit certified raw fallback. The smoothing object records the method,
-`collisionCertified`, its dense-piecewise-linear certification scope, input/output waypoint counts,
-rounded-corner count, requested/applied radius, sample spacing, and maximum sampled turn angle before
-and after processing. Wait blocks are hard boundaries: their positions and absolute timestamps are
-preserved.
+Version 0.6 is a paired historical baseline. Its rows must not be pooled with v0.7 as though they
+were new scenarios. Scenario inclusion and all envelope thresholds are frozen before running the
+planners; the number of qualified execution candidates is an exported result, not a release gate.
 
-`kinematicDiagnostics` contains `raw` and `output` measurements derived from segment-average
-velocities: segment and movement counts, reversal count and threshold, maximum speed, maximum
-adjacent velocity change, a finite-difference acceleration proxy, and maximum absolute climb rate.
-Both the wrapper and each path record declare `continuousDynamicsCertified = false` (or the
-snake-case equivalent). These are waypoint diagnostics, not bounds on continuous acceleration,
-attitude, curvature, jerk, or actuator dynamics.
+### Predictive evidence layers
 
-Explicit wait intervals retain their reasons. `waitTimeS` is total stationary time, including short
-time-lattice alignment waits. Work units are carried in each metric record and are not normalized
-across algorithms. Compact presentation frames retain only semantic event anchors: timestamp,
-vehicle position, active temporary-zone IDs, moving-sphere states, and event annotation. Path arrays
-and uneventful dense smoothing samples are not duplicated inside frames; the Web client derives
-continuous positions, prefixes, and suffixes from `timedPath`.
+Every run exposes these path/metric pairs:
 
-Predictive metrics include `minimumSeparationM` and `minimumSeparationWitness`. Separation is the
-physical surface-to-surface distance after subtracting the vehicle radius; the declared safety
-margin is stored separately in the witness. The witness contains its time, vehicle position,
-nearest obstacle-surface position, obstacle ID/kind, method, `exact` flag, and declared margin.
-Moving-sphere witnesses are exact under piecewise-linear relative motion. Temporary-cylinder
-witnesses use a deterministic convex distance search and explicitly carry `exact: false`. Neither
-field changes the independent continuous collision verdict.
+| Path | Metric object | Contract |
+| --- | --- | --- |
+| `rawTimedPath` | `plannerMetrics` | Direct planner or online-policy output; every path-derived planner metric is computed only from this path. |
+| `geometryTimedPath` | `geometryMetrics` | Common rounded geometry under the original timing, independently collision-audited. |
+| nullable `executionTimedPath` | nullable `executionMetrics` | Deterministically retimed geometry candidate, exported only after qualification and a new collision audit. |
 
-`predictive-records.csv` projects the same closest-approach distance, witness time, obstacle
-identity/kind, and exactness flag. It also carries raw/output reversal counts and the output
-velocity-change, acceleration-proxy, and climb-rate diagnostics so downloaded records can be
-audited without parsing the dense trajectory arrays.
+The top-level run `status` and `failureReason` are planner-domain outcomes. A downstream geometry or
+execution failure does not change planner success. Likewise, geometry or execution lengths, arrival
+times, waits, separation witnesses, or safety outcomes must not be copied into `plannerMetrics`.
+`executionMetrics` and `executionTimedPath` are both null when qualification fails.
+
+Each metric object contains success and failure state, arrival/travel/wait time, path length, direct
+distance and path excess, replans, algorithm-specific work and unit, safety violations, and a
+closest-approach diagnostic. Work units are carried through each domain for provenance but are not
+normalized across algorithm families.
+
+`geometryWaitIntervals` and nullable `executionWaitIntervals` retain explicit wait reasons. Compact
+`geometryFrames` and nullable `executionFrames` retain semantic event anchors: timestamp, vehicle
+position, active temporary-zone IDs, moving-sphere states, and event annotation. Uneventful dense
+path samples are not duplicated inside frames; the Web client derives intermediate playback state
+from the selected path.
+
+### Geometry and execution diagnostics
+
+The `smoothing` object describes the common geometry stage: method, applied/certified state,
+dense-piecewise-linear collision scope, input/output waypoint counts, rounded-corner count,
+requested/applied radius, sample spacing, and sampled maximum turn angle before and after rounding.
+Wait blocks remain hard geometry boundaries under the original timing.
+
+`smoothing.kinematicDiagnostics.raw` and `.output` contain measurements derived from
+segment-average velocities: segment and movement counts, reversal count and threshold, maximum
+speed, maximum adjacent velocity change, an interior finite-difference acceleration proxy, and
+maximum absolute climb rate. These remain descriptive diagnostics.
+
+`smoothing.execution` records the optional time-parameterization outcome, including status,
+qualification flag, collision-audit flag and scope, frozen envelope, boundary-aware qualification,
+iteration count, original/candidate durations, and added duration. The envelope is:
+
+| Field | Frozen value |
+| --- | ---: |
+| `maxSpeedMps` | `8.0` |
+| `maxAbsClimbRateMps` | `3.0` |
+| `maxDiscreteAccelerationProxyMps2` | `4.0` |
+| `reversalThresholdDeg` | `150.0` |
+| `allowReversals` | `false` |
+| `maxExecutionTimeS` | `90.0` |
+
+The boundary-aware acceleration proxy includes virtual zero velocity at the start and end of every
+movement block, including boundaries created by waits. Wait duration is not treated as additional
+braking time. Retiming keeps geometry and actions fixed, never shortens a movement-segment duration,
+and preserves every wait duration. Because later absolute timestamps may change, a candidate must
+pass the continuous space-time collision audit again. An unrepairable reversal, time-limit failure,
+non-convergence, or post-retiming collision leaves the execution path and metrics null and records an
+explicit status.
+
+All envelope and qualification records declare `continuousDynamicsCertified: false`. The schema
+does not represent continuous acceleration, attitude, thrust, curvature, jerk, actuator limits,
+tracking error, wind, or regulatory flight certification. A qualified record is therefore a
+discrete waypoint-envelope result, not a vehicle-dynamics or operational-safety certificate.
+
+### Separation witnesses and artifact validation
+
+Each metric domain can contain its own `minimumSeparationM` and `minimumSeparationWitness`.
+Separation is physical surface-to-surface distance after subtracting the vehicle radius; the
+declared safety margin is stored separately. A witness contains time, vehicle and nearest
+obstacle-surface positions, obstacle ID/kind, method, `exact` flag, and declared margin. Moving-
+sphere witnesses are exact under the piecewise-linear relative-motion model. Temporary-cylinder
+witnesses use a deterministic convex distance search and explicitly carry `exact: false`. A witness
+does not replace the independent continuous collision verdict.
+
+`predictive-records.csv` uses explicit `planner_`, `geometry_`, and `execution_` prefixes for
+layer-specific values. It projects the planner witness fields, geometry and execution outcomes,
+execution status and duration increase, and raw/output discrete diagnostics so the domain boundary
+remains visible without parsing dense arrays.
 
 The bundle references `predictive-records.csv` and `predictive-scenario-manifest.json` by byte size
-and SHA-256. Python reruns all 40 deterministic missions, independently collision-audits both raw
-and certified timestamped paths, and cross-checks the JSON/CSV/manifest identities. JavaScript
-independently validates structural geometry bounds, temporal order, endpoints, waits, smoothing,
-frames, metrics, digests, and run-count invariants; it does not repeat the continuous collision
-calculation. Predictive public floats are rounded to eleven decimal places at the serialization
-boundary so platform-level `libm` drift cannot change deterministic evidence bytes.
+and SHA-256. Python reruns all 40 deterministic missions, independently collision-audits raw,
+geometry, and every non-null execution path, and cross-checks JSON/CSV/manifest identities.
+JavaScript independently validates structural geometry bounds, temporal order, endpoints, waits,
+evidence-layer consistency, frames, metrics, digests, and run-count invariants; it does not repeat
+the continuous collision calculation. Predictive public floats are rounded to eleven decimal places
+at the serialization boundary so platform-level `libm` drift cannot change deterministic evidence
+bytes.
+
+The frozen experimental contract is documented in the
+[v0.7 execution-envelope experiment plan](v0.7-execution-envelope-plan.md).

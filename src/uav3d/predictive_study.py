@@ -1,4 +1,4 @@
-"""Fixed v0.6 protocol for complex-city predictive planning demonstrations."""
+"""Fixed v0.7 protocol for planning, geometry, and execution-candidate evidence."""
 
 from __future__ import annotations
 
@@ -16,7 +16,12 @@ from pathlib import Path
 from uav3d.dynamic import DynamicScenario, dynamic_scenario_fingerprint
 from uav3d.dynamic_collision import DynamicSeparationWitness, minimum_dynamic_separation
 from uav3d.geometry import Point3, almost_equal, distance, polyline_length
-from uav3d.kinematics import DiscreteKinematicDiagnostics, diagnose_timed_path_kinematics
+from uav3d.kinematics import (
+    DiscreteExecutionEnvelope,
+    DiscreteExecutionQualification,
+    DiscreteKinematicDiagnostics,
+    diagnose_timed_path_kinematics,
+)
 from uav3d.planners.space_time_astar import SpaceTimeAStar3D, SpaceTimeAStarConfig
 from uav3d.predictive import TimedPath, TimedWaypoint
 from uav3d.predictive_scenarios import build_predictive_cohort, load_predictive_scenario
@@ -26,13 +31,13 @@ from uav3d.predictive_smoothing import (
 )
 from uav3d.replanning import DynamicFrame, DynamicRun, simulate_replanning
 
-PROTOCOL_ID = "predictive-space-time-v3"
+PROTOCOL_ID = "predictive-space-time-v4"
 VERIFICATION_STATUS = "PREDICTIVE_DEMO_NON_CONFIRMATORY"
 # Eleven decimal places remain far below the spatial and temporal resolution of the
 # protocol while absorbing platform-level libm drift observed in the twelfth place.
 SERIALIZATION_DECIMAL_PLACES = 11
 # Kinematic diagnostics involve square-root and division chains whose accumulated
-# platform-level libm drift can reach the ninth decimal place.  Eight places keep
+# platform-level libm drift can reach the ninth decimal place. Eight places keep
 # values stable across CPython builds while preserving ample diagnostic precision.
 KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES = 8
 
@@ -47,7 +52,15 @@ PREDICTION_HORIZON_S = 90.0
 MAX_EXPANDED_STATES = 240_000
 SMOOTHING_TURN_RADIUS_M = 6.0
 SMOOTHING_SAMPLE_SPACING_M = 0.5
-TRAJECTORY_POSTPROCESSOR = "wait-preserving-certified-sampled-circular-fillet-v1"
+TRAJECTORY_POSTPROCESSOR = "certified-fillet-plus-discrete-execution-envelope-v2"
+EXECUTION_ENVELOPE = DiscreteExecutionEnvelope(
+    max_speed_mps=8.0,
+    max_abs_climb_rate_mps=3.0,
+    max_discrete_acceleration_proxy_mps2=4.0,
+    reversal_threshold_deg=150.0,
+    allow_reversals=False,
+    max_execution_time_s=90.0,
+)
 
 PREDICTIVE_ALGORITHMS = (
     "repeated-astar-3d",
@@ -89,24 +102,44 @@ RECORD_FIELDS = (
     "predictive",
     "status",
     "failure_reason",
-    "success",
-    "arrival_time_s",
-    "travel_time_s",
-    "wait_time_s",
-    "executed_path_length_m",
+    "planner_success",
+    "planner_arrival_time_s",
+    "planner_travel_time_s",
+    "planner_wait_time_s",
+    "planner_path_length_m",
     "direct_distance_m",
-    "path_excess_pct",
+    "planner_path_excess_pct",
     "replans",
     "expanded_states",
     "work_unit",
-    "minimum_dynamic_separation_m",
-    "minimum_separation_time_s",
-    "minimum_separation_obstacle_id",
-    "minimum_separation_obstacle_kind",
-    "minimum_separation_exact",
-    "safety_violations",
+    "planner_minimum_separation_m",
+    "planner_minimum_separation_time_s",
+    "planner_minimum_separation_obstacle_id",
+    "planner_minimum_separation_obstacle_kind",
+    "planner_minimum_separation_exact",
+    "planner_safety_violations",
+    "geometry_success",
+    "geometry_arrival_time_s",
+    "geometry_travel_time_s",
+    "geometry_wait_time_s",
+    "geometry_path_length_m",
+    "geometry_path_excess_pct",
+    "geometry_minimum_separation_m",
+    "geometry_safety_violations",
+    "execution_status",
+    "execution_qualified",
+    "execution_collision_certified",
+    "execution_arrival_time_s",
+    "execution_travel_time_s",
+    "execution_wait_time_s",
+    "execution_path_length_m",
+    "execution_path_excess_pct",
+    "execution_minimum_separation_m",
+    "execution_safety_violations",
+    "execution_added_duration_s",
     "raw_waypoint_count",
-    "waypoint_count",
+    "geometry_waypoint_count",
+    "execution_waypoint_count",
     "smoothing_method",
     "smoothing_applied",
     "smoothing_certified",
@@ -174,19 +207,34 @@ class PredictiveEpisode:
     timed_path: TimedPath
     smoothing: PredictiveSmoothingResult
     metrics: PredictiveEpisodeMetrics
+    geometry_metrics: PredictiveEpisodeMetrics
+    execution_metrics: PredictiveEpisodeMetrics | None
+
+    @property
+    def execution_timed_path(self) -> TimedPath | None:
+        return self.smoothing.execution_candidate
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "schema_version": "predictive-run-v2",
+            "schema_version": "predictive-run-v3",
             "scenario_id": self.scenario_id,
             "scenario_fingerprint": self.scenario_fingerprint,
             "planner_id": self.planner_id,
             "predictive": self.predictive,
             "parameters": self.parameters,
             "raw_timed_path": self.raw_timed_path.to_dict(),
-            "timed_path": self.timed_path.to_dict(),
+            "geometry_timed_path": self.timed_path.to_dict(),
+            "execution_timed_path": (
+                self.execution_timed_path.to_dict()
+                if self.execution_timed_path is not None
+                else None
+            ),
             "smoothing": self.smoothing.to_dict(),
-            "metrics": self.metrics.to_dict(),
+            "planner_metrics": self.metrics.to_dict(),
+            "geometry_metrics": self.geometry_metrics.to_dict(),
+            "execution_metrics": (
+                self.execution_metrics.to_dict() if self.execution_metrics is not None else None
+            ),
         }
 
 
@@ -218,9 +266,16 @@ def _protocol() -> dict[str, object]:
         "predictiveMaxExpandedStatesPerMission": MAX_EXPANDED_STATES,
         "reactiveReplanIntervalS": REPLAN_INTERVAL_S,
         "trajectoryPostprocessor": TRAJECTORY_POSTPROCESSOR,
+        "executionEnvelope": _export_execution_envelope(EXECUTION_ENVELOPE),
+        "continuousDynamicsCertified": False,
         "informationModel": "reactive snapshots and deterministic complete-schedule conditions",
         "analysisBoundary": "scenario-level descriptive contrasts; no pooled effect estimator",
         "independenceUnit": "scenario",
+        "metricDomains": {
+            "plannerMetrics": "raw planner or simulator output only",
+            "geometryMetrics": "common collision-certified geometric post-processing",
+            "executionMetrics": "optional discrete-envelope-qualified retimed candidate",
+        },
     }
 
 
@@ -240,7 +295,7 @@ def predictive_run_id(
     }
     payload = json.dumps(
         {
-            "schema": "uav3d-predictive-run-v2",
+            "schema": "uav3d-predictive-run-v3",
             "scenario_fingerprint": scenario_fingerprint,
             "planner_id": planner_id,
             "protocol": protocol,
@@ -321,6 +376,7 @@ def _postprocess_trajectory(
             requested_radius_m=SMOOTHING_TURN_RADIUS_M,
             sample_spacing_m=SMOOTHING_SAMPLE_SPACING_M,
             max_speed_mps=CRUISE_SPEED_MPS,
+            execution_envelope=EXECUTION_ENVELOPE,
         )
     return PredictiveSmoothingResult(
         timed_path=raw_timed_path,
@@ -337,6 +393,50 @@ def _postprocess_trajectory(
         max_turn_after_deg=0.0,
         raw_kinematics=diagnose_timed_path_kinematics(raw_timed_path),
         output_kinematics=diagnose_timed_path_kinematics(raw_timed_path),
+        execution_envelope=EXECUTION_ENVELOPE,
+    )
+
+
+def _path_metrics(
+    scenario: DynamicScenario,
+    path: TimedPath,
+    *,
+    planner_success: bool,
+    planner_failure_reason: str | None,
+    path_safe: bool,
+    replans: int,
+    expanded_states: int,
+    work_unit: str,
+    observed_safety_violations: int = 0,
+) -> PredictiveEpisodeMetrics:
+    """Measure one evidence layer without borrowing geometry from another layer."""
+
+    direct = distance(scenario.static_scene.start, scenario.static_scene.goal)
+    length = polyline_length(path.positions)
+    separation_witness = minimum_dynamic_separation(scenario, path.timed_points)
+    success = planner_success and path_safe
+    failure_reason = None
+    if not success:
+        failure_reason = planner_failure_reason or (
+            "trajectory-audit-failed" if not path_safe else "planner-did-not-succeed"
+        )
+    return PredictiveEpisodeMetrics(
+        success=success,
+        failure_reason=failure_reason,
+        arrival_time_s=path.arrival_time_s if success else None,
+        travel_time_s=(path.duration_s - path.wait_time_s) if success else None,
+        wait_time_s=path.wait_time_s,
+        executed_path_length_m=length,
+        direct_distance_m=direct,
+        path_excess_ratio=(length / direct - 1.0) if success and direct > 0 else None,
+        replans=replans,
+        expanded_states=expanded_states,
+        work_unit=work_unit,
+        minimum_separation_m=(
+            separation_witness.separation_m if separation_witness is not None else None
+        ),
+        minimum_separation_witness=separation_witness,
+        safety_violations=max(observed_safety_violations, 0 if path_safe else 1),
     )
 
 
@@ -362,31 +462,47 @@ def _reactive_episode(
     raw_safe = raw_timed_path.is_safe(scenario)
     smoothing = _postprocess_trajectory(scenario, raw_timed_path, raw_safe=raw_safe)
     timed_path = smoothing.timed_path
-    safe = smoothing.certified and timed_path.is_safe(scenario)
-    direct = distance(scenario.static_scene.start, scenario.static_scene.goal)
-    length = polyline_length(timed_path.positions)
-    separation_witness = minimum_dynamic_separation(scenario, timed_path.timed_points)
-    success = run.metrics.success and safe
-    arrival = timed_path.arrival_time_s if success else None
-    metrics = PredictiveEpisodeMetrics(
-        success=success,
-        failure_reason=None
-        if success
-        else (run.metrics.failure_reason or "trajectory-audit-failed"),
-        arrival_time_s=arrival,
-        travel_time_s=(timed_path.duration_s - timed_path.wait_time_s) if success else None,
-        wait_time_s=timed_path.wait_time_s,
-        executed_path_length_m=length,
-        direct_distance_m=direct,
-        path_excess_ratio=(length / direct - 1.0) if success and direct > 0 else None,
-        replans=run.metrics.replans,
-        expanded_states=run.metrics.total_planning_work,
-        work_unit=WORK_UNITS[planner_id],
-        minimum_separation_m=(
-            separation_witness.separation_m if separation_witness is not None else None
-        ),
-        minimum_separation_witness=separation_witness,
-        safety_violations=run.metrics.collision_count + (0 if safe else 1),
+    replans = run.metrics.replans
+    expanded_states = run.metrics.total_planning_work
+    work_unit = WORK_UNITS[planner_id]
+    metrics = _path_metrics(
+        scenario,
+        raw_timed_path,
+        planner_success=run.metrics.success,
+        planner_failure_reason=run.metrics.failure_reason,
+        path_safe=raw_safe,
+        observed_safety_violations=run.metrics.collision_count,
+        replans=replans,
+        expanded_states=expanded_states,
+        work_unit=work_unit,
+    )
+    geometry_safe = smoothing.certified and timed_path.is_safe(scenario)
+    geometry_metrics = _path_metrics(
+        scenario,
+        timed_path,
+        planner_success=metrics.success,
+        planner_failure_reason=metrics.failure_reason,
+        path_safe=geometry_safe,
+        replans=replans,
+        expanded_states=expanded_states,
+        work_unit=work_unit,
+    )
+    execution_path = smoothing.execution_candidate
+    execution_metrics = (
+        _path_metrics(
+            scenario,
+            execution_path,
+            planner_success=metrics.success,
+            planner_failure_reason=metrics.failure_reason,
+            path_safe=(
+                smoothing.execution_collision_certified and execution_path.is_safe(scenario)
+            ),
+            replans=replans,
+            expanded_states=expanded_states,
+            work_unit=work_unit,
+        )
+        if execution_path is not None
+        else None
     )
     parameters: dict[str, float | int] = {
         "timeStepS": TIME_STEP_S,
@@ -410,6 +526,8 @@ def _reactive_episode(
         timed_path,
         smoothing,
         metrics,
+        geometry_metrics,
+        execution_metrics,
     )
 
 
@@ -428,28 +546,46 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
     raw_safe = raw_timed_path.is_safe(scenario)
     smoothing = _postprocess_trajectory(scenario, raw_timed_path, raw_safe=raw_safe)
     timed_path = smoothing.timed_path
-    trajectory_safe = smoothing.certified and timed_path.is_safe(scenario)
-    direct = distance(scenario.static_scene.start, scenario.static_scene.goal)
-    length = polyline_length(timed_path.positions)
-    separation_witness = minimum_dynamic_separation(scenario, timed_path.timed_points)
-    success = result.success and trajectory_safe
-    metrics = PredictiveEpisodeMetrics(
-        success=success,
-        failure_reason=None if success else (result.failure_reason or "trajectory-audit-failed"),
-        arrival_time_s=timed_path.arrival_time_s if success else None,
-        travel_time_s=(timed_path.duration_s - timed_path.wait_time_s) if success else None,
-        wait_time_s=timed_path.wait_time_s,
-        executed_path_length_m=length,
-        direct_distance_m=direct,
-        path_excess_ratio=(length / direct - 1.0) if success and direct > 0 else None,
-        replans=1,
-        expanded_states=result.expanded_spacetime_states,
-        work_unit=WORK_UNITS[result.algorithm],
-        minimum_separation_m=(
-            separation_witness.separation_m if separation_witness is not None else None
-        ),
-        minimum_separation_witness=separation_witness,
-        safety_violations=0 if trajectory_safe else 1,
+    replans = 1
+    expanded_states = result.expanded_spacetime_states
+    work_unit = WORK_UNITS[result.algorithm]
+    metrics = _path_metrics(
+        scenario,
+        raw_timed_path,
+        planner_success=result.success,
+        planner_failure_reason=result.failure_reason,
+        path_safe=raw_safe,
+        replans=replans,
+        expanded_states=expanded_states,
+        work_unit=work_unit,
+    )
+    geometry_safe = smoothing.certified and timed_path.is_safe(scenario)
+    geometry_metrics = _path_metrics(
+        scenario,
+        timed_path,
+        planner_success=metrics.success,
+        planner_failure_reason=metrics.failure_reason,
+        path_safe=geometry_safe,
+        replans=replans,
+        expanded_states=expanded_states,
+        work_unit=work_unit,
+    )
+    execution_path = smoothing.execution_candidate
+    execution_metrics = (
+        _path_metrics(
+            scenario,
+            execution_path,
+            planner_success=metrics.success,
+            planner_failure_reason=metrics.failure_reason,
+            path_safe=(
+                smoothing.execution_collision_certified and execution_path.is_safe(scenario)
+            ),
+            replans=replans,
+            expanded_states=expanded_states,
+            work_unit=work_unit,
+        )
+        if execution_path is not None
+        else None
     )
     parameters: dict[str, float | int] = {
         "timeStepS": TIME_STEP_S,
@@ -474,6 +610,8 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
         timed_path,
         smoothing,
         metrics,
+        geometry_metrics,
+        execution_metrics,
     )
 
 
@@ -530,13 +668,13 @@ def _normalize_record_numbers(value: object) -> object:
     raise TypeError(f"unsupported predictive export value: {type(value).__name__}")
 
 
-def _wait_intervals(episode: PredictiveEpisode) -> list[dict[str, object]]:
+def _wait_intervals(path: TimedPath, *, predictive: bool) -> list[dict[str, object]]:
     intervals: list[dict[str, object]] = []
-    for previous, current in pairwise(episode.timed_path.waypoints):
+    for previous, current in pairwise(path.waypoints):
         if current.action != "wait":
             continue
         duration = current.time_s - previous.time_s
-        if not episode.predictive:
+        if not predictive:
             reason = "reactive safety hold"
         elif duration < TIME_RESOLUTION_S - 1e-12:
             reason = "time-lattice alignment"
@@ -554,22 +692,21 @@ def _wait_intervals(episode: PredictiveEpisode) -> list[dict[str, object]]:
 
 
 def _frame_event(
-    episode: PredictiveEpisode,
+    path: TimedPath,
+    *,
+    predictive: bool,
+    success: bool,
     index: int,
     active: tuple[str, ...],
     previous_active: tuple[str, ...],
 ) -> dict[str, str | None]:
-    waypoint = episode.timed_path.waypoints[index]
-    following = (
-        episode.timed_path.waypoints[index + 1]
-        if index + 1 < len(episode.timed_path.waypoints)
-        else None
-    )
+    waypoint = path.waypoints[index]
+    following = path.waypoints[index + 1] if index + 1 < len(path.waypoints) else None
     activated = sorted(set(active) - set(previous_active))
     deactivated = sorted(set(previous_active) - set(active))
-    if index == len(episode.timed_path.waypoints) - 1 and episode.metrics.success:
+    if index == len(path.waypoints) - 1 and success:
         return {"kind": "goal-reached", "label": "Goal reached", "subjectId": None}
-    if index == len(episode.timed_path.waypoints) - 1 and not episode.metrics.success:
+    if index == len(path.waypoints) - 1 and not success:
         return {"kind": "no-path", "label": "Goal not reached", "subjectId": None}
     waiting_before = waypoint.action == "wait"
     waiting_after = following is not None and following.action == "wait"
@@ -593,26 +730,37 @@ def _frame_event(
         }
     if index == 0:
         return {
-            "kind": "prediction-update" if episode.predictive else "replan",
-            "label": "Full schedule planned" if episode.predictive else "Reactive plan initialized",
+            "kind": "prediction-update" if predictive else "replan",
+            "label": "Full schedule planned" if predictive else "Reactive plan initialized",
             "subjectId": None,
         }
     return {"kind": "none", "label": "Nominal execution", "subjectId": None}
 
 
 def _export_frames(
-    scenario: DynamicScenario, episode: PredictiveEpisode
+    scenario: DynamicScenario,
+    path: TimedPath,
+    *,
+    predictive: bool,
+    success: bool,
 ) -> list[dict[str, object]]:
     """Export semantic event anchors without duplicating dense trajectory samples."""
 
-    waypoints = episode.timed_path.waypoints
+    waypoints = path.waypoints
     previous_active: tuple[str, ...] = ()
     frames: list[dict[str, object]] = []
     for index, waypoint in enumerate(waypoints):
         active = tuple(
             zone.zone_id for zone in scenario.temporary_cylinders if zone.is_active(waypoint.time_s)
         )
-        event = _frame_event(episode, index, active, previous_active)
+        event = _frame_event(
+            path,
+            predictive=predictive,
+            success=success,
+            index=index,
+            active=active,
+            previous_active=previous_active,
+        )
         if event["kind"] != "none":
             frames.append(
                 {
@@ -665,7 +813,7 @@ def _export_kinematic_diagnostics(
 ) -> dict[str, object]:
     """Serialize finite-difference diagnostics without changing their internal API."""
 
-    def _rd(value: float) -> float:
+    def _rounded(value: float) -> float:
         return round(value, KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES)
 
     return {
@@ -674,16 +822,45 @@ def _export_kinematic_diagnostics(
         "segmentCount": diagnostics.segment_count,
         "movementSegmentCount": diagnostics.movement_segment_count,
         "reversalCount": diagnostics.reversal_count,
-        "reversalThresholdDeg": _rd(diagnostics.reversal_threshold_deg),
-        "maxSpeedMps": _rd(diagnostics.max_speed_mps),
-        "maxDiscreteVelocityChangeMps": _rd(diagnostics.max_discrete_velocity_change_mps),
-        "maxDiscreteAccelerationProxyMps2": _rd(diagnostics.max_discrete_acceleration_proxy_mps2),
-        "maxAbsClimbRateMps": _rd(diagnostics.max_abs_climb_rate_mps),
+        "reversalThresholdDeg": _rounded(diagnostics.reversal_threshold_deg),
+        "maxSpeedMps": _rounded(diagnostics.max_speed_mps),
+        "maxDiscreteVelocityChangeMps": _rounded(diagnostics.max_discrete_velocity_change_mps),
+        "maxDiscreteAccelerationProxyMps2": _rounded(
+            diagnostics.max_discrete_acceleration_proxy_mps2
+        ),
+        "maxAbsClimbRateMps": _rounded(diagnostics.max_abs_climb_rate_mps),
     }
 
 
-def _export_metrics(episode: PredictiveEpisode) -> dict[str, object]:
-    metrics = episode.metrics
+def _export_execution_envelope(envelope: DiscreteExecutionEnvelope) -> dict[str, object]:
+    return {
+        "model": "discrete-segment-average-envelope-v1",
+        "maxSpeedMps": envelope.max_speed_mps,
+        "maxAbsClimbRateMps": envelope.max_abs_climb_rate_mps,
+        "maxDiscreteAccelerationProxyMps2": (envelope.max_discrete_acceleration_proxy_mps2),
+        "reversalThresholdDeg": envelope.reversal_threshold_deg,
+        "allowReversals": envelope.allow_reversals,
+        "maxExecutionTimeS": envelope.max_execution_time_s,
+        "continuousDynamicsCertified": False,
+    }
+
+
+def _export_execution_qualification(
+    qualification: DiscreteExecutionQualification,
+) -> dict[str, object]:
+    return {
+        "status": "qualified" if qualification.qualified else "not-qualified",
+        "qualified": qualification.qualified,
+        "continuousDynamicsCertified": False,
+        "diagnostics": _export_kinematic_diagnostics(qualification.diagnostics),
+        "boundaryAwareMaxDiscreteAccelerationProxyMps2": (
+            qualification.boundary_aware_max_discrete_acceleration_proxy_mps2
+        ),
+        "violations": list(qualification.violations),
+    }
+
+
+def _export_metrics(metrics: PredictiveEpisodeMetrics) -> dict[str, object]:
     return {
         "success": metrics.success,
         "failureReason": metrics.failure_reason,
@@ -727,10 +904,18 @@ def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[s
             {"timeS": waypoint.time_s, "position": list(waypoint.position)}
             for waypoint in episode.raw_timed_path.waypoints
         ],
-        "timedPath": [
+        "geometryTimedPath": [
             {"timeS": waypoint.time_s, "position": list(waypoint.position)}
             for waypoint in episode.timed_path.waypoints
         ],
+        "executionTimedPath": (
+            [
+                {"timeS": waypoint.time_s, "position": list(waypoint.position)}
+                for waypoint in episode.execution_timed_path.waypoints
+            ]
+            if episode.execution_timed_path is not None
+            else None
+        ),
         "smoothing": {
             "method": smoothing.method,
             "applied": smoothing.applied,
@@ -751,10 +936,63 @@ def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[s
                 "raw": _export_kinematic_diagnostics(smoothing.raw_kinematics),
                 "output": _export_kinematic_diagnostics(smoothing.output_kinematics),
             },
+            "execution": {
+                "status": smoothing.execution_status,
+                "qualified": smoothing.execution_qualified,
+                "collisionCertified": smoothing.execution_collision_certified,
+                "collisionCertificationScope": ("dense-piecewise-linear-space-time-path"),
+                "continuousDynamicsCertified": False,
+                "envelope": _export_execution_envelope(smoothing.execution_envelope),
+                "qualification": (
+                    _export_execution_qualification(smoothing.execution_qualification)
+                    if smoothing.execution_qualification is not None
+                    else None
+                ),
+                "timingIterations": smoothing.execution_timing_iterations,
+                "originalDurationS": smoothing.execution_original_duration_s,
+                "candidateDurationS": smoothing.execution_candidate_duration_s,
+                "addedDurationS": (
+                    smoothing.execution_candidate_duration_s
+                    - smoothing.execution_original_duration_s
+                    if smoothing.execution_candidate_duration_s is not None
+                    and smoothing.execution_original_duration_s is not None
+                    else None
+                ),
+            },
         },
-        "waitIntervals": _wait_intervals(episode),
-        "metrics": _export_metrics(episode),
-        "frames": _export_frames(scenario, episode),
+        "geometryWaitIntervals": _wait_intervals(episode.timed_path, predictive=episode.predictive),
+        "executionWaitIntervals": (
+            _wait_intervals(episode.execution_timed_path, predictive=episode.predictive)
+            if episode.execution_timed_path is not None
+            else None
+        ),
+        "plannerMetrics": _export_metrics(episode.metrics),
+        "geometryMetrics": _export_metrics(episode.geometry_metrics),
+        "executionMetrics": (
+            _export_metrics(episode.execution_metrics)
+            if episode.execution_metrics is not None
+            else None
+        ),
+        "geometryFrames": _export_frames(
+            scenario,
+            episode.timed_path,
+            predictive=episode.predictive,
+            success=episode.geometry_metrics.success,
+        ),
+        "executionFrames": (
+            _export_frames(
+                scenario,
+                episode.execution_timed_path,
+                predictive=episode.predictive,
+                success=(
+                    episode.execution_metrics.success
+                    if episode.execution_metrics is not None
+                    else False
+                ),
+            )
+            if episode.execution_timed_path is not None
+            else None
+        ),
     }
 
 
@@ -844,8 +1082,8 @@ def _scenario_manifest(
 ) -> dict[str, object]:
     _, cohort_manifest = build_predictive_cohort()
     return {
-        "schemaVersion": 2,
-        "datasetId": "predictive-complex-city-v0.6",
+        "schemaVersion": 3,
+        "datasetId": "predictive-execution-envelope-v0.7",
         "sourceCommit": source_commit,
         "generatedAt": generated_at,
         "protocolId": PROTOCOL_ID,
@@ -882,7 +1120,7 @@ def build_predictive_bundle(
     _validate_generated_at(timestamp)
     study = run_predictive_study()
     bundle: dict[str, object] = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "generatedAt": timestamp,
         "sourceCommit": source_commit,
         "verificationStatus": VERIFICATION_STATUS,
@@ -926,26 +1164,39 @@ def predictive_record_rows(bundle: dict[str, object]) -> list[dict[str, str]]:
         for run in scenario["runs"]:
             if not isinstance(run, dict):
                 raise TypeError("predictive runs must be objects")
-            metrics = run.get("metrics")
+            planner_metrics = run.get("plannerMetrics")
+            geometry_metrics = run.get("geometryMetrics")
+            execution_metrics = run.get("executionMetrics")
             raw_timed_path = run.get("rawTimedPath")
-            timed_path = run.get("timedPath")
+            geometry_timed_path = run.get("geometryTimedPath")
+            execution_timed_path = run.get("executionTimedPath")
             smoothing = run.get("smoothing")
             parameters = run.get("parameters")
             if (
-                not isinstance(metrics, dict)
+                not isinstance(planner_metrics, dict)
+                or not isinstance(geometry_metrics, dict)
                 or not isinstance(raw_timed_path, list)
-                or not isinstance(timed_path, list)
+                or not isinstance(geometry_timed_path, list)
                 or not isinstance(smoothing, dict)
             ):
                 raise TypeError("predictive run metrics, paths, or smoothing have invalid types")
+            if execution_metrics is not None and not isinstance(execution_metrics, dict):
+                raise TypeError("predictive execution metrics must be an object or null")
+            if execution_timed_path is not None and not isinstance(execution_timed_path, list):
+                raise TypeError("predictive execution path must be an array or null")
+            if (execution_metrics is None) != (execution_timed_path is None):
+                raise TypeError("predictive execution metrics and path availability disagree")
             if not isinstance(parameters, dict):
                 raise TypeError("predictive run parameters must be an object")
-            separation_witness = metrics.get("minimumSeparationWitness")
+            separation_witness = planner_metrics.get("minimumSeparationWitness")
             if separation_witness is not None and not isinstance(separation_witness, dict):
                 raise TypeError("predictive minimum-separation witness must be an object or null")
             kinematic_diagnostics = smoothing.get("kinematicDiagnostics")
+            execution = smoothing.get("execution")
             if not isinstance(kinematic_diagnostics, dict):
                 raise TypeError("predictive kinematic diagnostics must be an object")
+            if not isinstance(execution, dict):
+                raise TypeError("predictive execution qualification must be an object")
             raw_kinematics = kinematic_diagnostics.get("raw")
             output_kinematics = kinematic_diagnostics.get("output")
             if not isinstance(raw_kinematics, dict) or not isinstance(output_kinematics, dict):
@@ -965,38 +1216,84 @@ def predictive_record_rows(bundle: dict[str, object]) -> list[dict[str, str]]:
                     "failure_reason": (
                         "" if run["failureReason"] is None else str(run["failureReason"])
                     ),
-                    "success": str(metrics["success"]).lower(),
-                    "arrival_time_s": _csv_scalar(metrics["arrivalTimeS"]),
-                    "travel_time_s": _csv_scalar(metrics["travelTimeS"]),
-                    "wait_time_s": _csv_scalar(metrics["waitTimeS"]),
-                    "executed_path_length_m": _csv_scalar(metrics["executedPathLengthM"]),
-                    "direct_distance_m": _csv_scalar(metrics["directDistanceM"]),
-                    "path_excess_pct": _csv_scalar(metrics["pathExcessPct"]),
-                    "replans": str(metrics["replans"]),
-                    "expanded_states": str(metrics["expandedStates"]),
-                    "work_unit": str(metrics["workUnit"]),
-                    "minimum_dynamic_separation_m": _csv_scalar(metrics["minimumSeparationM"]),
-                    "minimum_separation_time_s": (
+                    "planner_success": str(planner_metrics["success"]).lower(),
+                    "planner_arrival_time_s": _csv_scalar(planner_metrics["arrivalTimeS"]),
+                    "planner_travel_time_s": _csv_scalar(planner_metrics["travelTimeS"]),
+                    "planner_wait_time_s": _csv_scalar(planner_metrics["waitTimeS"]),
+                    "planner_path_length_m": _csv_scalar(planner_metrics["executedPathLengthM"]),
+                    "direct_distance_m": _csv_scalar(planner_metrics["directDistanceM"]),
+                    "planner_path_excess_pct": _csv_scalar(planner_metrics["pathExcessPct"]),
+                    "replans": str(planner_metrics["replans"]),
+                    "expanded_states": str(planner_metrics["expandedStates"]),
+                    "work_unit": str(planner_metrics["workUnit"]),
+                    "planner_minimum_separation_m": _csv_scalar(
+                        planner_metrics["minimumSeparationM"]
+                    ),
+                    "planner_minimum_separation_time_s": (
                         ""
                         if separation_witness is None
                         else _csv_scalar(separation_witness["timeS"])
                     ),
-                    "minimum_separation_obstacle_id": (
+                    "planner_minimum_separation_obstacle_id": (
                         "" if separation_witness is None else str(separation_witness["obstacleId"])
                     ),
-                    "minimum_separation_obstacle_kind": (
+                    "planner_minimum_separation_obstacle_kind": (
                         ""
                         if separation_witness is None
                         else str(separation_witness["obstacleKind"])
                     ),
-                    "minimum_separation_exact": (
+                    "planner_minimum_separation_exact": (
                         ""
                         if separation_witness is None
                         else str(separation_witness["exact"]).lower()
                     ),
-                    "safety_violations": str(metrics["safetyViolations"]),
+                    "planner_safety_violations": str(planner_metrics["safetyViolations"]),
+                    "geometry_success": str(geometry_metrics["success"]).lower(),
+                    "geometry_arrival_time_s": _csv_scalar(geometry_metrics["arrivalTimeS"]),
+                    "geometry_travel_time_s": _csv_scalar(geometry_metrics["travelTimeS"]),
+                    "geometry_wait_time_s": _csv_scalar(geometry_metrics["waitTimeS"]),
+                    "geometry_path_length_m": _csv_scalar(geometry_metrics["executedPathLengthM"]),
+                    "geometry_path_excess_pct": _csv_scalar(geometry_metrics["pathExcessPct"]),
+                    "geometry_minimum_separation_m": _csv_scalar(
+                        geometry_metrics["minimumSeparationM"]
+                    ),
+                    "geometry_safety_violations": str(geometry_metrics["safetyViolations"]),
+                    "execution_status": str(execution["status"]),
+                    "execution_qualified": str(execution["qualified"]).lower(),
+                    "execution_collision_certified": str(execution["collisionCertified"]).lower(),
+                    "execution_arrival_time_s": _csv_scalar(
+                        None if execution_metrics is None else execution_metrics["arrivalTimeS"]
+                    ),
+                    "execution_travel_time_s": _csv_scalar(
+                        None if execution_metrics is None else execution_metrics["travelTimeS"]
+                    ),
+                    "execution_wait_time_s": _csv_scalar(
+                        None if execution_metrics is None else execution_metrics["waitTimeS"]
+                    ),
+                    "execution_path_length_m": _csv_scalar(
+                        None
+                        if execution_metrics is None
+                        else execution_metrics["executedPathLengthM"]
+                    ),
+                    "execution_path_excess_pct": _csv_scalar(
+                        None if execution_metrics is None else execution_metrics["pathExcessPct"]
+                    ),
+                    "execution_minimum_separation_m": _csv_scalar(
+                        None
+                        if execution_metrics is None
+                        else execution_metrics["minimumSeparationM"]
+                    ),
+                    "execution_safety_violations": (
+                        ""
+                        if execution_metrics is None
+                        else str(execution_metrics["safetyViolations"])
+                    ),
+                    "execution_added_duration_s": _csv_scalar(execution["addedDurationS"]),
                     "raw_waypoint_count": str(len(raw_timed_path)),
-                    "waypoint_count": str(len(timed_path)),
+                    "geometry_waypoint_count": str(len(geometry_timed_path)),
+                    "execution_waypoint_count": (
+                        "" if execution_timed_path is None else str(len(execution_timed_path))
+                    ),
                     "smoothing_method": str(smoothing["method"]),
                     "smoothing_applied": str(smoothing["applied"]).lower(),
                     "smoothing_certified": str(smoothing["certified"]).lower(),
@@ -1048,7 +1345,7 @@ def artifact_reference(path: Path) -> dict[str, str | int]:
 
 
 def export_predictive_study(output_dir: Path, *, source_commit: str) -> dict[str, object]:
-    """Execute the v0.6 protocol and write its self-describing public data bundle."""
+    """Execute the v0.7 protocol and write its self-describing public data bundle."""
 
     bundle, manifest = build_predictive_bundle(source_commit=source_commit)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1071,13 +1368,14 @@ def load_and_run_predictive_episode(scenario_id: str, planner_id: str) -> Predic
 __all__ = [
     "CRUISE_SPEED_MPS",
     "DOWNLOAD_ARTIFACTS",
+    "EXECUTION_ENVELOPE",
+    "KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES",
     "MAX_EXPANDED_STATES",
     "MAX_TIME_S",
     "PLANNER_LABELS",
     "PREDICTION_HORIZON_S",
     "PREDICTIVE_ALGORITHMS",
     "PREDICTIVE_FLAGS",
-    "KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES",
     "PROTOCOL_ID",
     "RECORD_FIELDS",
     "REPLAN_INTERVAL_S",

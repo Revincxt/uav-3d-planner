@@ -7,7 +7,7 @@ import pytest
 
 from uav3d.dynamic import DynamicScenario, MovingSphere, TemporaryCylinder
 from uav3d.dynamic_collision import minimum_dynamic_separation
-from uav3d.kinematics import diagnose_timed_path_kinematics
+from uav3d.kinematics import DiscreteExecutionEnvelope, diagnose_timed_path_kinematics
 from uav3d.predictive import TimedPath, TimedWaypoint
 from uav3d.predictive_smoothing import smooth_predictive_timed_path
 from uav3d.scene import AABB, Bounds3D, Scene
@@ -77,6 +77,15 @@ def test_open_right_angle_is_rounded_and_certified() -> None:
     assert result.timed_path.arrival_time_s == raw.arrival_time_s
     assert max(result.timed_path.segment_speeds()) <= 4.0 + 1e-9
     assert result.timed_path.is_safe(scenario)
+    assert result.geometry_candidate == result.timed_path
+    assert result.execution_status == "qualified"
+    assert result.execution_qualified
+    assert result.execution_candidate is not None
+    assert result.execution_candidate.is_safe(scenario)
+    assert result.execution_candidate.arrival_time_s >= result.timed_path.arrival_time_s
+    assert result.execution_qualification is not None
+    assert result.execution_qualification.qualified
+    assert result.execution_collision_certified
     assert all(
         current.time_s > previous.time_s
         for previous, current in pairwise(result.timed_path.waypoints)
@@ -169,14 +178,21 @@ def test_moving_sphere_conflict_rejects_every_rounded_candidate() -> None:
 def test_smoothing_is_deterministic() -> None:
     scenario = _scenario()
     raw = _right_angle_path()
-    parameters = {
-        "requested_radius_m": 2.5,
-        "sample_spacing_m": 0.2,
-        "max_speed_mps": 4.0,
-    }
 
-    first = smooth_predictive_timed_path(scenario, raw, **parameters)
-    second = smooth_predictive_timed_path(scenario, raw, **parameters)
+    first = smooth_predictive_timed_path(
+        scenario,
+        raw,
+        requested_radius_m=2.5,
+        sample_spacing_m=0.2,
+        max_speed_mps=4.0,
+    )
+    second = smooth_predictive_timed_path(
+        scenario,
+        raw,
+        requested_radius_m=2.5,
+        sample_spacing_m=0.2,
+        max_speed_mps=4.0,
+    )
 
     assert first == second
     assert first.to_dict() == second.to_dict()
@@ -208,11 +224,70 @@ def test_u_turn_is_retained_but_reported_as_a_discrete_reversal() -> None:
     assert result.output_kinematics.max_discrete_velocity_change_mps == pytest.approx(7.0)
     assert result.output_kinematics.max_discrete_acceleration_proxy_mps2 == pytest.approx(3.5)
     assert result.output_kinematics.max_abs_climb_rate_mps == 0.0
+    assert result.execution_candidate is None
+    assert result.execution_status == "reversal-not-allowed"
+    assert not result.execution_qualified
+    assert not result.execution_collision_certified
     payload = result.to_dict()
     assert payload["collision_certified"] is True
     kinematics = payload["kinematic_diagnostics"]
     assert isinstance(kinematics, dict)
     assert kinematics["continuous_dynamics_certified"] is False
+    execution = payload["execution"]
+    assert isinstance(execution, dict)
+    assert execution["status"] == "reversal-not-allowed"
+    assert execution["qualified"] is False
+    assert execution["continuous_dynamics_certified"] is False
+    assert payload["execution_candidate"] is None
+
+
+def test_retiming_collision_has_no_silent_execution_fallback() -> None:
+    raw = TimedPath(
+        (
+            TimedWaypoint(0.0, (4.0, 4.0, 5.0), "start"),
+            TimedWaypoint(1.0, (12.0, 4.0, 5.0), "move"),
+        )
+    )
+    zone = TemporaryCylinder(
+        "late-gate",
+        (8.0, 4.0),
+        0.5,
+        0.0,
+        10.0,
+        1.5,
+        3.0,
+    )
+    scenario = _scenario(
+        start=raw.start,
+        goal=raw.goal,
+        temporary_cylinders=(zone,),
+    )
+    assert raw.is_safe(scenario)
+
+    result = smooth_predictive_timed_path(
+        scenario,
+        raw,
+        requested_radius_m=2.0,
+        sample_spacing_m=0.25,
+        max_speed_mps=8.0,
+        execution_envelope=DiscreteExecutionEnvelope(max_discrete_acceleration_proxy_mps2=1.0),
+    )
+
+    assert result.collision_certified
+    assert result.geometry_candidate == raw
+    assert result.execution_candidate is None
+    assert result.execution_status == "dynamic-collision-after-retiming"
+    assert not result.execution_qualified
+    assert not result.execution_collision_certified
+    assert result.execution_qualification is not None
+    assert result.execution_qualification.qualified
+    assert result.execution_candidate_duration_s == pytest.approx(4.0)
+    payload = result.to_dict()
+    assert payload["execution_candidate"] is None
+    execution = payload["execution"]
+    assert isinstance(execution, dict)
+    assert execution["status"] == "dynamic-collision-after-retiming"
+    assert execution["qualified"] is False
 
 
 def test_discrete_kinematic_diagnostics_report_climb_and_velocity_change() -> None:
@@ -286,12 +361,15 @@ def test_dynamic_separation_labels_temporary_cylinder_search_as_approximate() ->
 def test_invalid_parameters_are_rejected(parameter: str, value: float) -> None:
     scenario = _scenario()
     raw = _right_angle_path()
-    parameters = {
-        "requested_radius_m": 2.0,
-        "sample_spacing_m": 0.25,
-        "max_speed_mps": 4.0,
-    }
-    parameters[parameter] = value
+    requested_radius = value if parameter == "requested_radius_m" else 2.0
+    sample_spacing = value if parameter == "sample_spacing_m" else 0.25
+    max_speed = value if parameter == "max_speed_mps" else 4.0
 
     with pytest.raises(ValueError, match="finite and positive"):
-        smooth_predictive_timed_path(scenario, raw, **parameters)
+        smooth_predictive_timed_path(
+            scenario,
+            raw,
+            requested_radius_m=requested_radius,
+            sample_spacing_m=sample_spacing,
+            max_speed_mps=max_speed,
+        )

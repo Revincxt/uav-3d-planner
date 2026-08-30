@@ -99,8 +99,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="uav3d",
         description=(
-            "Reproducible static, dynamic, and v0.6 complex-city predictive benchmark for 3D "
-            "UAV path planning with collision-certified trajectory smoothing."
+            "Reproducible static, dynamic, and v0.7 predictive benchmark for 3D UAV path "
+            "planning with collision-audited geometry and discrete execution-envelope evidence."
         ),
     )
     parser.add_argument("--version", action="version", version=f"uav3d {__version__}")
@@ -221,17 +221,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     predictive_parser = commands.add_parser(
         "predictive",
-        help="Inspect or run the v0.6 complex-city predictive space-time study.",
+        help="Inspect or run the v0.7 predictive execution-envelope study.",
         description=(
-            "Inspect or run the fixed v0.6 complex-city study. Every safe raw trajectory passes "
-            "through the common wait-preserving, collision-certified smoothing stage."
+            "Inspect or run the fixed v0.7 study. Raw planner output, collision-audited geometry, "
+            "and an optional retimed execution candidate remain separate evidence layers."
         ),
     )
     predictive_commands = predictive_parser.add_subparsers(dest="predictive_command", required=True)
-    predictive_commands.add_parser("list", help="List the ten v0.6 complex-city scenarios.")
+    predictive_commands.add_parser("list", help="List the ten frozen v0.7 study scenarios.")
     predictive_plan_parser = predictive_commands.add_parser(
         "plan",
-        help="Run one planner and export its raw and certified-smoothed timed paths.",
+        help="Run one condition and export its raw, geometry, and execution-candidate evidence.",
     )
     predictive_plan_parser.add_argument(
         "--scenario", choices=list_predictive_scenarios(), required=True
@@ -241,10 +241,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     predictive_export_parser = commands.add_parser(
         "export-predictive",
-        help="Export the v0.6 complex-city protocol with certified trajectory smoothing.",
+        help="Export the v0.7 execution-envelope protocol and separated evidence layers.",
         description=(
-            "Run all ten v0.6 complex-city scenarios with four planners and export raw paths, "
-            "collision-certified smoothed paths, metrics, and compact replay frames."
+            "Run the frozen ten-scenario by four-condition matrix and export raw planner paths, "
+            "geometry candidates, optional execution candidates, metrics, and replay evidence."
         ),
     )
     predictive_export_parser.add_argument("--output-dir", type=Path, required=True)

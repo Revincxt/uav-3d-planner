@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/Revincxt/uav-3d-planner-lab/blob/main/scenarios/schema.json",
+  "$id": "https://github.com/Revincxt/uav-3d-planner/blob/main/scenarios/schema.json",
   "title": "UAV 3D Planner Lab scene",
   "type": "object",
   "required": [
@@ -79,4 +79,3 @@
     }
   }
 }
-

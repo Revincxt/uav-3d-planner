@@ -147,7 +147,15 @@ function parseProtocol(value) {
       entry.trajectoryPostprocessor,
       "protocol.trajectoryPostprocessor",
     ),
+    executionEnvelope: executionEnvelope(entry.executionEnvelope, "protocol.executionEnvelope"),
+    continuousDynamicsCertified: bool(
+      entry.continuousDynamicsCertified,
+      "protocol.continuousDynamicsCertified",
+    ),
   };
+  if (protocol.continuousDynamicsCertified) {
+    fail("protocol.continuousDynamicsCertified must remain false");
+  }
   if (protocol.timeResolutionS > protocol.planningHorizonS) {
     fail("protocol.timeResolutionS cannot exceed planningHorizonS");
   }
@@ -429,6 +437,177 @@ function kinematicDiagnostics(value, label) {
   };
 }
 
+function executionEnvelope(value, label) {
+  const entry = object(value, label);
+  const parsed = {
+    model: text(entry.model, `${label}.model`),
+    maxSpeedMps: positive(entry.maxSpeedMps, `${label}.maxSpeedMps`),
+    maxAbsClimbRateMps: positive(
+      entry.maxAbsClimbRateMps,
+      `${label}.maxAbsClimbRateMps`,
+    ),
+    maxDiscreteAccelerationProxyMps2: positive(
+      entry.maxDiscreteAccelerationProxyMps2,
+      `${label}.maxDiscreteAccelerationProxyMps2`,
+    ),
+    reversalThresholdDeg: positive(
+      entry.reversalThresholdDeg,
+      `${label}.reversalThresholdDeg`,
+    ),
+    allowReversals: bool(entry.allowReversals, `${label}.allowReversals`),
+    maxExecutionTimeS: positive(entry.maxExecutionTimeS, `${label}.maxExecutionTimeS`),
+    continuousDynamicsCertified: bool(
+      entry.continuousDynamicsCertified,
+      `${label}.continuousDynamicsCertified`,
+    ),
+  };
+  if (parsed.model !== "discrete-segment-average-envelope-v1") {
+    fail(`${label}.model is unsupported`);
+  }
+  if (parsed.reversalThresholdDeg > 180 + TOLERANCE) {
+    fail(`${label}.reversalThresholdDeg cannot exceed 180 degrees`);
+  }
+  if (parsed.allowReversals || parsed.continuousDynamicsCertified) {
+    fail(`${label} must forbid reversals and must not claim continuous-dynamics certification`);
+  }
+  const frozen = {
+    maxSpeedMps: 8,
+    maxAbsClimbRateMps: 3,
+    maxDiscreteAccelerationProxyMps2: 4,
+    reversalThresholdDeg: 150,
+    maxExecutionTimeS: 90,
+  };
+  Object.entries(frozen).forEach(([key, expected]) => {
+    if (!sameNumber(parsed[key], expected)) fail(`${label}.${key} disagrees with v0.7`);
+  });
+  return parsed;
+}
+
+function executionQualification(value, label) {
+  if (value === null) return null;
+  const entry = object(value, label);
+  if (entry.status !== "qualified" && entry.status !== "not-qualified") {
+    fail(`${label}.status is unsupported`);
+  }
+  const violations = list(entry.violations, `${label}.violations`).map((value, index) =>
+    text(value, `${label}.violations[${index}]`),
+  );
+  const allowedViolations = new Set([
+    "speed-limit-exceeded",
+    "climb-rate-limit-exceeded",
+    "acceleration-proxy-limit-exceeded",
+    "reversal-not-allowed",
+    "execution-time-limit-exceeded",
+  ]);
+  if (
+    new Set(violations).size !== violations.length ||
+    violations.some((violation) => !allowedViolations.has(violation))
+  ) {
+    fail(`${label}.violations contains an unsupported or duplicate value`);
+  }
+  const parsed = {
+    status: entry.status,
+    qualified: bool(entry.qualified, `${label}.qualified`),
+    continuousDynamicsCertified: bool(
+      entry.continuousDynamicsCertified,
+      `${label}.continuousDynamicsCertified`,
+    ),
+    diagnostics: discreteKinematicDiagnostics(entry.diagnostics, `${label}.diagnostics`),
+    boundaryAwareMaxDiscreteAccelerationProxyMps2: nonNegative(
+      entry.boundaryAwareMaxDiscreteAccelerationProxyMps2,
+      `${label}.boundaryAwareMaxDiscreteAccelerationProxyMps2`,
+    ),
+    violations,
+  };
+  if (
+    parsed.continuousDynamicsCertified ||
+    parsed.qualified !== (parsed.status === "qualified") ||
+    parsed.qualified !== (violations.length === 0)
+  ) {
+    fail(`${label} qualification verdict is inconsistent`);
+  }
+  return parsed;
+}
+
+function executionMetadata(value, label) {
+  const entry = object(value, label);
+  const statuses = new Set([
+    "not-evaluated",
+    "qualified",
+    "reversal-not-allowed",
+    "execution-time-limit-exceeded",
+    "time-parameterization-did-not-converge",
+    "dynamic-collision-after-retiming",
+  ]);
+  if (!statuses.has(entry.status)) fail(`${label}.status is unsupported`);
+  const nullableDuration = (candidate, field) =>
+    candidate === null ? null : nonNegative(candidate, `${label}.${field}`);
+  const parsed = {
+    status: entry.status,
+    qualified: bool(entry.qualified, `${label}.qualified`),
+    collisionCertified: bool(entry.collisionCertified, `${label}.collisionCertified`),
+    collisionCertificationScope:
+      entry.collisionCertificationScope === "dense-piecewise-linear-space-time-path"
+        ? entry.collisionCertificationScope
+        : fail(`${label}.collisionCertificationScope is unsupported`),
+    continuousDynamicsCertified: bool(
+      entry.continuousDynamicsCertified,
+      `${label}.continuousDynamicsCertified`,
+    ),
+    envelope: executionEnvelope(entry.envelope, `${label}.envelope`),
+    qualification: executionQualification(entry.qualification, `${label}.qualification`),
+    timingIterations: integer(entry.timingIterations, `${label}.timingIterations`),
+    originalDurationS: nullableDuration(entry.originalDurationS, "originalDurationS"),
+    candidateDurationS: nullableDuration(entry.candidateDurationS, "candidateDurationS"),
+    addedDurationS: nullableDuration(entry.addedDurationS, "addedDurationS"),
+  };
+  if (parsed.continuousDynamicsCertified) {
+    fail(`${label}.continuousDynamicsCertified must remain false`);
+  }
+  const durationFields = [
+    parsed.originalDurationS,
+    parsed.candidateDurationS,
+    parsed.addedDurationS,
+  ];
+  if (durationFields.some((item) => item === null) && !durationFields.every((item) => item === null)) {
+    fail(`${label} duration fields must be all numeric or all null`);
+  }
+  if (parsed.status === "not-evaluated") {
+    if (
+      parsed.qualified ||
+      parsed.collisionCertified ||
+      parsed.qualification !== null ||
+      parsed.timingIterations !== 0 ||
+      !durationFields.every((item) => item === null)
+    ) {
+      fail(`${label} not-evaluated metadata is inconsistent`);
+    }
+    return parsed;
+  }
+  if (parsed.qualification === null || durationFields.some((item) => item === null)) {
+    fail(`${label} evaluated status requires qualification and durations`);
+  }
+  if (
+    parsed.candidateDurationS + TOLERANCE < parsed.originalDurationS ||
+    !sameNumber(parsed.addedDurationS, parsed.candidateDurationS - parsed.originalDurationS)
+  ) {
+    fail(`${label} retiming must not shorten the path and addedDurationS must be exact`);
+  }
+  if (parsed.status === "qualified") {
+    if (!parsed.qualified || !parsed.collisionCertified || !parsed.qualification.qualified) {
+      fail(`${label} qualified status requires both discrete and collision qualification`);
+    }
+  } else if (parsed.qualified || parsed.collisionCertified) {
+    fail(`${label} failed status cannot expose a qualified or collision-certified candidate`);
+  } else if (
+    parsed.status === "dynamic-collision-after-retiming" &&
+    !parsed.qualification.qualified
+  ) {
+    fail(`${label} collision-after-retiming requires a discretely qualified timing result`);
+  }
+  return parsed;
+}
+
 function smoothing(value, label) {
   const entry = object(value, label);
   const before =
@@ -466,6 +645,7 @@ function smoothing(value, label) {
       entry.kinematicDiagnostics,
       `${label}.kinematicDiagnostics`,
     ),
+    execution: executionMetadata(entry.execution, `${label}.execution`),
   };
   if (parsed.collisionCertified !== parsed.certified) {
     fail(`${label}.collisionCertified must agree with certified`);
@@ -546,6 +726,183 @@ function metrics(value, label) {
   };
 }
 
+function stationarySegments(points) {
+  const waits = [];
+  for (let index = 1; index < points.length; index += 1) {
+    if (samePoint(points[index - 1].position, points[index].position)) {
+      waits.push({
+        startTimeS: points[index - 1].timeS,
+        endTimeS: points[index].timeS,
+        position: points[index].position,
+      });
+    }
+  }
+  return waits;
+}
+
+function stationaryDuration(points) {
+  return stationarySegments(points).reduce(
+    (total, interval) => total + interval.endTimeS - interval.startTimeS,
+    0,
+  );
+}
+
+function framesForPath(value, label, scenario, points) {
+  const frames = list(value, label).map((raw, index) =>
+    frame(raw, `${label}[${index}]`, scenario),
+  );
+  if (frames.length === 0 || frames.length > points.length || frames[0].timeS !== 0) {
+    fail(`${label} must be a non-empty compact path subset starting at time 0`);
+  }
+  frames.forEach((current, index) => {
+    if (
+      current.event === null ||
+      current.event.kind === "none" ||
+      !samePoint(current.vehicle, interpolate(points, current.timeS))
+    ) {
+      fail(`${label}[${index}] must be a semantic event on its declared path`);
+    }
+    if (index > 0 && current.timeS <= frames[index - 1].timeS) {
+      fail(`${label} must be strictly increasing in time`);
+    }
+  });
+  if (!sameNumber(frames.at(-1).timeS, points.at(-1).timeS)) {
+    fail(`${label} must anchor the final path waypoint`);
+  }
+  return frames;
+}
+
+function validateWitness(outcome, label, scenario, points) {
+  const witness = outcome.minimumSeparationWitness;
+  if ((outcome.minimumSeparationM === null) !== (witness === null)) {
+    fail(`${label} minimum separation and witness must be present together`);
+  }
+  if (witness === null) return;
+  if (
+    !sameNumber(outcome.minimumSeparationM, witness.separationM) ||
+    !sameNumber(witness.declaredSafetyMarginM, scenario.constraints.safetyMarginM)
+  ) {
+    fail(`${label} minimum-separation witness is inconsistent`);
+  }
+  if (
+    witness.timeS > points.at(-1).timeS + TOLERANCE ||
+    !inBounds(witness.vehiclePosition, scenario.bounds) ||
+    !inBounds(witness.obstaclePosition, scenario.bounds) ||
+    !samePoint(witness.vehiclePosition, interpolate(points, witness.timeS))
+  ) {
+    fail(`${label} minimum-separation witness is outside its metric-domain path`);
+  }
+  const witnessSurfaceDistance = Math.hypot(
+    witness.vehiclePosition[0] - witness.obstaclePosition[0],
+    witness.vehiclePosition[1] - witness.obstaclePosition[1],
+    witness.vehiclePosition[2] - witness.obstaclePosition[2],
+  );
+  if (
+    !sameNumber(
+      witness.separationM,
+      witnessSurfaceDistance - scenario.constraints.vehicleRadiusM,
+    )
+  ) {
+    fail(`${label} minimum-separation witness geometry is inconsistent`);
+  }
+  if (witness.obstacleKind === "moving-sphere") {
+    const definition = scenario.movingSphereMap.get(witness.obstacleId);
+    const center = definition && interpolate(definition.keyframes, witness.timeS);
+    if (
+      definition === undefined ||
+      center === undefined ||
+      !witness.exact ||
+      !sameNumber(
+        Math.hypot(
+          witness.obstaclePosition[0] - center[0],
+          witness.obstaclePosition[1] - center[1],
+          witness.obstaclePosition[2] - center[2],
+        ),
+        definition.radiusM,
+      ) ||
+      !sameNumber(
+        Math.hypot(
+          witness.vehiclePosition[0] - center[0],
+          witness.vehiclePosition[1] - center[1],
+          witness.vehiclePosition[2] - center[2],
+        ),
+        witnessSurfaceDistance + definition.radiusM,
+      )
+    ) {
+      fail(`${label} moving-sphere witness is inconsistent`);
+    }
+  } else if (
+    witness.exact ||
+    !scenario.temporaryNoFlyZones.some((zone) => zone.id === witness.obstacleId)
+  ) {
+    fail(`${label} temporary-cylinder witness is inconsistent`);
+  }
+  if (
+    outcome.safetyViolations === 0 &&
+    witness.separationM + TOLERANCE < scenario.constraints.safetyMarginM
+  ) {
+    fail(`${label} safe trajectory violates its declared dynamic safety margin`);
+  }
+}
+
+function validateMetricsAgainstPath(value, label, scenario, points, frames = null) {
+  const outcome = metrics(value, label);
+  const directDistance = Math.hypot(
+    scenario.goal[0] - scenario.start[0],
+    scenario.goal[1] - scenario.start[1],
+    scenario.goal[2] - scenario.start[2],
+  );
+  const executedLength = pathLength(points.map((point) => point.position));
+  const waitTime = stationaryDuration(points);
+  if (
+    !sameNumber(outcome.directDistanceM, directDistance) ||
+    !sameNumber(outcome.executedPathLengthM, executedLength) ||
+    !sameNumber(outcome.waitTimeS, waitTime)
+  ) {
+    fail(`${label} path length or stationary time disagrees with its metric-domain path`);
+  }
+  validateWitness(outcome, label, scenario, points);
+  if (outcome.success) {
+    if (
+      outcome.failureReason !== null ||
+      outcome.arrivalTimeS === null ||
+      outcome.travelTimeS === null ||
+      outcome.pathExcessPct === null ||
+      !samePoint(points.at(-1).position, scenario.goal) ||
+      !sameNumber(outcome.arrivalTimeS, points.at(-1).timeS) ||
+      !sameNumber(outcome.travelTimeS, outcome.arrivalTimeS - outcome.waitTimeS)
+    ) {
+      fail(`${label} successful metrics are incomplete or inconsistent`);
+    }
+  } else if (
+    outcome.failureReason === null ||
+    outcome.arrivalTimeS !== null ||
+    outcome.travelTimeS !== null ||
+    outcome.pathExcessPct !== null
+  ) {
+    fail(`${label} failed metrics cannot define arrival, travel, or path excess`);
+  }
+  if (
+    outcome.pathExcessPct !== null &&
+    !sameNumber(
+      outcome.pathExcessPct,
+      (outcome.executedPathLengthM / outcome.directDistanceM - 1) * 100,
+    )
+  ) {
+    fail(`${label}.pathExcessPct is inconsistent`);
+  }
+  if (frames !== null) {
+    const finalFrame = frames.at(-1);
+    if (
+      !samePoint(finalFrame.vehicle, points.at(-1).position) ||
+      finalFrame.event?.kind !== (outcome.success ? "goal-reached" : "no-path")
+    ) {
+      fail(`${label} final event disagrees with metric success`);
+    }
+  }
+  return outcome;
+}
+
 function run(value, label, scenario, planner) {
   const entry = object(value, label);
   const statuses = new Set(["success", "no-path", "timeout", "invalid"]);
@@ -561,111 +918,89 @@ function run(value, label, scenario, planner) {
   if (predictive !== planner.predictive) fail(`${label}.predictive disagrees with its planner`);
   const parameters = object(entry.parameters, `${label}.parameters`);
   if (Object.keys(parameters).length === 0) fail(`${label}.parameters cannot be empty`);
-  Object.entries(parameters).forEach(([key, parameter]) => finite(parameter, `${label}.parameters.${key}`));
+  Object.entries(parameters).forEach(([key, parameter]) =>
+    finite(parameter, `${label}.parameters.${key}`),
+  );
 
   const rawPoints = timedPath(entry.rawTimedPath, `${label}.rawTimedPath`, scenario.bounds);
-  const points = timedPath(entry.timedPath, `${label}.timedPath`, scenario.bounds);
-  if (!samePoint(rawPoints[0].position, scenario.start) || !samePoint(points[0].position, scenario.start)) {
-    fail(`${label} paths must start at scenario start`);
+  const geometryPoints = timedPath(
+    entry.geometryTimedPath,
+    `${label}.geometryTimedPath`,
+    scenario.bounds,
+  );
+  if (
+    !samePoint(rawPoints[0].position, scenario.start) ||
+    !samePoint(geometryPoints[0].position, scenario.start)
+  ) {
+    fail(`${label} raw and geometry paths must start at scenario start`);
   }
   const postprocess = smoothing(entry.smoothing, `${label}.smoothing`);
   if (
     postprocess.rawWaypointCount !== rawPoints.length ||
-    postprocess.outputWaypointCount !== points.length
+    postprocess.outputWaypointCount !== geometryPoints.length
   ) {
-    fail(`${label}.smoothing waypoint counts disagree with exported paths`);
+    fail(`${label}.smoothing waypoint counts disagree with raw/geometry paths`);
   }
-  if (!postprocess.applied && !sameTimedPath(rawPoints, points)) {
+  if (!postprocess.applied && !sameTimedPath(rawPoints, geometryPoints)) {
     fail(`${label} unapplied smoothing must preserve the raw path exactly`);
   }
-  const waits = waitIntervals(entry.waitIntervals, `${label}.waitIntervals`, scenario.bounds, points);
-  const frames = list(entry.frames, `${label}.frames`).map((raw, index) =>
-    frame(raw, `${label}.frames[${index}]`, scenario),
+  if (
+    !sameNumber(rawPoints.at(-1).timeS, geometryPoints.at(-1).timeS) ||
+    !samePoint(rawPoints.at(-1).position, geometryPoints.at(-1).position)
+  ) {
+    fail(`${label} geometry post-processing must preserve the endpoint and duration`);
+  }
+  const rawWaits = stationarySegments(rawPoints);
+  const geometryWaits = waitIntervals(
+    entry.geometryWaitIntervals,
+    `${label}.geometryWaitIntervals`,
+    scenario.bounds,
+    geometryPoints,
   );
-  if (frames.length === 0 || frames[0].timeS !== 0) {
-    fail(`${label}.frames must be non-empty and start at time 0`);
+  if (
+    rawWaits.length !== geometryWaits.length ||
+    rawWaits.some(
+      (wait, index) =>
+        !sameNumber(wait.startTimeS, geometryWaits[index].startTimeS) ||
+        !sameNumber(wait.endTimeS, geometryWaits[index].endTimeS) ||
+        !samePoint(wait.position, geometryWaits[index].position),
+    )
+  ) {
+    fail(`${label} geometry post-processing changed a planner wait interval`);
   }
-  frames.forEach((current, index) => {
-    if (!samePoint(current.vehicle, interpolate(points, current.timeS))) {
-      fail(`${label}.frames[${index}].vehicle disagrees with timedPath`);
-    }
-    if (index > 0 && current.timeS <= frames[index - 1].timeS) {
-      fail(`${label}.frames must be strictly increasing in time`);
-    }
-  });
+  const geometryFrames = framesForPath(
+    entry.geometryFrames,
+    `${label}.geometryFrames`,
+    scenario,
+    geometryPoints,
+  );
 
-  const outcome = metrics(entry.metrics, `${label}.metrics`);
-  const separationWitness = outcome.minimumSeparationWitness;
-  if ((outcome.minimumSeparationM === null) !== (separationWitness === null)) {
-    fail(`${label}.metrics minimum separation and witness must be present together`);
+  const plannerMetrics = validateMetricsAgainstPath(
+    entry.plannerMetrics,
+    `${label}.plannerMetrics`,
+    scenario,
+    rawPoints,
+  );
+  const geometryMetrics = validateMetricsAgainstPath(
+    entry.geometryMetrics,
+    `${label}.geometryMetrics`,
+    scenario,
+    geometryPoints,
+    geometryFrames,
+  );
+  const succeeded = entry.status === "success";
+  if (
+    plannerMetrics.success !== succeeded ||
+    plannerMetrics.failureReason !== failureReason ||
+    geometryMetrics.success !== plannerMetrics.success ||
+    geometryMetrics.failureReason !== plannerMetrics.failureReason
+  ) {
+    fail(`${label} planner/geometry metric status fields disagree`);
   }
-  if (separationWitness !== null) {
-    if (
-      !sameNumber(outcome.minimumSeparationM, separationWitness.separationM) ||
-      !sameNumber(separationWitness.declaredSafetyMarginM, scenario.constraints.safetyMarginM)
-    ) {
-      fail(`${label}.metrics minimum-separation witness is inconsistent`);
-    }
-    if (
-      separationWitness.timeS > points.at(-1).timeS + TOLERANCE ||
-      !inBounds(separationWitness.vehiclePosition, scenario.bounds) ||
-      !inBounds(separationWitness.obstaclePosition, scenario.bounds) ||
-      !samePoint(separationWitness.vehiclePosition, interpolate(points, separationWitness.timeS))
-    ) {
-      fail(`${label}.metrics minimum-separation witness is outside the executed trajectory`);
-    }
-    const witnessSurfaceDistance = Math.hypot(
-      separationWitness.vehiclePosition[0] - separationWitness.obstaclePosition[0],
-      separationWitness.vehiclePosition[1] - separationWitness.obstaclePosition[1],
-      separationWitness.vehiclePosition[2] - separationWitness.obstaclePosition[2],
-    );
-    if (
-      !sameNumber(
-        separationWitness.separationM,
-        witnessSurfaceDistance - scenario.constraints.vehicleRadiusM,
-      )
-    ) {
-      fail(`${label}.metrics minimum-separation witness geometry is inconsistent`);
-    }
-    if (separationWitness.obstacleKind === "moving-sphere") {
-      const definition = scenario.movingSphereMap.get(separationWitness.obstacleId);
-      const center = definition && interpolate(definition.keyframes, separationWitness.timeS);
-      if (
-        definition === undefined ||
-        center === undefined ||
-        !separationWitness.exact ||
-        !sameNumber(
-          Math.hypot(
-            separationWitness.obstaclePosition[0] - center[0],
-            separationWitness.obstaclePosition[1] - center[1],
-            separationWitness.obstaclePosition[2] - center[2],
-          ),
-          definition.radiusM,
-        ) ||
-        !sameNumber(
-          Math.hypot(
-            separationWitness.vehiclePosition[0] - center[0],
-            separationWitness.vehiclePosition[1] - center[1],
-            separationWitness.vehiclePosition[2] - center[2],
-          ),
-          witnessSurfaceDistance + definition.radiusM,
-        )
-      ) {
-        fail(`${label}.metrics moving-sphere witness is inconsistent`);
-      }
-    } else if (
-      separationWitness.exact ||
-      !scenario.temporaryNoFlyZones.some((zone) => zone.id === separationWitness.obstacleId)
-    ) {
-      fail(`${label}.metrics temporary-cylinder witness is inconsistent`);
-    }
-    if (
-      outcome.safetyViolations === 0 &&
-      separationWitness.separationM + TOLERANCE < scenario.constraints.safetyMarginM
-    ) {
-      fail(`${label}.metrics safe run violates its declared dynamic safety margin`);
-    }
+  if (succeeded && !postprocess.certified) {
+    fail(`${label} successful geometry candidate must be collision-certified`);
   }
+
   const expectedWorkUnit =
     planner.id === "space-time-astar-4d"
       ? "expanded-spacetime-states"
@@ -674,77 +1009,124 @@ function run(value, label, scenario, planner) {
         : planner.id === "repeated-astar-3d"
           ? "expanded-nodes"
           : null;
-  if (expectedWorkUnit !== null && outcome.workUnit !== expectedWorkUnit) {
-    fail(`${label}.metrics.workUnit disagrees with its planner`);
-  }
-  const runId = text(entry.runId, `${label}.runId`);
-  if (!/^sha256:[0-9a-f]{64}$/.test(runId)) fail(`${label}.runId must be a SHA-256 digest`);
-  const succeeded = entry.status === "success";
-  if (outcome.success !== succeeded || outcome.failureReason !== failureReason) {
-    fail(`${label}.metrics status fields disagree with the run`);
-  }
-  const finalPoint = points.at(-1);
-  const finalFrame = frames.at(-1);
-  if (!sameNumber(finalPoint.timeS, finalFrame.timeS)) {
-    fail(`${label}.frames and timedPath must end at the same time`);
-  }
-  if (succeeded) {
-    if (
-      !postprocess.certified ||
-      outcome.arrivalTimeS === null ||
-      outcome.travelTimeS === null ||
-      outcome.pathExcessPct === null ||
-      !samePoint(finalPoint.position, scenario.goal) ||
-      !samePoint(rawPoints.at(-1).position, scenario.goal) ||
-      !samePoint(finalFrame.vehicle, scenario.goal) ||
-      finalFrame.event?.kind !== "goal-reached"
-    ) {
-      fail(`${label} successful outcome is incomplete`);
-    }
-    if (
-      !sameNumber(outcome.arrivalTimeS, finalPoint.timeS) ||
-      !sameNumber(outcome.travelTimeS, outcome.arrivalTimeS - outcome.waitTimeS)
-    ) {
-      fail(`${label}.metrics arrival, travel, and stationary times are inconsistent`);
-    }
-  } else if (
-    outcome.arrivalTimeS !== null ||
-    outcome.travelTimeS !== null ||
-    outcome.pathExcessPct !== null
-  ) {
-    fail(`${label} failed outcome cannot define arrival, travel, or path excess`);
-  }
-  const directDistance = Math.hypot(
-    scenario.goal[0] - scenario.start[0],
-    scenario.goal[1] - scenario.start[1],
-    scenario.goal[2] - scenario.start[2],
-  );
-  const executedLength = pathLength(points.map((point) => point.position));
-  if (
-    !sameNumber(outcome.directDistanceM, directDistance) ||
-    !sameNumber(outcome.executedPathLengthM, executedLength)
-  ) {
-    fail(`${label}.metrics path lengths disagree with timedPath geometry`);
+  if (expectedWorkUnit !== null && plannerMetrics.workUnit !== expectedWorkUnit) {
+    fail(`${label}.plannerMetrics.workUnit disagrees with its planner`);
   }
   if (
-    outcome.pathExcessPct !== null &&
-    !sameNumber(outcome.pathExcessPct, (outcome.executedPathLengthM / outcome.directDistanceM - 1) * 100)
+    geometryMetrics.workUnit !== plannerMetrics.workUnit ||
+    geometryMetrics.expandedStates !== plannerMetrics.expandedStates ||
+    geometryMetrics.replans !== plannerMetrics.replans
   ) {
-    fail(`${label}.metrics.pathExcessPct is inconsistent`);
+    fail(`${label}.geometryMetrics must retain planner work accounting`);
   }
-  const stationaryTime = waits.reduce(
-    (total, interval) => total + interval.endTimeS - interval.startTimeS,
-    0,
-  );
-  if (!sameNumber(outcome.waitTimeS, stationaryTime)) {
-    fail(`${label}.metrics.waitTimeS disagrees with waitIntervals`);
-  }
-  const visiblePlanningEvents = frames.filter(
+  const visiblePlanningEvents = geometryFrames.filter(
     (item) => item.event?.kind === "replan" || item.event?.kind === "prediction-update",
   ).length;
-  if (outcome.replans < visiblePlanningEvents) {
-    fail(`${label}.metrics.replans is smaller than recorded planning events`);
+  if (plannerMetrics.replans < visiblePlanningEvents) {
+    fail(`${label}.plannerMetrics.replans is smaller than recorded planning events`);
   }
+
+  const available =
+    postprocess.execution.status === "qualified" &&
+    postprocess.execution.qualified &&
+    postprocess.execution.collisionCertified;
+  const executionValues = [
+    entry.executionTimedPath,
+    entry.executionWaitIntervals,
+    entry.executionMetrics,
+    entry.executionFrames,
+  ];
+  if (executionValues.some((item) => item === null) !== !available) {
+    fail(`${label} execution evidence availability disagrees with its qualification`);
+  }
+  if (!available && executionValues.some((item) => item !== null)) {
+    fail(`${label} failed execution qualification must not expose candidate evidence`);
+  }
+  if (postprocess.execution.originalDurationS !== null &&
+      !sameNumber(postprocess.execution.originalDurationS, geometryPoints.at(-1).timeS)) {
+    fail(`${label}.smoothing.execution.originalDurationS disagrees with geometry path`);
+  }
+  if (postprocess.execution.qualification !== null &&
+      postprocess.execution.qualification.diagnostics.segmentCount !== geometryPoints.length - 1) {
+    fail(`${label}.smoothing.execution qualification waypoint count is inconsistent`);
+  }
+  if (available) {
+    const executionPoints = timedPath(
+      entry.executionTimedPath,
+      `${label}.executionTimedPath`,
+      scenario.bounds,
+    );
+    if (
+      executionPoints.length !== geometryPoints.length ||
+      executionPoints.some(
+        (point, index) => !samePoint(point.position, geometryPoints[index].position),
+      )
+    ) {
+      fail(`${label} execution retiming must preserve geometry and waypoint count`);
+    }
+    for (let index = 1; index < executionPoints.length; index += 1) {
+      const geometryDuration = geometryPoints[index].timeS - geometryPoints[index - 1].timeS;
+      const executionDuration = executionPoints[index].timeS - executionPoints[index - 1].timeS;
+      if (executionDuration + TOLERANCE < geometryDuration) {
+        fail(`${label} execution retiming shortened segment ${index - 1}`);
+      }
+      if (
+        samePoint(geometryPoints[index - 1].position, geometryPoints[index].position) &&
+        !sameNumber(executionDuration, geometryDuration)
+      ) {
+        fail(`${label} execution retiming changed wait duration at segment ${index - 1}`);
+      }
+    }
+    if (
+      !sameNumber(
+        postprocess.execution.candidateDurationS,
+        executionPoints.at(-1).timeS,
+      ) ||
+      !sameNumber(stationaryDuration(executionPoints), stationaryDuration(geometryPoints))
+    ) {
+      fail(`${label} execution duration metadata or preserved wait time is inconsistent`);
+    }
+    const executionWaits = waitIntervals(
+      entry.executionWaitIntervals,
+      `${label}.executionWaitIntervals`,
+      scenario.bounds,
+      executionPoints,
+    );
+    if (!sameNumber(
+      executionWaits.reduce(
+        (total, interval) => total + interval.endTimeS - interval.startTimeS,
+        0,
+      ),
+      stationaryDuration(geometryPoints),
+    )) {
+      fail(`${label}.executionWaitIntervals do not preserve total wait duration`);
+    }
+    const executionFrames = framesForPath(
+      entry.executionFrames,
+      `${label}.executionFrames`,
+      scenario,
+      executionPoints,
+    );
+    const executionMetrics = validateMetricsAgainstPath(
+      entry.executionMetrics,
+      `${label}.executionMetrics`,
+      scenario,
+      executionPoints,
+      executionFrames,
+    );
+    if (
+      executionMetrics.success !== plannerMetrics.success ||
+      executionMetrics.failureReason !== plannerMetrics.failureReason ||
+      executionMetrics.workUnit !== plannerMetrics.workUnit ||
+      executionMetrics.expandedStates !== plannerMetrics.expandedStates ||
+      executionMetrics.replans !== plannerMetrics.replans
+    ) {
+      fail(`${label}.executionMetrics must retain planner outcome and work accounting`);
+    }
+  }
+
+  const runId = text(entry.runId, `${label}.runId`);
+  if (!/^sha256:[0-9a-f]{64}$/.test(runId)) fail(`${label}.runId must be a SHA-256 digest`);
   return { runId, plannerId: planner.id };
 }
 
@@ -859,7 +1241,7 @@ function artifact(value, label, expectedPath) {
 
 function validateBundle(value) {
   const root = object(value, "root");
-  if (root.schemaVersion !== 2) fail("schemaVersion must be 2");
+  if (root.schemaVersion !== 3) fail("schemaVersion must be 3");
   if (root.verificationStatus !== "PREDICTIVE_DEMO_NON_CONFIRMATORY") {
     fail("verificationStatus must be PREDICTIVE_DEMO_NON_CONFIRMATORY");
   }
@@ -870,8 +1252,8 @@ function validateBundle(value) {
     fail("sourceCommit must be a full lowercase Git object ID");
   }
   const protocol = parseProtocol(root.protocol);
-  if (protocol.id !== "predictive-space-time-v3") {
-    fail("protocol.id must be predictive-space-time-v3");
+  if (protocol.id !== "predictive-space-time-v4") {
+    fail("protocol.id must be predictive-space-time-v4");
   }
 
   const plannerEntries = uniqueIdObjects(root.planners, "planners").map((planner, index) => ({
@@ -914,7 +1296,7 @@ function validateBundle(value) {
     scenarios.length !== expectedScenarioIds.length ||
     expectedScenarioIds.some((id) => !scenarios.some((entry) => entry.id === id))
   ) {
-    fail("the public v0.6 protocol requires the ten declared scenarios");
+    fail("the public v0.7 protocol requires the ten declared scenarios");
   }
   if (new Set(scenarios.map((entry) => entry.id)).size !== scenarios.length) fail("scenario IDs must be unique");
   if (new Set(scenarios.map((entry) => entry.fingerprint)).size !== scenarios.length) {
@@ -931,7 +1313,7 @@ function validateBundle(value) {
     fail("at least one demo scenario must have 14 buildings, a static NFZ, and two dynamic hazards");
   }
   const runIds = scenarios.flatMap((entry) => entry.runs.map((record) => record.runId));
-  if (runIds.length !== 40) fail("the public v0.6 protocol requires exactly 40 planner runs");
+  if (runIds.length !== 40) fail("the public v0.7 protocol requires exactly 40 planner runs");
   if (new Set(runIds).size !== runIds.length) fail("runId values must be unique across the bundle");
 
   const downloads = object(root.downloads, "downloads");
@@ -966,6 +1348,25 @@ async function verifyArtifact(reference) {
   }
   if (digest !== reference.sha256) {
     fail(`${reference.path} digest is ${digest}, expected ${reference.sha256}`);
+  }
+  if (reference.path === "predictive-scenario-manifest.json") {
+    let manifest;
+    try {
+      manifest = object(JSON.parse(contents.toString("utf8")), "scenarioManifest");
+    } catch (error) {
+      fail(
+        `predictive-scenario-manifest.json is invalid JSON (${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
+    if (manifest.schemaVersion !== 3) {
+      fail("predictive-scenario-manifest.json schemaVersion must be 3");
+    }
+    if (manifest.protocolId !== "predictive-space-time-v4") {
+      fail("predictive-scenario-manifest.json protocolId must be predictive-space-time-v4");
+    }
+    if (manifest.datasetId !== "predictive-execution-envelope-v0.7") {
+      fail("predictive-scenario-manifest.json datasetId must be predictive-execution-envelope-v0.7");
+    }
   }
 }
 

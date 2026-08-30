@@ -436,7 +436,7 @@ async function start(): Promise<void> {
     `${bundle.protocol.bootstrap.resamples.toLocaleString()} scene-clustered bootstrap resamples.`;
   const provenance = element("#provenance");
   const sourceLink = document.createElement("a");
-  sourceLink.href = `https://github.com/Revincxt/uav-3d-planner-lab/commit/${bundle.sourceCommit}`;
+  sourceLink.href = `https://github.com/Revincxt/uav-3d-planner/commit/${bundle.sourceCommit}`;
   sourceLink.textContent = bundle.sourceCommit;
   provenance.replaceChildren(
     document.createTextNode(

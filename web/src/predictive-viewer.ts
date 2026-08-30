@@ -6,6 +6,7 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
 import type {
   MovingSphereDefinition,
+  PredictiveMinimumSeparationWitness,
   PredictivePathMode,
   PredictiveRun,
   PredictiveScenario,
@@ -16,6 +17,45 @@ import type {
 
 export type ViewPreset = "isometric" | "xy" | "xz" | "yz" | "fit";
 export type ViewerLayer = "buildings" | "zones" | "dynamic" | "raw";
+
+const WITNESS_TIME_TOLERANCE_S = 1e-7;
+
+export interface MinimumSeparationEvidence {
+  witness: PredictiveMinimumSeparationWitness;
+  safetyEnvelopeRadiusM: number;
+  connectorDashed: boolean;
+}
+
+export function minimumSeparationEvidence(
+  scenario: Pick<PredictiveScenario, "constraints">,
+  run: Pick<PredictiveRun, "plannerMetrics" | "geometryMetrics" | "executionMetrics">,
+  mode: PredictivePathMode,
+): MinimumSeparationEvidence | null {
+  const metrics =
+    mode === "raw"
+      ? run.plannerMetrics
+      : mode === "geometry"
+        ? run.geometryMetrics
+        : run.executionMetrics;
+  const witness = metrics?.minimumSeparationWitness ?? null;
+  if (witness === null) return null;
+  return {
+    witness,
+    safetyEnvelopeRadiusM:
+      scenario.constraints.vehicleRadiusM + witness.declaredSafetyMarginM,
+    connectorDashed: !witness.exact,
+  };
+}
+
+export function isMinimumSeparationEvidenceTime(
+  evidence: MinimumSeparationEvidence | null,
+  timeS: number,
+): boolean {
+  return (
+    evidence !== null &&
+    Math.abs(timeS - evidence.witness.timeS) <= WITNESS_TIME_TOLERANCE_S
+  );
+}
 
 interface ZoneVisual {
   fill: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>;
@@ -38,6 +78,10 @@ interface ThemePalette {
   staticZone: number;
   temporaryZone: number;
   movingSphere: number;
+  witnessVehicle: number;
+  witnessSurface: number;
+  witnessConnector: number;
+  safetyEnvelope: number;
   rawPath: number;
   plannedPath: number;
   executedPath: number;
@@ -60,6 +104,10 @@ const LIGHT_PALETTE: ThemePalette = {
   staticZone: 0x9b4239,
   temporaryZone: 0xb2742f,
   movingSphere: 0x6f578a,
+  witnessVehicle: 0x0f7468,
+  witnessSurface: 0x9b4239,
+  witnessConnector: 0x7b552f,
+  safetyEnvelope: 0xa96c29,
   rawPath: 0x697176,
   plannedPath: 0x245a85,
   executedPath: 0x0f7468,
@@ -82,6 +130,10 @@ const DARK_PALETTE: ThemePalette = {
   staticZone: 0xe08779,
   temporaryZone: 0xe0ae69,
   movingSphere: 0xb69ac5,
+  witnessVehicle: 0x6fc0ad,
+  witnessSurface: 0xe08779,
+  witnessConnector: 0xe0ae69,
+  safetyEnvelope: 0xe0ae69,
   rawPath: 0xa9b0b3,
   plannedPath: 0x82acd4,
   executedPath: 0x6fc0ad,
@@ -162,6 +214,7 @@ export class PredictiveViewer {
   private readonly dynamicGroup = new THREE.Group();
   private readonly primaryPathGroup = new THREE.Group();
   private readonly rawPathGroup = new THREE.Group();
+  private readonly evidenceGroup = new THREE.Group();
   private readonly resizeObserver: ResizeObserver;
   private readonly colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
   private readonly onColorSchemeChange = (): void => this.rebuild();
@@ -173,7 +226,7 @@ export class PredictiveViewer {
   };
   private scenario: PredictiveScenario | null = null;
   private run: PredictiveRun | null = null;
-  private pathMode: PredictivePathMode = "certified";
+  private pathMode: PredictivePathMode = "geometry";
   private currentTimeS = 0;
   private currentView: ViewPreset = "isometric";
   private temporaryZones = new Map<string, ZoneVisual>();
@@ -197,6 +250,7 @@ export class PredictiveViewer {
       this.dynamicGroup,
       this.rawPathGroup,
       this.primaryPathGroup,
+      this.evidenceGroup,
     );
     this.scene.add(this.content);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -219,6 +273,7 @@ export class PredictiveViewer {
   setRun(run: PredictiveRun): void {
     this.run = run;
     this.replacePathLines();
+    this.replaceMinimumSeparationEvidence();
     this.setTime(0);
   }
 
@@ -226,6 +281,7 @@ export class PredictiveViewer {
     if (this.pathMode === mode) return;
     this.pathMode = mode;
     this.replacePathLines();
+    this.replaceMinimumSeparationEvidence();
     this.setTime(this.currentTimeS);
   }
 
@@ -269,6 +325,10 @@ export class PredictiveViewer {
       3.7,
       false,
       1,
+    );
+    this.evidenceGroup.visible = isMinimumSeparationEvidenceTime(
+      minimumSeparationEvidence(this.scenario, this.run, this.pathMode),
+      this.currentTimeS,
     );
     this.render();
   }
@@ -320,7 +380,11 @@ export class PredictiveViewer {
 
   private get activePath(): TimedWaypoint[] {
     if (!this.run) return [];
-    return this.pathMode === "raw" ? this.run.rawTimedPath : this.run.timedPath;
+    if (this.pathMode === "raw") return this.run.rawTimedPath;
+    if (this.pathMode === "execution" && this.run.executionTimedPath !== null) {
+      return this.run.executionTimedPath;
+    }
+    return this.run.geometryTimedPath;
   }
 
   private rebuild(): void {
@@ -458,6 +522,7 @@ export class PredictiveViewer {
       this.dynamicGroup,
       this.rawPathGroup,
       this.primaryPathGroup,
+      this.evidenceGroup,
     ]) {
       for (const child of [...group.children]) {
         group.remove(child);
@@ -471,6 +536,7 @@ export class PredictiveViewer {
         this.dynamicGroup,
         this.rawPathGroup,
         this.primaryPathGroup,
+        this.evidenceGroup,
       ].includes(child as THREE.Group)) {
         this.content.remove(child);
         disposeObject(child);
@@ -679,6 +745,87 @@ export class PredictiveViewer {
     this.primaryPathGroup.add(marker);
   }
 
+  private clearMinimumSeparationEvidence(): void {
+    this.evidenceGroup.traverse((child) => {
+      if (child instanceof Line2 && child.material instanceof LineMaterial) {
+        this.lineMaterials.delete(child.material);
+      }
+    });
+    for (const child of [...this.evidenceGroup.children]) {
+      this.evidenceGroup.remove(child);
+      disposeObject(child);
+    }
+  }
+
+  private replaceMinimumSeparationEvidence(): void {
+    this.clearMinimumSeparationEvidence();
+    if (!this.scenario || !this.run) return;
+    const evidence = minimumSeparationEvidence(this.scenario, this.run, this.pathMode);
+    if (evidence === null) return;
+
+    const { witness } = evidence;
+    const palette = this.palette;
+    const markerRadius = Math.max(
+      0.22,
+      Math.min(0.72, evidence.safetyEnvelopeRadiusM * 0.28),
+    );
+    const overlayMaterial = (color: number): THREE.MeshBasicMaterial =>
+      new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false });
+
+    const vehiclePoint = new THREE.Mesh(
+      new THREE.SphereGeometry(markerRadius, 18, 12),
+      overlayMaterial(palette.witnessVehicle),
+    );
+    vehiclePoint.name = "minimum-separation-vehicle-point";
+    vehiclePoint.position.fromArray(enuToThree(witness.vehiclePosition));
+    vehiclePoint.renderOrder = 9;
+
+    const obstacleSurfacePoint = new THREE.Mesh(
+      new THREE.OctahedronGeometry(markerRadius * 1.12),
+      overlayMaterial(palette.witnessSurface),
+    );
+    obstacleSurfacePoint.name = "minimum-separation-obstacle-surface-point";
+    obstacleSurfacePoint.position.fromArray(enuToThree(witness.obstaclePosition));
+    obstacleSurfacePoint.renderOrder = 9;
+
+    const envelope = new THREE.Mesh(
+      new THREE.SphereGeometry(evidence.safetyEnvelopeRadiusM, 18, 12),
+      new THREE.MeshBasicMaterial({
+        color: palette.safetyEnvelope,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.58,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+    envelope.name = "declared-safety-margin-envelope";
+    envelope.position.copy(vehiclePoint.position);
+    envelope.renderOrder = 8;
+
+    const connector = this.replaceLine(
+      this.evidenceGroup,
+      null,
+      [witness.vehiclePosition, witness.obstaclePosition],
+      palette.witnessConnector,
+      2.8,
+      evidence.connectorDashed,
+      0.94,
+    );
+    if (connector) {
+      connector.name = evidence.connectorDashed
+        ? "minimum-separation-connector-approximate"
+        : "minimum-separation-connector-exact";
+      const connectorMaterial = connector.material as LineMaterial;
+      connectorMaterial.depthTest = false;
+      connectorMaterial.depthWrite = false;
+      connector.renderOrder = 8;
+    }
+
+    this.evidenceGroup.add(envelope, vehiclePoint, obstacleSurfacePoint);
+    this.evidenceGroup.visible = false;
+  }
+
   private replacePathLines(): void {
     if (!this.run) return;
     const path = this.activePath;
@@ -774,7 +921,7 @@ export class PredictiveViewer {
     this.zonesGroup.visible = this.layerVisibility.zones;
     this.dynamicGroup.visible = this.layerVisibility.dynamic;
     this.rawPathGroup.visible =
-      this.layerVisibility.raw && this.pathMode === "certified" && Boolean(this.run?.smoothing.applied);
+      this.layerVisibility.raw && this.pathMode !== "raw" && Boolean(this.run?.smoothing.applied);
   }
 
   private resize(): void {
