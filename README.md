@@ -6,14 +6,14 @@
 
 [![CI](https://github.com/Revincxt/uav-3d-planner/actions/workflows/ci.yml/badge.svg)](https://github.com/Revincxt/uav-3d-planner/actions/workflows/ci.yml)
 [![Pages](https://github.com/Revincxt/uav-3d-planner/actions/workflows/pages.yml/badge.svg)](https://github.com/Revincxt/uav-3d-planner/actions/workflows/pages.yml)
-[![Release](https://img.shields.io/github/v/release/Revincxt/uav-3d-planner?display_name=tag&sort=semver)](https://github.com/Revincxt/uav-3d-planner/releases/tag/v0.5.0)
+[![Release](https://img.shields.io/github/v/release/Revincxt/uav-3d-planner?display_name=tag&sort=semver)](https://github.com/Revincxt/uav-3d-planner/releases/latest)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-555.svg)](LICENSE)
 
 [**Open the live study**](https://revincxt.github.io/uav-3d-planner/predictive.html) ·
 [Reproduce a run](#quick-start) ·
 [Read the methodology](docs/methodology.md) ·
-[Download v0.5.0](https://github.com/Revincxt/uav-3d-planner/releases/tag/v0.5.0)
+[Latest release](https://github.com/Revincxt/uav-3d-planner/releases/latest)
 
 </div>
 
