@@ -36,6 +36,10 @@ VERIFICATION_STATUS = "PREDICTIVE_DEMO_NON_CONFIRMATORY"
 # Eleven decimal places remain far below the spatial and temporal resolution of the
 # protocol while absorbing platform-level libm drift observed in the twelfth place.
 SERIALIZATION_DECIMAL_PLACES = 11
+# Approximate separation witnesses come from a deterministic convex search whose
+# minimizer can drift within its declared 1e-6 positional/time tolerance across libm
+# implementations. Canonicalize only those approximate witness coordinates and times.
+APPROXIMATE_SEPARATION_WITNESS_DECIMAL_PLACES = 6
 # Kinematic diagnostics involve square-root and division chains whose accumulated
 # platform-level libm drift can reach the ninth decimal place. Eight places keep
 # values stable across CPython builds while preserving ample diagnostic precision.
@@ -795,13 +799,21 @@ def _run_status(episode: PredictiveEpisode) -> str:
 def _export_separation_witness(witness: DynamicSeparationWitness) -> dict[str, object]:
     """Serialize an internal witness using the public bundle's camelCase vocabulary."""
 
+    def _canonicalize_approximate(value: float) -> float:
+        if witness.exact:
+            return value
+        return round(value, APPROXIMATE_SEPARATION_WITNESS_DECIMAL_PLACES)
+
+    def _canonicalize_position(position: Point3) -> list[float]:
+        return [_canonicalize_approximate(coordinate) for coordinate in position]
+
     return {
         "separationM": witness.separation_m,
-        "timeS": witness.time_s,
-        "vehiclePosition": list(witness.vehicle_position),
+        "timeS": _canonicalize_approximate(witness.time_s),
+        "vehiclePosition": _canonicalize_position(witness.vehicle_position),
         "obstacleId": witness.obstacle_id,
         "obstacleKind": witness.obstacle_kind,
-        "obstaclePosition": list(witness.obstacle_position),
+        "obstaclePosition": _canonicalize_position(witness.obstacle_position),
         "declaredSafetyMarginM": witness.declared_safety_margin_m,
         "method": witness.method,
         "exact": witness.exact,
@@ -1366,6 +1378,7 @@ def load_and_run_predictive_episode(scenario_id: str, planner_id: str) -> Predic
 
 
 __all__ = [
+    "APPROXIMATE_SEPARATION_WITNESS_DECIMAL_PLACES",
     "CRUISE_SPEED_MPS",
     "DOWNLOAD_ARTIFACTS",
     "EXECUTION_ENVELOPE",

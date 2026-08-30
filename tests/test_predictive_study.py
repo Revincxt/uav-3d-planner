@@ -12,9 +12,11 @@ import pytest
 import uav3d.predictive_study as predictive_study_module
 from uav3d.cli import main
 from uav3d.dynamic import DynamicScenario, TemporaryCylinder
+from uav3d.dynamic_collision import DynamicSeparationWitness
 from uav3d.kinematics import DiscreteKinematicDiagnostics
 from uav3d.predictive_scenarios import load_predictive_scenario
 from uav3d.predictive_study import (
+    APPROXIMATE_SEPARATION_WITNESS_DECIMAL_PLACES,
     DOWNLOAD_ARTIFACTS,
     KINEMATIC_DIAGNOSTIC_DECIMAL_PLACES,
     PREDICTIVE_ALGORITHMS,
@@ -68,6 +70,57 @@ def test_kinematic_diagnostic_export_absorbs_cross_platform_libm_drift() -> None
 
     assert first_export == second_export
     assert first_export["maxDiscreteVelocityChangeMps"] == 666.78439776
+
+
+def test_approximate_separation_witness_export_absorbs_platform_drift() -> None:
+    assert APPROXIMATE_SEPARATION_WITNESS_DECIMAL_PLACES == 6
+    common = {
+        "separation_m": 2.98528137424,
+        "obstacle_id": "skyway-high-east-gate",
+        "obstacle_kind": "temporary-cylinder",
+        "declared_safety_margin_m": 0.5,
+        "method": "deterministic-convex-distance-search",
+        "exact": False,
+    }
+    first = DynamicSeparationWitness(
+        **common,
+        time_s=14.06023593475,
+        vehicle_position=(82.00000004841, 62.00000004841, 42.00000004841),
+        obstacle_position=(79.53553393446, 64.46446612259, 42.00000004841),
+    )
+    second = DynamicSeparationWitness(
+        **common,
+        time_s=14.06023577984,
+        vehicle_position=(81.99999989379, 61.99999989379, 41.99999989379),
+        obstacle_position=(79.53553377984, 64.46446627721, 41.99999989379),
+    )
+
+    first_export = predictive_study_module._export_separation_witness(first)
+    second_export = predictive_study_module._export_separation_witness(second)
+
+    assert first_export == second_export
+    assert first_export["timeS"] == 14.060236
+    assert first_export["obstaclePosition"] == [79.535534, 64.464466, 42.0]
+
+
+def test_exact_separation_witness_export_preserves_precision() -> None:
+    witness = DynamicSeparationWitness(
+        separation_m=1.23456789123,
+        time_s=4.12345678912,
+        vehicle_position=(1.12345678912, 2.0, 3.0),
+        obstacle_id="moving-obstacle",
+        obstacle_kind="moving-sphere",
+        obstacle_position=(4.12345678912, 5.0, 6.0),
+        declared_safety_margin_m=0.5,
+        method="exact-piecewise-linear",
+        exact=True,
+    )
+
+    exported = predictive_study_module._export_separation_witness(witness)
+
+    assert exported["timeS"] == witness.time_s
+    assert exported["vehiclePosition"] == list(witness.vehicle_position)
+    assert exported["obstaclePosition"] == list(witness.obstacle_position)
 
 
 @pytest.fixture(scope="module")
