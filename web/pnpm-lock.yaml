@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       three:
-        specifier: 0.179.1
-        version: 0.179.1
+        specifier: 0.186.1
+        version: 0.186.1
     devDependencies:
       '@types/three':
         specifier: 0.179.0
@@ -510,8 +510,8 @@ packages:
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
 
-  three@0.179.1:
-    resolution: {integrity: sha512-5y/elSIQbrvKOISxpwXCR4sQqHtGiOI+MKLc3SsBdDXA2hz3Mdp3X59aUp8DyybMa34aeBwbFTpdoLJaUDEWSw==}
+  three@0.186.1:
+    resolution: {integrity: sha512-blFeqb49wRCSGUGj7gtpfnSGHy2lwDk94RhUmS1c/hTby70kvChbWpkJ4Pm1390LqzzvTmzgXKHPEafJwCb8jA==}
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -991,7 +991,7 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
 
-  three@0.179.1: {}
+  three@0.186.1: {}
 
   tinybench@2.9.0: {}
 
