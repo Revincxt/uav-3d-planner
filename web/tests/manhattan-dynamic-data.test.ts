@@ -6,7 +6,9 @@ const filesystemModule = "node:fs";
 const { readFileSync } = await import(filesystemModule);
 const source = JSON.parse(readFileSync(new URL("../public/dynamic-data.json", import.meta.url), "utf8"));
 
-describe("recorded Manhattan reactive missions", () => {
+// These integration tests clone and validate the complete 126 MB native cohort.
+// Runner contention must not turn data-integrity checks into 5-second speed tests.
+describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
   it("retains the complete real city, footprints, mission identity and actual replay", () => {
     const bundle = validateDynamicBundle(source);
     expect(bundle.protocol.id).toBe("manhattan-reactive-demo-v3");
@@ -76,7 +78,7 @@ describe("recorded Manhattan reactive missions", () => {
       }
     }
     expect(validateDynamicBundle(bundle).protocol.id).toBe("manhattan-reactive-demo-v1");
-  }, 30000);
+  });
 
   it("retains compatibility with the legacy Manhattan v2 unconstrained-height replay", () => {
     const bundle = structuredClone(source);
@@ -86,7 +88,7 @@ describe("recorded Manhattan reactive missions", () => {
       for (const run of scenario.runs) delete run.parameters.preserveAltitude;
     }
     expect(validateDynamicBundle(bundle).protocol.id).toBe("manhattan-reactive-demo-v2");
-  }, 30000);
+  });
 
   it.each([undefined, true, 0, 2])("rejects v2 protocol.pathShortcut=%s", (value) => {
     expect(() => validateDynamicBundle({ ...source, protocol: {
