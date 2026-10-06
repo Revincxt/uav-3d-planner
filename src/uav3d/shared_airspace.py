@@ -60,7 +60,9 @@ def share_dynamic_airspace(
     for scenario in scenarios:
         scene = scenario.static_scene
         if (scene.bounds, scene.buildings, scene.no_fly_zones, scene.required_clearance) != (
-            reference.bounds, reference.buildings, reference.no_fly_zones,
+            reference.bounds,
+            reference.buildings,
+            reference.no_fly_zones,
             reference.required_clearance,
         ):
             raise ValueError("Shared missions must have identical physical city constraints")
@@ -76,9 +78,12 @@ def share_dynamic_airspace(
             ):
                 raise ValueError("Shared reservation obstructs another mission's service roof")
     for aircraft in traffic:
-        if any(not segment_is_free(reference, a, b,
-                    clearance=aircraft.radius + reference.required_clearance)
-               for (_, a), (_, b) in pairwise(aircraft.keyframes)):
+        if any(
+            not segment_is_free(
+                reference, a, b, clearance=aircraft.radius + reference.required_clearance
+            )
+            for (_, a), (_, b) in pairwise(aircraft.keyframes)
+        ):
             raise ValueError("Shared aircraft motion intersects the physical city")
     world = world_record(identifier, reference, len(scenarios), zones, traffic)
     shared = []
@@ -86,6 +91,7 @@ def share_dynamic_airspace(
         metadata = dict(scenario.metadata) | {"sharedWorld": world}
         if "mission" in metadata:
             metadata["mission"] = dict(metadata["mission"]) | {"sharedWorld": world}
-        shared.append(replace(scenario, temporary_cylinders=zones, moving_spheres=traffic,
-                              metadata=metadata))
+        shared.append(
+            replace(scenario, temporary_cylinders=zones, moving_spheres=traffic, metadata=metadata)
+        )
     return tuple(shared)

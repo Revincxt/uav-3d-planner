@@ -32,8 +32,10 @@ def smooth_timed_horizontal_curves(
     points: list[Point3] = []
     parameters: list[float] = []
     protected: set[float] = set()
-    task_positions = [tuple(task["position"])
-                      for task in scenario.static_scene.metadata.get("missionTaskPoints", [])]
+    task_positions = [
+        tuple(task["position"])
+        for task in scenario.static_scene.metadata.get("missionTaskPoints", [])
+    ]
     for waypoint, clock in zip(path.waypoints, clocks, strict=True):
         if any(almost_equal(waypoint.position, anchor) for anchor in task_positions):
             protected.add(clock)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gzip
+import hashlib
 import importlib
 import json
 from copy import deepcopy
@@ -143,3 +145,47 @@ def test_snapshot_rejects_stale_or_incomplete_inputs(inputs, snapshot, change):
     path.write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ValueError):
         inputs.load_inputs(public, city)
+
+
+@pytest.fixture
+def source_archive(inputs, tmp_path, monkeypatch):
+    source = b"def distance(x, y):\n    return (x*x + y*y)**0.5\n"
+    sha256 = "sha256:" + hashlib.sha256(source).hexdigest()
+    path = tmp_path / "planner.py"
+    path.write_bytes(source)
+    archive = {
+        "schemaVersion": 1,
+        "files": {"planner.py": {"source": source.decode(), "sha256": sha256}},
+    }
+    target = tmp_path / "sources.json.gz"
+    target.write_bytes(gzip.compress(json.dumps(archive).encode()))
+    monkeypatch.setattr(inputs, "ROOT", tmp_path)
+    monkeypatch.setattr(inputs, "SOURCE_ARCHIVE", target)
+    return path, sha256, target, archive
+
+
+def test_source_formatting_keeps_original_computation_hash(inputs, source_archive):
+    path, sha256, target, _ = source_archive
+    inputs.audit_source(path, sha256)
+    path.write_text("def distance(x, y):\n    return (x * x + y * y) ** 0.5\n", encoding="utf-8")
+    assert inputs.digest(path) != sha256
+    inputs.audit_source(path, sha256)
+    target.unlink()
+    with pytest.raises(ValueError, match="Computation source changed"):
+        inputs.audit_source(path, sha256)
+
+
+def test_semantic_change_cannot_pass_as_formatting(inputs, source_archive):
+    path, sha256, _, _ = source_archive
+    path.write_text("def distance(x, y):\n    return (x * x + y * y) ** 0.6\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="semantics changed"):
+        inputs.audit_source(path, sha256)
+
+
+def test_source_archive_cannot_forge_original_computation_bytes(inputs, source_archive):
+    path, sha256, target, archive = source_archive
+    path.write_text("def distance(x, y):\n    return x + y\n", encoding="utf-8")
+    archive["files"]["planner.py"]["source"] = path.read_text()
+    target.write_bytes(gzip.compress(json.dumps(archive).encode()))
+    with pytest.raises(ValueError, match="Original computation source digest mismatch"):
+        inputs.audit_source(path, sha256)

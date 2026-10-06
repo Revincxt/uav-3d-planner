@@ -644,8 +644,10 @@ def _positive_finite(name: str, value: float) -> None:
 
 def _shortcut_horizontal_timed_path(scenario: DynamicScenario, path: TimedPath) -> TimedPath:
     raw = path.waypoints
-    task_positions = [tuple(task["position"])
-                      for task in scenario.static_scene.metadata.get("missionTaskPoints", [])]
+    task_positions = [
+        tuple(task["position"])
+        for task in scenario.static_scene.metadata.get("missionTaskPoints", [])
+    ]
     output = [raw[0]]
     index = 0
     while index < len(raw) - 1:
@@ -654,9 +656,11 @@ def _shortcut_horizontal_timed_path(scenario: DynamicScenario, path: TimedPath) 
             index += 1
             continue
         block_end = index + 1
-        while (block_end + 1 < len(raw) and raw[block_end + 1].action == "move"
-               and not any(almost_equal(raw[block_end].position, anchor)
-                           for anchor in task_positions)):
+        while (
+            block_end + 1 < len(raw)
+            and raw[block_end + 1].action == "move"
+            and not any(almost_equal(raw[block_end].position, anchor) for anchor in task_positions)
+        ):
             block_end += 1
         following = index + 1
         selected = list(raw[index : following + 1])

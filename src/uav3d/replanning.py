@@ -204,7 +204,10 @@ def _safe_traversals(scenario: DynamicScenario, traversals: tuple[_Traversal, ..
 
 
 def _horizontal_escape(
-    scenario: DynamicScenario, position: Point3, time_s: float, duration: float,
+    scenario: DynamicScenario,
+    position: Point3,
+    time_s: float,
+    duration: float,
     cruise_speed: float,
 ) -> tuple[Point3, ...]:
     """Locally observed traffic can require movement instead of an unsafe hover.
@@ -222,17 +225,25 @@ def _horizontal_escape(
         span = cruise_speed * duration * scale
         for index in range(32):
             angle = heading + index * math.tau / 32
-            endpoint = (position[0] + span * math.cos(angle),
-                        position[1] + span * math.sin(angle), position[2])
-            if not spacetime_segment_is_free(scenario, position, endpoint,
-                                              time_s, time_s + duration):
+            endpoint = (
+                position[0] + span * math.cos(angle),
+                position[1] + span * math.sin(angle),
+                position[2],
+            )
+            if not spacetime_segment_is_free(
+                scenario, position, endpoint, time_s, time_s + duration
+            ):
                 continue
-            if not spacetime_segment_is_free(scenario, endpoint, endpoint,
-                                              time_s + duration, time_s + duration * 2):
+            if not spacetime_segment_is_free(
+                scenario, endpoint, endpoint, time_s + duration, time_s + duration * 2
+            ):
                 continue
-            separations = [distance(endpoint, aircraft.position_at(time_s + duration * 2))
-                           - aircraft.radius - scenario.static_scene.required_clearance
-                           for aircraft in scenario.moving_spheres]
+            separations = [
+                distance(endpoint, aircraft.position_at(time_s + duration * 2))
+                - aircraft.radius
+                - scenario.static_scene.required_clearance
+                for aircraft in scenario.moving_spheres
+            ]
             progress = distance(position, goal) - distance(endpoint, goal)
             clearance = min(separations, default=80.0)
             candidates.append((progress + 2 * min(80, clearance), endpoint))
@@ -466,15 +477,23 @@ def simulate_replanning(
 
         # Do not wait inside an approaching aircraft's swept volume until the
         # hold itself becomes unsafe. Defaults of frozen studies are unchanged.
-        if not safe and allow_horizontal_escape and guard is not None and (
-            not point_is_free(guard, position) or not spacetime_segment_is_free(
-                scenario, position, position, time_s, time_s + step_duration)
+        if (
+            not safe
+            and allow_horizontal_escape
+            and guard is not None
+            and (
+                not point_is_free(guard, position)
+                or not spacetime_segment_is_free(
+                    scenario, position, position, time_s, time_s + step_duration
+                )
+            )
         ):
             escape = _horizontal_escape(scenario, position, time_s, step_duration, cruise_speed)
             if escape:
                 current_path = escape
                 traversals, remaining_path, movement_duration = _candidate_traversal(
-                    current_path, time_s, step_duration, cruise_speed)
+                    current_path, time_s, step_duration, cruise_speed
+                )
                 safe = bool(traversals) and _safe_traversals(scenario, traversals)
                 next_replan = time_s + step_duration
                 replan_reason = "safety-gate"

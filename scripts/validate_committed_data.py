@@ -10,7 +10,13 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
-from committed_inputs import assert_equivalent, input_record, load_inputs, restore_input
+from committed_inputs import (
+    assert_equivalent,
+    audit_source,
+    input_record,
+    load_inputs,
+    restore_input,
+)
 from export_manhattan_static_dynamic import mission_scenes, shared_dynamic_scenarios
 
 from uav3d.benchmark import scene_fingerprint
@@ -59,9 +65,7 @@ def audit_city(bundle: dict[str, Any], city: Any) -> None:
             path = ROOT / source["path"]
             if not path.resolve().is_relative_to(ROOT):
                 raise ValueError("Source provenance leaves the project")
-            digest = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
-            if digest != source["sha256"]:
-                raise ValueError(f"Computation source changed: {source['path']}")
+            audit_source(path, source["sha256"])
 
 
 def audit_current(public: Path) -> dict[str, int]:

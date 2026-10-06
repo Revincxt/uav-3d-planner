@@ -8,6 +8,9 @@ Building envelopes come directly from the separately verified official city file
 
 from __future__ import annotations
 
+import argparse
+import ast
+import gzip
 import hashlib
 import json
 import math
@@ -24,6 +27,7 @@ from uav3d.scene import Scene
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / "data" / "studies" / "planning-inputs.json"
+SOURCE_ARCHIVE = ROOT / "data" / "studies" / "computation-sources.json.gz"
 NATIVE_FILES = {
     "static": "demo-data.json",
     "dynamic": "dynamic-data.json",
@@ -36,6 +40,56 @@ RECONSTRUCTION_TOLERANCE = 1e-7
 
 def digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def audit_source(path: Path, expected: str) -> None:
+    """Keep original source hashes, accepting only verified formatting-only edits."""
+    current = path.read_bytes()
+    if "sha256:" + hashlib.sha256(current).hexdigest() == expected:
+        return
+    if not SOURCE_ARCHIVE.is_file():
+        raise ValueError(f"Computation source changed: {path.relative_to(ROOT)}")
+    archive = json.loads(gzip.decompress(SOURCE_ARCHIVE.read_bytes()))
+    if archive.get("schemaVersion") != 1:
+        raise ValueError("Unsupported computation-source archive")
+    record = archive["files"].get(path.relative_to(ROOT).as_posix())
+    if not record:
+        raise ValueError(f"Computation source changed: {path.relative_to(ROOT)}")
+    original = record["source"].encode("utf-8")
+    if record["sha256"] != expected or "sha256:" + hashlib.sha256(original).hexdigest() != expected:
+        raise ValueError("Original computation source digest mismatch")
+    # Include type comments and ignore only location attributes. Changed constants,
+    # expressions, imports, control flow, docstrings, and annotations still fail.
+    original_tree = ast.dump(ast.parse(original, type_comments=True), include_attributes=False)
+    current_tree = ast.dump(ast.parse(current, type_comments=True), include_attributes=False)
+    if original_tree != current_tree:
+        raise ValueError(f"Computation source semantics changed: {path.relative_to(ROOT)}")
+
+
+def archive_sources(paths: list[str]) -> None:
+    """Archive existing computation bytes before an explicitly formatting-only edit."""
+    bundles = [
+        json.loads((ROOT / "web" / "public" / name).read_text(encoding="utf-8"))
+        for name in NATIVE_FILES.values()
+    ]
+    files = {}
+    for name in paths:
+        path = ROOT / name
+        if not path.resolve().is_relative_to(ROOT / "src" / "uav3d") or path.suffix != ".py":
+            raise ValueError("Computation archive only accepts project planning Python sources")
+        source = path.read_bytes().decode("utf-8")
+        sha256 = digest(path)
+        for bundle in bundles:
+            provenance = bundle.get("computationSourceProvenance", bundle["sourceProvenance"])
+            expected = next(
+                record["sha256"] for record in provenance["files"] if record["path"] == name
+            )
+            if sha256 != expected:
+                raise ValueError(f"Cannot archive different computation source: {name}")
+        files[name] = {"sha256": sha256, "source": source}
+    archive = {"schemaVersion": 1, "files": files}
+    SOURCE_ARCHIVE.write_bytes(gzip.compress(json.dumps(archive, sort_keys=True).encode(), mtime=0))
+    print(f"Archived {len(files)} byte-exact computation sources before formatting.")
 
 
 def input_record(problem: Scene | DynamicScenario) -> dict[str, Any]:
@@ -128,4 +182,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--archive-sources", nargs="+", metavar="PATH")
+    args = parser.parse_args()
+    if args.archive_sources:
+        archive_sources(args.archive_sources)
+    else:
+        main()
