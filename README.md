@@ -1,3 +1,5 @@
+<div align="center">
+
 # UAV 3D Planner
 
 [![CI](https://github.com/Revincxt/uav-3d-planner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Revincxt/uav-3d-planner/actions/workflows/ci.yml)
@@ -8,6 +10,7 @@
 [![pnpm 11.9](https://img.shields.io/badge/pnpm-11.9-f69220.svg)](https://pnpm.io/installation)
 [![License: MIT](https://img.shields.io/badge/license-MIT-555.svg)](LICENSE)
 
+</div>
 A 3D UAV path-planning simulator built on real Manhattan building data, featuring static routing, reactive replanning, and predictive space-time planning.
 
 [Live Demo](https://revincxt.github.io/uav-3d-planner/) · [Quick Start](#quick-start) · [References](#references)
