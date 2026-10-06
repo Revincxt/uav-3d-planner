@@ -1,99 +1,70 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Recorded comparison of 3D A*, Lazy Theta*, and RRT* in static urban UAV scenes."
-    />
-    <title>UAV 3D Planner Lab</title>
+    <meta name="description" content="Explore and compare UAV flight paths in 3D urban scenarios." />
+    <title>Manhattan missions · UAV 3D Planner</title>
   </head>
   <body>
-    <main>
-      <nav class="study-nav" aria-label="Study views">
-        <span aria-current="page">Recorded paths</span>
-        <a href="./results.html">Benchmark results</a>
-        <a href="./dynamic.html">Dynamic replanning</a>
-        <a href="./predictive.html">Predictive planning</a>
-      </nav>
-
-      <header class="masthead">
-        <div>
-          <p class="eyebrow">Reproducible planning study</p>
-          <h1>UAV 3D Planner Lab</h1>
-          <p class="scope">
-            Collision-aware path planning through static city buildings and fixed no-fly zones.
-          </p>
-        </div>
-        <p class="record-status">Recorded demonstration · non-confirmatory</p>
+    <main class="workspace workspace-static">
+      <header class="app-header">
+        <nav class="study-nav" aria-label="Workspace views">
+          <a href="./" aria-current="page">Static</a>
+          <a href="./dynamic.html">Dynamic</a>
+          <a href="./predictive.html">Predictive</a>
+          <a href="./results.html">Results</a>
+        </nav>
       </header>
 
-      <section class="controls" aria-label="Figure controls">
-        <label>
-          <span>Scene</span>
-          <select id="scene-select"></select>
-        </label>
+      <div class="workspace-body">
+        <select id="scene-select" aria-label="Route details" hidden></select>
 
-        <fieldset>
-          <legend>Trajectory</legend>
-          <label><input type="radio" name="path-mode" value="raw" /> Raw</label>
-          <label><input type="radio" name="path-mode" value="smoothed" checked /> Smoothed</label>
-        </fieldset>
+        <section class="workspace-content" aria-labelledby="scene-title">
+          <div class="content-heading">
+            <div><h1 id="scene-title">Manhattan</h1><p id="scene-caption" hidden></p></div>
+          </div>
 
-        <fieldset id="planner-controls">
-          <legend>Planner</legend>
-        </fieldset>
+          <div class="demo-grid">
+            <section class="stage-card" aria-label="Scene and camera controls">
+              <div class="stage-toolbar">
+                <select id="static-planner-select" aria-label="Planner"></select>
+                <div class="follow-controls"><select id="follow-target" aria-label="Drone to follow"></select><button id="follow-toggle" type="button" aria-pressed="false" title="Close chase view centered on the selected UAV">Follow</button></div>
+                <div class="stage-controls">
+                  <div class="view-controls" role="group" aria-label="Camera view">
+                    <button type="button" data-view="isometric" aria-pressed="true">3D</button>
+                    <button type="button" data-view="top" aria-pressed="false">Top</button>
+                    <button type="button" data-view="reset" title="Reset camera" aria-label="Reset camera"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.2 7A6 6 0 1 1 4 12M4.2 7V3.7M4.2 7h3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+                  </div>
+                </div>
+              </div>
+              <div class="stage-viewport">
+                <div id="scene-viewer" class="scene-viewer" role="img" aria-label="Three-dimensional urban path-planning scene"></div>
+                <div id="playback-state" class="playback-state" title="Illustrative static-route playback">Fixed route · Ready</div>
+                <div id="legend" class="canvas-legend" aria-label="Scene legend"></div>
+                <div class="map-attribution">Imagery: USDA · <a href="https://www.usgs.gov/the-national-map-data-delivery" target="_blank" rel="noopener noreferrer">USGS The National Map</a></div>
+              </div>
+              <div class="playback-bar" aria-label="Static route playback controls">
+                <div class="button-group">
+                  <button id="previous-frame" type="button" aria-label="Back two seconds">‹</button>
+                  <button id="play-pause" type="button" aria-pressed="false" aria-label="Play" title="Play"><svg viewBox="0 0 20 20" aria-hidden="true"><path class="play-symbol" d="M7 4.5 16 10l-9 5.5Z" fill="currentColor" /><path class="pause-symbol" d="M6 5h3v10H6zm5 0h3v10h-3z" fill="currentColor" /></svg></button>
+                  <button id="next-frame" type="button" aria-label="Forward two seconds">›</button>
+                </div>
+                <label class="timeline-control" for="timeline"><span><output id="timeline-value" for="timeline">0.0 s</output></span><input id="timeline" type="range" min="0" max="0" step="any" value="0" title="Static route playback at 15 m/s · fly-through checkpoints" /></label>
+                <div class="speed-control" aria-label="Playback speed"><button type="button" data-speed="0.5" aria-pressed="false">0.5×</button><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-speed="2" aria-pressed="false">2×</button></div>
+              </div>
+              <div hidden><strong id="start-coordinate"></strong><strong id="goal-coordinate"></strong></div>
+            </section>
 
-        <div class="view-controls" aria-label="Camera view">
-          <span>View</span>
-          <button type="button" data-view="isometric">Isometric</button>
-          <button type="button" data-view="top">Top</button>
-          <button type="button" data-view="reset">Reset</button>
-        </div>
-      </section>
-
-      <figure>
-        <div
-          id="scene-viewer"
-          class="scene-viewer"
-          role="img"
-          aria-label="Three-dimensional urban path-planning scene"
-        ></div>
-        <figcaption>
-          <div id="legend" class="legend" aria-label="Figure legend"></div>
-          <p id="scene-caption"></p>
-        </figcaption>
-      </figure>
-
-      <section class="results" aria-labelledby="results-heading">
-        <h2 id="results-heading">Recorded result</h2>
-        <div class="table-wrap">
-          <table>
-            <caption class="sr-only">
-              Recorded planning results for the selected static scene
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Planner</th>
-                <th scope="col">Status</th>
-                <th scope="col">Time (ms)</th>
-                <th scope="col">Raw length (m)</th>
-                <th scope="col">Smoothed (m)</th>
-                <th scope="col">Min. clearance (m)</th>
-                <th scope="col">Search effort</th>
-                <th scope="col">Seed</th>
-              </tr>
-            </thead>
-            <tbody id="results-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <details>
-        <summary>Method and provenance</summary>
-        <div id="provenance"></div>
-      </details>
+            <aside class="inspector-card" aria-labelledby="results-heading">
+              <div class="inspector-heading"><h2 id="results-heading">Details</h2><p id="comparison-caption" hidden></p></div>
+              <div id="planner-results" class="planner-results"></div>
+              <div class="flight-envelope"><span class="eyebrow">MODEL ENVELOPE</span><div><span>Model ceiling</span><strong id="altitude-limit">—</strong></div><div><span>Safety margin</span><strong id="safety-margin">—</strong></div></div>
+            </aside>
+          </div>
+        </section>
+      </div>
       <p id="live-region" class="sr-only" aria-live="polite"></p>
     </main>
     <script type="module" src="/src/main.ts"></script>

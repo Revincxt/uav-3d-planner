@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildPredictiveComparisonRows,
   loadPredictiveBundle,
+  stationaryDuration,
   validatePredictiveBundle,
 } from "../src/predictive-data";
 import type {
@@ -20,6 +21,31 @@ import type {
 const start: Vec3 = [0, 0, 10];
 const goal: Vec3 = [30, 40, 10];
 const directDistance = 50;
+
+describe("origin-independent wait classification", () => {
+  it.each([-10_000, 0, 1500, 1_000_000])("does not label sub-millimetre motion as a wait at origin %s", origin => {
+    const path: TimedWaypoint[] = [
+      { timeS: 0, position: [origin, origin, 180] },
+      { timeS: 0.0000599279, position: [origin + 0.0006, origin + 0.0006, 180] },
+    ];
+    expect(stationaryDuration(path)).toBe(0);
+  });
+  it("counts actual waits but not short horizontal or vertical motion", () => {
+    const path: TimedWaypoint[] = [
+      { timeS: 0, position: [1500, 3000, 180] },
+      { timeS: 2, position: [1500, 3000, 180] },
+      { timeS: 3, position: [1500.0001, 3000, 180] },
+      { timeS: 4, position: [1500.0001, 3000, 180.0001] },
+    ];
+    expect(stationaryDuration(path)).toBe(2);
+  });
+  it("uses the same absolute numerical tolerance as the Python planner", () => {
+    expect(stationaryDuration([
+      { timeS: 0, position: [0, 0, 0] },
+      { timeS: 2, position: [5e-10, 0, 0] },
+    ])).toBe(2);
+  });
+});
 
 const executionEnvelope: PredictiveExecutionEnvelope = {
   model: "discrete-segment-average-envelope-v1",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from bisect import bisect_right
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -120,13 +121,10 @@ class MovingSphere:
             return self.keyframes[0][1]
         if time_s >= self.keyframes[-1][0]:
             return self.keyframes[-1][1]
-        for (left_time, left), (right_time, right) in zip(
-            self.keyframes, self.keyframes[1:], strict=True
-        ):
-            if left_time <= time_s <= right_time:
-                fraction = (time_s - left_time) / (right_time - left_time)
-                return lerp(left, right, fraction)
-        raise AssertionError("validated keyframes must bracket an interior interpolation time")
+        index = bisect_right(self.keyframes, time_s, key=lambda frame: frame[0]) - 1
+        left_time, left = self.keyframes[index]
+        right_time, right = self.keyframes[index + 1]
+        return lerp(left, right, (time_s - left_time) / (right_time - left_time))
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -284,24 +282,52 @@ def dynamic_scenario_fingerprint(scenario: DynamicScenario) -> str:
 
 
 def snapshot_scene(
-    scenario: DynamicScenario, time_s: float, *, start: Point3 | None = None
+    scenario: DynamicScenario,
+    time_s: float,
+    *,
+    start: Point3 | None = None,
+    lookahead_s: float = 0.0,
 ) -> Scene:
-    """Return a conservative static snapshot of every obstacle at ``time_s``."""
+    """Snapshot obstacles, optionally guarding their entire near-term swept volume.
+
+    The default is the unchanged instantaneous snapshot. A requested guard also
+    includes temporary airspace becoming active within its declared window.
+    """
 
     if not math.isfinite(time_s) or time_s < 0:
         raise ValueError("snapshot time must be finite and non-negative")
+    if not math.isfinite(lookahead_s) or lookahead_s < 0:
+        raise ValueError("snapshot lookahead must be finite and non-negative")
     dynamic_zones = [
-        zone.as_static() for zone in scenario.temporary_cylinders if zone.is_active(time_s)
+        zone.as_static()
+        for zone in scenario.temporary_cylinders
+        if (zone.active_from <= time_s + lookahead_s and zone.active_until > time_s)
     ]
     for sphere in scenario.moving_spheres:
         x, y, z = sphere.position_at(time_s)
+        radius, z_min, z_max = sphere.radius, z - sphere.radius, z + sphere.radius
+        if lookahead_s:
+            samples = [
+                sphere.position_at(time_s),
+                sphere.position_at(time_s + lookahead_s),
+                *(
+                    position
+                    for clock, position in sphere.keyframes
+                    if time_s < clock < time_s + lookahead_s
+                ),
+            ]
+            x = (min(point[0] for point in samples) + max(point[0] for point in samples)) / 2
+            y = (min(point[1] for point in samples) + max(point[1] for point in samples)) / 2
+            radius += max(math.hypot(point[0] - x, point[1] - y) for point in samples)
+            z_min = min(point[2] for point in samples) - sphere.radius
+            z_max = max(point[2] for point in samples) + sphere.radius
         dynamic_zones.append(
             Cylinder(
                 sphere.sphere_id,
                 (x, y),
-                sphere.radius,
-                z - sphere.radius,
-                z + sphere.radius,
+                radius,
+                z_min,
+                z_max,
             )
         )
     scene_start = scenario.static_scene.start if start is None else start

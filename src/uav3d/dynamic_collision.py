@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from bisect import bisect_left, bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import pairwise
@@ -162,7 +163,9 @@ def _moving_sphere_collision(
         relative = subtract(a, sphere.position_at(start_time))
         return _relative_segment_hits_sphere(relative, relative, sphere.radius + padding)
     boundaries = [start_time]
-    boundaries.extend(time_s for time_s, _ in sphere.keyframes if start_time < time_s < end_time)
+    first = bisect_right(sphere.keyframes, start_time, key=lambda frame: frame[0])
+    last = bisect_left(sphere.keyframes, end_time, key=lambda frame: frame[0])
+    boundaries.extend(time_s for time_s, _ in sphere.keyframes[first:last])
     boundaries.append(end_time)
     duration = end_time - start_time
     for left, right in pairwise(boundaries):
@@ -267,7 +270,9 @@ def _moving_sphere_separation_witness(
     end_time: float,
 ) -> DynamicSeparationWitness:
     boundaries = [start_time]
-    boundaries.extend(time_s for time_s, _ in sphere.keyframes if start_time < time_s < end_time)
+    first = bisect_right(sphere.keyframes, start_time, key=lambda frame: frame[0])
+    last = bisect_left(sphere.keyframes, end_time, key=lambda frame: frame[0])
+    boundaries.extend(time_s for time_s, _ in sphere.keyframes[first:last])
     boundaries.append(end_time)
     duration = end_time - start_time
     candidates: list[DynamicSeparationWitness] = []

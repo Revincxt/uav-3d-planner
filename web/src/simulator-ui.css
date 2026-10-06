@@ -1,0 +1,363 @@
+/* Shared simulator shell. Flight geometry and replay records remain unchanged. */
+:root {
+  color-scheme: dark;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-size: 12px; --ui-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --page: #101820; --background: #101820;
+  /* Alpha belongs to surfaces, never to their text, icons or flight data. */
+  --glass-surface: rgba(17, 26, 35, .72); --glass-panel: rgba(15, 24, 33, .76);
+  --glass-card: rgba(11, 22, 32, .2); --glass-popup: rgba(17, 26, 35, .82);
+  --paper: var(--glass-panel); --paper-secondary: var(--glass-card); --surface: var(--glass-card);
+  --ink: #e5eef4; --foreground: #e5eef4; --muted: #cfdae3; --faint: #c4d2dd;
+  --line: #ffffff17; --rule: #ffffff17; --soft-line: #ffffff0c; --rule-strong: #ffffff38;
+  --control: rgba(32, 49, 63, .68); --control-active: #77bde81a; --control-border: #77bde84c; --focus: #77bde8; --accent: #77bde8;
+  --success: #abe0c6; --warning: #f0ce9f; --failed: #f4aaa5;
+  --hud-surface: var(--glass-surface); --hud-border: #a8bdca40;
+  --hud-shadow: 0 5px 20px #06101424, inset 0 1px 0 #ffffff05;
+  --hud-gap: 18px;
+}
+body { background: var(--page); font-size: var(--ui-size); }
+.workspace input { font-size: var(--ui-size); }
+.workspace button, .workspace select {
+  min-height: 34px; border-color: var(--hud-border); border-radius: 6px;
+  background: #ffffff04; color: var(--ink); font-size: var(--ui-size); font-weight: 500;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.workspace button:hover:not(:disabled) { border-color: #afc3d140; background: #ffffff0a; }
+.workspace button[aria-pressed="true"], .workspace button[aria-expanded="true"] { color: #c1e6fb; border-color: var(--control-border); background: var(--control-active); }
+.workspace button:disabled, .workspace select:disabled { opacity: .38; cursor: default; }
+.workspace select { cursor: pointer; }
+.workspace select option { background: var(--paper); color: var(--ink); }
+.workspace button:focus-visible, .workspace select:focus-visible,
+.workspace input:focus-visible, .workspace a:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.workspace .brand { color: var(--ink); font-size: 12px; letter-spacing: -.02em; }
+.workspace .brand-mark { width: 27px; height: 27px; background: #77bde80b; border-color: #77bde85c; border-radius: 5px; }
+.workspace .brand-mark::before, .workspace .brand-mark::after { background: var(--accent); width: 13px; left: 6px; top: 11px; }
+.workspace .study-nav { gap: 4px; }
+.workspace .study-nav a, .workspace .study-nav span { color: var(--muted); font-size: var(--ui-size); padding: 8px 12px; border: 1px solid transparent; border-radius: 5px; white-space: nowrap; }
+.workspace .study-nav [aria-current="page"] { color: #c1e6fb; background: var(--control-active); border-color: #77bde84c; }
+.workspace .study-nav a:hover { background: #ffffff0a; color: #fff; }
+.workspace .study-nav a[aria-current="page"]:hover { background: #77bde829; color: #c1e6fb; }
+
+/* Full-bleed world. Only actual controls intercept orbit/zoom gestures. */
+.workspace:not(.workspace-results) { position: relative; display: block; }
+.workspace:not(.workspace-results) .workspace-body,
+.workspace:not(.workspace-results) .workspace-content,
+.workspace:not(.workspace-results) .demo-grid { position: absolute; inset: 0; display: block; margin: 0; padding: 0; }
+.workspace:not(.workspace-results) .stage-card { position: absolute; inset: 0; display: block; border: 0; border-radius: 0; background: #eef1ee; box-shadow: none; }
+.workspace:not(.workspace-results) .stage-viewport { position: absolute; inset: 0; }
+.workspace:not(.workspace-results) .stage-viewport::after {
+  content: ""; position: absolute; z-index: 1; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, #0b192547 0, transparent 210px, transparent 70%, #0b192530 100%);
+}
+.workspace:not(.workspace-results) .app-header {
+  position: absolute; z-index: 5; top: var(--hud-gap); left: var(--hud-gap); right: var(--hud-gap);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: 44px; gap: 12px;
+  height: 44px; min-height: 0; padding: 0; border: 0; background: none; pointer-events: none;
+}
+.workspace:not(.workspace-results) .study-nav,
+.workspace:not(.workspace-results) .inspector-toggle,
+.workspace:not(.workspace-results) .stage-toolbar > select,
+.workspace:not(.workspace-results) .stage-toolbar > label,
+.workspace:not(.workspace-results) .follow-controls,
+.workspace:not(.workspace-results) .view-controls {
+  background: var(--hud-surface); border: 1px solid var(--hud-border); border-radius: 7px;
+  box-shadow: var(--hud-shadow); backdrop-filter: blur(8px); pointer-events: auto;
+}
+.workspace:not(.workspace-results) .study-nav { position: static; justify-self: center; transform: none; height: 44px; padding: 3px; margin: 0; }
+.workspace:not(.workspace-results) .camera-controls { justify-self: end; padding: 3px; }
+.workspace .camera-controls button { height: 34px; min-height: 34px; font-size: var(--ui-size); padding: 6px 8px; }
+.workspace .camera-controls button:is([data-view="reset"], #observe-encounter) { width: 34px; min-width: 34px; padding: 7px; }
+.workspace .camera-controls svg { display: block; width: 18px; height: 18px; }
+.workspace:not(.workspace-results) .content-heading {
+  position: absolute; z-index: 4; top: 128px; left: var(--hud-gap); right: var(--hud-gap);
+  min-height: 0; padding: 0; pointer-events: none;
+}
+.workspace:not(.workspace-results) .content-heading > div:first-child { flex: none; }
+.workspace:not(.workspace-results) .content-heading h1 {
+  display: inline-flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 7px;
+  background: var(--hud-surface); border: 1px solid var(--hud-border); color: #dfebe9;
+  font-size: var(--ui-size); font-weight: 600; line-height: 1.2; letter-spacing: .06em; text-transform: uppercase;
+  backdrop-filter: blur(12px);
+}
+.workspace:not(.workspace-results) .content-heading h1::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--success); }
+.workspace:not(.workspace-results) .inspector-toggle { position: absolute; top: -52px; right: 0; min-width: 80px; height: 40px; padding: 0 14px; color: var(--ink); margin: 0; font-size: var(--ui-size); }
+.workspace:not(.workspace-results) .inspector-toggle[aria-expanded="true"] { color: #c1e6fb; background: linear-gradient(var(--control-active), var(--control-active)), var(--hud-surface); border-color: var(--control-border); }
+.workspace:not(.workspace-results) .stage-toolbar {
+  position: absolute; z-index: 5; top: 76px; left: var(--hud-gap); right: var(--hud-gap);
+  min-height: 0; padding: 0; border: 0; gap: 8px; background: none; pointer-events: none;
+}
+.workspace:not(.workspace-results) .stage-toolbar > select { min-width: 146px; height: 38px; }
+.workspace:not(.workspace-results) .stage-toolbar select { font-size: var(--ui-size); }
+.workspace:not(.workspace-results) .stage-toolbar > label { padding: 2px; }
+.workspace:not(.workspace-results) .stage-toolbar > label select { border: 0; background: transparent; }
+.workspace:not(.workspace-results) .follow-controls { padding: 2px; gap: 3px; }
+.workspace:not(.workspace-results) .stage-toolbar > .follow-controls { margin-left: 0; }
+.workspace:not(.workspace-results) .follow-controls select { border: 0; background: transparent; }
+.workspace:not(.workspace-results) .follow-controls button { min-width: 67px; background: #ffffff08; }
+.workspace .follow-controls button[aria-pressed="true"] { color: #c1e6fb; border-color: var(--control-border); background: var(--control-active); }
+.workspace:not(.workspace-results) .stage-controls { gap: 8px; pointer-events: none; }
+.workspace:not(.workspace-results) .view-controls { padding: 3px; gap: 2px; }
+.workspace:not(.workspace-results) .view-controls button { border-color: transparent; padding: 6px 9px; background: none; }
+.workspace:not(.workspace-results) .view-controls button[aria-pressed="true"] { color: #c1e6fb; background: var(--control-active); border-color: var(--control-border); }
+.workspace-dynamic .stage-toolbar > .stage-controls { width: 100%; justify-content: flex-start; margin: 0; }
+.workspace-dynamic .planner-control { padding: 2px; border: 1px solid var(--hud-border); border-radius: 7px; background: var(--hud-surface); backdrop-filter: blur(8px); pointer-events: auto; }
+.workspace-dynamic .planner-control select { border: 0; background: none; }
+.workspace-dynamic .stage-controls > .view-controls:last-child { margin-left: auto; }
+.workspace:not(.workspace-results) .playback-state { top: 170px; left: var(--hud-gap); max-width: calc(100% - 36px); padding: 7px 10px; background: var(--hud-surface); color: var(--muted); font-size: var(--ui-size); border-color: var(--hud-border); backdrop-filter: blur(8px); }
+.workspace .playback-state[data-action="flying"] { color: var(--success); }
+.workspace .playback-state:is([data-action="waiting"], [data-action="replanning"]) { color: var(--warning); border-color: #e5b77c4c; }
+.workspace:not(.workspace-results) .scene-challenge,
+.workspace:not(.workspace-results) .canvas-corner-label,
+.workspace:not(.workspace-results) .canvas-hint,
+.workspace:not(.workspace-results) .orientation-reference,
+.workspace:not(.workspace-results) .event-strip { display: none; }
+.workspace:not(.workspace-results) .app-header .route-legend {
+  position: static; margin: 0; max-width: none;
+  display: flex; flex-wrap: nowrap; align-items: center; min-height: 44px; pointer-events: auto;
+  gap: 2px; justify-content: flex-start; padding: 4px; border-radius: 7px; border: 1px solid var(--hud-border);
+  background: var(--hud-surface); box-shadow: var(--hud-shadow); color: #c4d4d7; backdrop-filter: blur(12px);
+}
+.workspace .route-legend button { padding: 5px 6px; min-height: 30px; background: none; border-color: transparent; color: #c7d7e2; font: 500 var(--ui-size)/1.3 var(--ui-mono); }
+.workspace .route-legend button[aria-pressed="true"] { color: #fff; background: #ffffff08; border-color: transparent; box-shadow: inset 0 -2px 0 var(--route-color); }
+.workspace .route-legend i { width: 12px; }
+.workspace .task-arrival-notice { bottom: 248px; background: rgba(20, 43, 37, .72); color: #c2edd9; border-color: #80cda859; font-size: var(--ui-size); backdrop-filter: blur(8px); }
+.flight-announcement {
+  position: absolute; z-index: 6; left: 50%; bottom: 244px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 9px; width: max-content; max-width: calc(100% - 24px);
+  padding: 10px 13px; border: 1px solid #e5b77c45; border-radius: 8px;
+  background: var(--hud-surface); box-shadow: var(--hud-shadow); backdrop-filter: blur(8px);
+  color: #edc995; font-size: var(--ui-size); line-height: 1.5; pointer-events: none;
+}
+.flight-announcement svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.flight-announcement[data-kind="resume"] { color: #b0e5cd; border-color: #80cda840; }
+.stage-viewport:has(> .flight-announcement:not([hidden])) .task-arrival-notice { visibility: hidden; }
+.flight-announcement[hidden] { display: none; }
+.workspace:not(.workspace-results) .map-attribution { bottom: var(--hud-gap); right: var(--hud-gap); max-width: calc(100% - 36px); color: #d7e3eb; font-size: 9px; background: var(--hud-surface); }
+.workspace .flight-hud .playback-bar {
+  position: relative; bottom: auto; left: auto; transform: none; width: 100%; padding: 10px 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "transport transport" "timeline speed";
+  gap: 8px 10px; border: 0; border-top: 1px solid var(--hud-border); border-radius: 0;
+  background: #ffffff03; box-shadow: none; pointer-events: auto;
+}
+.workspace .flight-hud .playback-bar button { min-height: 30px; height: 30px; }
+.workspace .flight-hud .playback-bar #play-pause { display: inline-grid; place-items: center; width: 32px; min-width: 32px; padding: 0; background: var(--control-active); color: #c1e6fb; border-color: var(--control-border); }
+.workspace .flight-hud .playback-bar #play-pause:hover { background: #77bde83b; }
+.workspace .flight-hud .playback-bar #play-pause[aria-pressed="true"] { background: #77bde840; color: #e0f3ff; border-color: #9ed6f580; }
+.workspace .playback-bar #play-pause svg { width: 18px; height: 18px; }
+.workspace .playback-bar #play-pause .pause-symbol,
+.workspace .playback-bar #play-pause[aria-pressed="true"] .play-symbol { display: none; }
+.workspace .playback-bar #play-pause[aria-pressed="true"] .pause-symbol { display: block; }
+.workspace .flight-hud .playback-bar .button-group { grid-area: transport; justify-self: center; gap: 7px; }
+.workspace .playback-bar .button-group > button:not(#play-pause) { min-width: 31px; }
+.workspace .flight-hud .playback-bar .timeline-control { grid-area: timeline; display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; }
+.workspace .flight-hud .playback-bar .timeline-control > span { min-width: 48px; }
+.workspace .playback-bar .timeline-control output, .workspace .playback-bar #timeline-value { color: #c7d7e2; font-size: var(--ui-size); font-family: var(--ui-mono); }
+.workspace .flight-hud .playback-bar input[type="range"] { flex: 1; width: 100%; min-width: 0; margin: 0; accent-color: var(--accent); height: 14px; }
+.workspace .flight-hud .playback-bar .speed-control { grid-area: speed; justify-self: end; margin: 0; }
+.workspace .speed-control { gap: 2px; }
+.workspace .speed-control button { min-height: 29px; padding: 4px 7px; border: 1px solid transparent; color: var(--muted); background: none; font-size: var(--ui-size); font-variant-numeric: tabular-nums; }
+.workspace .speed-control button[aria-pressed="true"] { color: #c1e6fb; background: var(--control-active); border-color: var(--control-border); }
+
+/* Retained telemetry instrument; no decorative or invented flight data. */
+.flight-hud { position: absolute; z-index: 4; left: 50%; bottom: var(--hud-gap); transform: translateX(-50%); width: 380px; max-width: calc(100% - 24px); padding: 0; border: 1px solid var(--hud-border); border-radius: 9px; overflow: hidden; background: var(--hud-surface); box-shadow: var(--hud-shadow); backdrop-filter: blur(8px); color: var(--ink); pointer-events: none; }
+.hud-telemetry { padding: 12px 16px 14px; }
+.hud-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; font-size: var(--ui-size); color: var(--muted); }
+.hud-frame { color: var(--faint); font: var(--ui-size)/1.4 var(--ui-mono); letter-spacing: .05em; }
+.hud-aircraft { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-size: var(--ui-size); font-weight: 600; white-space: nowrap; }
+.hud-aircraft::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--hud-route); box-shadow: 0 0 0 3px #ffffff08; }
+.hud-flight { display: grid; grid-template-columns: 68px minmax(0, 1fr); align-items: center; gap: 16px; }
+.hud-instruments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; }
+.hud-reading { min-width: 0; padding-left: 10px; border-left: 1px solid var(--hud-border); }
+.hud-reading:first-child { padding-left: 0; border: 0; }
+.hud-reading > span { display: flex; align-items: baseline; gap: 4px; margin-bottom: 7px; color: var(--muted); font-size: var(--ui-size); font-weight: 500; }
+.hud-reading > span small { font-size: inherit; font-weight: 400; color: var(--faint); }
+.hud-reading:nth-child(1) { --readout-color: #d4e3ef; }
+.hud-reading:nth-child(2) { --readout-color: #bedcf0; }
+.hud-reading:nth-child(3) { --readout-color: #c3e5d9; }
+.hud-reading output { display: block; color: var(--readout-color); font: 500 18px/1.2 var(--ui-mono); font-variant-numeric: tabular-nums; letter-spacing: -.035em; text-shadow: 0 1px 1px #00000030; }
+.hud-compass { --compass-size: 68px; position: relative; width: var(--compass-size); height: var(--compass-size); border-radius: 50%; background: radial-gradient(circle at 50% 35%, #22323f80, #111b2573 70%); }
+.hud-dial { display: block; width: 100%; height: 100%; stroke: #97abba58; stroke-width: .8; }
+.hud-dial-inner { stroke: #9eb1bf1a; }
+.hud-tick { stroke: #8ca5b756; }
+.hud-tick-major { stroke: #bbcddba0; stroke-width: 1; }
+.hud-compass > span { position: absolute; color: #b3c7d5; font: 10px/1 var(--ui-mono); }
+.hud-compass > span:nth-of-type(1) { top: 10px; left: 50%; transform: translateX(-50%); color: #d5e5f0; }
+.hud-compass > span:nth-of-type(2) { right: 10px; top: 50%; transform: translateY(-50%); }
+.hud-compass > span:nth-of-type(3) { bottom: 10px; left: 50%; transform: translateX(-50%); }
+.hud-compass > span:nth-of-type(4) { left: 10px; top: 50%; transform: translateY(-50%); }
+.hud-bearing { position: absolute; inset: 17px 24px; transform: rotate(var(--heading, 0deg)); }
+.hud-bearing svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.hud-needle { fill: #a9d7f0; stroke: #d5edf9; stroke-width: .6; }
+.hud-needle-tail { fill: #607e95; }
+.hud-compass-center { position: absolute; width: 4px; height: 4px; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 1px solid #caddea; border-radius: 50%; background: #253f5399; }
+
+/* Shared translucent panels; inner cards reuse the parent blur. */
+.workspace .inspector-card { color: var(--ink); background: var(--glass-panel); border-color: var(--hud-border); border-top-color: var(--active-route, var(--hud-border)); backdrop-filter: blur(8px); font-size: var(--ui-size); }
+.workspace:not(.workspace-results) .demo-grid > .inspector-card { top: 128px; bottom: var(--hud-gap); right: var(--hud-gap); width: 340px; border-radius: 7px; box-shadow: var(--hud-shadow); }
+.workspace:not(.workspace-results) .inspector-card :is(h2, h4, p, dt, dd, span, small, strong, label, legend, figcaption, button, .eyebrow, .evidence-list, .result-details, .comparison-title, .comparison-metrics, .comparison-note, .position-readout, .planner-metrics) { font-size: var(--ui-size); }
+.workspace .inspector-card #frame-summary { font-size: var(--ui-size); }
+.workspace .inspector-card :is(h2, h4, .eyebrow) { letter-spacing: .02em; }
+.workspace .inspector-card :is(dt, p, label, .result-details, .comparison-note) { line-height: 1.45; }
+.workspace .inspector-card .inspector-close { width: 28px; height: 28px; min-height: 28px; font-size: 18px; color: var(--muted); }
+.workspace:not(.workspace-results) .inspector-card .metric-card :is(dd, strong) { font: 500 20px/1.2 var(--ui-mono); margin-top: 4px; }
+.workspace .inspector-card .path-length > strong { font: 500 24px/1.1 var(--ui-mono); }
+.workspace .inspector-card :is(.planner-metrics dd, .position-readout strong, .comparison-metrics strong, .flight-envelope strong, .result-details b) { font-family: var(--ui-mono); font-variant-numeric: tabular-nums; }
+.workspace .inspector-card .planner-status { color: var(--success); }
+.workspace .inspector-card :is(.status-no-path, .status-invalid) { color: var(--warning); }
+.workspace .inspector-card .planner-metrics > div { flex-wrap: wrap; }
+.workspace .inspector-card .path-visibility { background: transparent; border-radius: 3px; }
+.workspace .inspector-card .path-visibility::after { border-radius: 1px; }
+.workspace .inspector-card .result-details { flex-wrap: wrap; gap: 4px 10px; }
+.workspace .inspector-card .trajectory-chart text { font-size: var(--ui-size); fill: var(--muted); }
+.workspace .inspector-card .trajectory-chart :is(.data-line, .current-rule) { stroke: var(--accent); }
+.workspace .inspector-card .trajectory-chart :is(.waypoint, .current-point) { fill: var(--accent); }
+.workspace .inspector-card .trajectory-chart .grid-line { stroke: var(--line); }
+.workspace .metric-card, .workspace .planner-card, .workspace .comparison-card { background: var(--glass-card); border-color: var(--hud-border); border-radius: 5px; }
+.workspace .inspector-card :is(.metric-card, .planner-card, .comparison-card, .planner-result) { background: var(--glass-card); border-color: var(--hud-border); border-radius: 5px; }
+.workspace .inspector-card .planner-card:not(.is-hidden) { background: var(--control-active); border-color: var(--control-border); }
+.workspace .inspector-card .planner-card:not(.is-hidden) .path-visibility { border-color: var(--accent); }
+.workspace .inspector-card .planner-card:not(.is-hidden) .path-visibility::after { background: var(--accent); }
+.workspace .inspector-card .comparison-card[aria-pressed="true"], .workspace .inspector-card .planner-result.is-active { background: var(--control-active); border-color: var(--control-border); }
+.workspace .metric-card strong, .workspace .comparison-metrics strong, .workspace .position-readout strong { color: #e2eeec; }
+.workspace .dynamic-metric-panel .metric-card { background: var(--glass-card); border-color: #ffffff14; }
+.workspace .dynamic-metric-panel .metric-card strong,
+.workspace .planner-result strong { color: #e2eeec; }
+.workspace .planner-result { background: var(--glass-card); border-color: #ffffff14; }
+.workspace .planner-result.is-active { background: var(--control-active); border-color: var(--control-border); }
+.workspace .planner-result .result-details { color: var(--muted); }
+.workspace .planner-result .result-details b { color: #d1e4ed; }
+.workspace .planner-result .result-status,
+.workspace .run-status.is-success, .workspace .status-success, .workspace .metric-positive { color: var(--success); }
+.workspace .planner-result .result-status.is-failure,
+.workspace .run-status.is-failure { color: var(--warning); }
+.workspace-dynamic #timeline { accent-color: var(--accent); }
+.workspace .comparison-card[aria-pressed="true"] { background: var(--control-active); border-color: var(--control-border); }
+.workspace .current-event { color: #c1dce9; background: #77bde80b; border-color: #77bde830; }
+.workspace .run-status, .workspace .mode-badge, .workspace .witness-quality { background: #ffffff05; border-color: var(--hud-border); color: var(--muted); }
+.workspace .inspector-tabs button { background: none; }
+.workspace .inspector-tabs button[aria-selected="true"] { color: #c1e6fb; background: #77bde810; }
+.workspace .evidence-list > div { border-color: #ffffff0e; }
+.workspace .layer-controls label { color: #c2d3d4; }
+.workspace .profile-chart figcaption { color: #c0d2d4; }
+.workspace .load-state { background: var(--hud-surface); border-color: var(--hud-border); color: var(--ink); font-size: var(--ui-size); }
+.workspace .viewer-witness-readout { top: 266px; left: var(--hud-gap); color: #f0cf9c; background: rgba(40, 39, 25, .72); border-color: #e7bf7d42; font-size: var(--ui-size); }
+.workspace .viewer-witness-readout :is(strong, small) { font-size: var(--ui-size); }
+.workspace-results .app-header { background: var(--glass-surface); border-color: var(--hud-border); backdrop-filter: blur(8px); }
+.workspace-results .stage-card { background: var(--glass-panel); border-color: var(--hud-border); backdrop-filter: blur(8px); }
+
+/* Compact details keep the same type size; reflow cards rather than shrinking labels. */
+@container flight-inspector (max-height: 520px) {
+  .workspace:not(.workspace-results) .inspector-card .inspector-header { min-height: 42px; padding: 10px 48px 10px 12px; }
+  .workspace:not(.workspace-results) .inspector-card .inspector-tabs { padding-top: 4px; }
+  .workspace-static .inspector-card .planner-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 10px; }
+  .workspace-static .inspector-card .planner-card-heading { align-self: center; margin: 0; min-width: 0; }
+  .workspace-static .inspector-card .path-length { align-self: center; margin: 0; }
+  .workspace-static .inspector-card .path-length > strong { font-size: 20px; }
+  .workspace-static .inspector-card .path-length-label { display: none; }
+  .workspace-static .inspector-card .planner-metrics { grid-column: 1 / -1; }
+  .workspace-static .inspector-card .planner-metrics > div { display: grid; gap: 3px; }
+  .workspace-dynamic .inspector-card .inspector-heading { padding-bottom: 4px; }
+  .workspace-dynamic .inspector-card .inspector-heading .eyebrow { display: none; }
+  .workspace-dynamic .inspector-card .planner-result .result-details { display: none; }
+  .workspace-dynamic .inspector-card .planner-result { padding: 8px 10px; }
+  .workspace-predictive .inspector-card .inspector-panel { padding: 10px; gap: 8px; }
+  .workspace-predictive .inspector-card .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .workspace-predictive .inspector-card .metric-card { padding: 6px 8px; }
+  .workspace-predictive .inspector-card #overview-panel .current-event,
+  .workspace-predictive .inspector-card .witness-section .muted,
+  .workspace-predictive .inspector-card .comparison-note { display: none; }
+  .workspace-predictive .inspector-card .evidence-list > div { padding: 3px 0; }
+  .workspace-predictive .inspector-card .inspector-panel h4 { margin-bottom: 4px; }
+  .workspace-predictive .inspector-card .comparison-card { gap: 4px; padding: 8px; }
+  .workspace-predictive .inspector-card .comparison-metrics { gap: 10px; }
+  .workspace-predictive .inspector-card .jump-to-witness { min-height: 30px; margin-top: 4px; }
+}
+
+@media (max-width: 1100px) {
+  .workspace .route-legend button { gap: 3px; padding: 4px 3px; }
+  .workspace .route-legend i { width: 6px; }
+  .workspace:not(.workspace-results) .study-nav { gap: 1px; padding: 3px; }
+  .workspace:not(.workspace-results) .study-nav a, .workspace:not(.workspace-results) .study-nav span { padding: 8px 6px; }
+  .workspace:not(.workspace-results) .stage-toolbar select { max-width: 165px; }
+}
+@media (max-width: 760px) {
+  :root { --hud-gap: 12px; }
+  .workspace:not(.workspace-results) .app-header { display: flex; flex-direction: column; align-items: stretch; height: auto; gap: 8px; }
+  .workspace:not(.workspace-results) .app-header .route-legend { width: 100%; max-width: none; min-height: 38px; justify-content: space-between; gap: 1px; padding: 4px; }
+  .workspace .route-legend button { gap: 3px; min-height: 28px; padding: 3px; }
+  .workspace .route-legend i { width: 5px; }
+  .workspace:not(.workspace-results) .study-nav { width: 100%; height: 40px; justify-content: center; gap: 1px; padding: 3px; }
+  .workspace:not(.workspace-results) .study-nav a, .workspace:not(.workspace-results) .study-nav span { padding: 6px; }
+  .workspace:not(.workspace-results) .camera-controls { position: absolute; top: 92px; right: 0; height: 40px; }
+  .workspace:not(.workspace-results) .inspector-toggle { top: -49px; height: 40px; }
+  .workspace:not(.workspace-results) .stage-toolbar { top: 104px; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 7px; }
+  .workspace:not(.workspace-results) .stage-toolbar > select { width: calc(100% - 172px); min-width: 0; max-width: none; height: 40px; }
+  .workspace:not(.workspace-results) .stage-toolbar > label { width: calc(100% - 172px); max-width: none; height: 40px; }
+  .workspace:not(.workspace-results) .stage-toolbar > label select { width: 100%; max-width: none; }
+  .workspace:not(.workspace-results) .stage-toolbar > .follow-controls { width: max-content; height: 40px; margin-left: 0; }
+  .workspace-dynamic .stage-toolbar > .stage-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  .workspace-dynamic .planner-control { width: calc(100% - 172px); min-width: 0; height: 40px; }
+  .workspace:not(.workspace-results) .planner-control select { max-width: 100%; width: 100%; }
+  .workspace-dynamic .stage-controls > .follow-controls { width: max-content; height: 40px; margin-left: 0; }
+  .workspace:not(.workspace-results) .content-heading { top: 198px; }
+  .workspace:not(.workspace-results) .playback-state { top: 236px; }
+  .workspace .speed-control button { min-width: 31px; }
+  .flight-hud { width: 366px; }
+  .hud-telemetry { padding: 12px 13px; }
+  .hud-heading { gap: 8px; }
+  .hud-flight { grid-template-columns: 60px minmax(0, 1fr); gap: 12px; }
+  .hud-compass { --compass-size: 60px; }
+  .hud-bearing { inset: 15px 21px; }
+  .hud-reading { padding-left: 6px; }
+  .hud-reading > span { gap: 3px; }
+  .flight-announcement { bottom: 239px; }
+  .workspace .task-arrival-notice { bottom: 235px; padding: 9px 13px; }
+  .workspace:not(.workspace-results) .map-attribution { bottom: 218px; right: 12px; }
+  .workspace:not(.workspace-results) .demo-grid > .inspector-card { top: 198px; bottom: 12px; right: 12px; width: calc(100% - 24px); }
+  .workspace .viewer-witness-readout { top: 316px; }
+}
+@media (max-height: 550px) and (min-width: 761px) {
+  :root { --hud-gap: 12px; }
+  .workspace:not(.workspace-results) .app-header { height: 36px; grid-template-rows: 36px; }
+  .workspace:not(.workspace-results) .study-nav { height: 36px; padding: 2px; }
+  .workspace:not(.workspace-results) .study-nav a, .workspace:not(.workspace-results) .study-nav span { padding: 5px 6px; }
+  .workspace:not(.workspace-results) .camera-controls { padding: 2px; }
+  .workspace .camera-controls button { height: 30px; min-height: 30px; padding-top: 5px; padding-bottom: 5px; }
+  .workspace:not(.workspace-results) .stage-toolbar { top: 57px; padding: 0; gap: 8px; }
+  .workspace:not(.workspace-results) .content-heading { top: 102px; }
+  .workspace:not(.workspace-results) .inspector-toggle { top: -45px; height: 38px; }
+  .workspace:not(.workspace-results) .playback-state { top: 139px; }
+  .workspace:not(.workspace-results) .app-header .route-legend { min-height: 36px; gap: 2px; padding: 3px; }
+  .workspace .route-legend button { gap: 3px; padding: 3px; min-height: 28px; }
+  .workspace .route-legend i { width: 6px; }
+  .flight-hud { width: 346px; }
+  .hud-telemetry { padding: 8px 13px; }
+  .workspace .flight-hud .playback-bar { padding: 7px 12px; gap: 5px 10px; }
+  .hud-heading { margin-bottom: 7px; }
+  .hud-flight { grid-template-columns: 52px minmax(0, 1fr); gap: 14px; }
+  .hud-compass { --compass-size: 52px; }
+  .hud-bearing { inset: 13px 18px; }
+  .hud-compass > span:nth-of-type(1) { top: 8px; }
+  .hud-compass > span:nth-of-type(2) { right: 7px; }
+  .hud-compass > span:nth-of-type(3) { bottom: 8px; }
+  .hud-compass > span:nth-of-type(4) { left: 7px; }
+  .hud-reading output { font-size: 16px; }
+  .flight-announcement { bottom: auto; top: 182px; left: 12px; transform: none; max-width: calc((100% - 346px) / 2 - 24px); padding: 8px 11px; }
+  .workspace .task-arrival-notice { bottom: auto; top: 182px; left: 12px; transform: none; padding: 8px 11px; }
+  .workspace:not(.workspace-results) .demo-grid > .inspector-card { top: 102px; bottom: 12px; right: 12px; width: calc(100% - 24px); }
+  .workspace-static .inspector-card .planner-results { flex-direction: row; }
+  .workspace-static .inspector-card .planner-card { flex: 1; }
+  .workspace:not(.workspace-results) .inspector-card .inspector-panel { display: grid; align-content: start; gap: 12px; }
+  .workspace-predictive .inspector-card #overview-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .workspace-predictive .inspector-card #compare-panel .planner-comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workspace-predictive .inspector-card #profile-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workspace-predictive .inspector-card #overview-panel .current-event { display: block; }
+  .workspace-predictive .inspector-card .comparison-metrics > span { display: grid; }
+  .workspace-predictive .inspector-card .trajectory-chart svg { height: 112px; }
+  .workspace-dynamic .inspector-card .inspector-heading { display: block; }
+  .workspace-dynamic .inspector-card .dynamic-metric-panel { padding: 8px 0; }
+  .workspace-dynamic .inspector-card .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .workspace-dynamic .inspector-card .comparison-heading { display: flex; padding: 4px 0; }
+  .workspace-dynamic .inspector-card .planner-comparison { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

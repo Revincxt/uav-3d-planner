@@ -52,9 +52,10 @@ def _spacetime_segment_is_free(
 class SpaceTimeAStarConfig:
     """Fixed motion and finite-search contract for :class:`SpaceTimeAStar3D`.
 
-    Moving actions use a six-connected grid. ``resolution / cruise_speed`` must therefore be an
-    integer number of time steps. Every moving action has exactly ``cruise_speed``; a separate wait
-    action advances one time step without changing position.
+    The default six-connected grid keeps the original fixed-speed contract: axis motion must
+    contain an integer number of clock steps. With 26-connected motion, each edge duration is
+    rounded up to whole clock steps, so diagonal motion never exceeds ``cruise_speed``. A separate
+    wait action advances one time step without changing position in either mode.
     """
 
     resolution: float = 4.0
@@ -62,6 +63,7 @@ class SpaceTimeAStarConfig:
     cruise_speed: float = 8.0
     time_horizon: float = 60.0
     max_expansions: int = 120_000
+    connectivity: int = 6
 
     def __post_init__(self) -> None:
         numeric = (self.resolution, self.time_step, self.cruise_speed, self.time_horizon)
@@ -69,6 +71,8 @@ class SpaceTimeAStarConfig:
             raise ValueError("space-time resolution, clock, speed, and horizon must be positive")
         if self.max_expansions <= 0:
             raise ValueError("max_expansions must be positive")
+        if not isinstance(self.connectivity, int) or self.connectivity not in (6, 26):
+            raise ValueError("space-time connectivity must be 6 or 26")
         if not math.isclose(
             self.time_horizon / self.time_step,
             round(self.time_horizon / self.time_step),
@@ -76,7 +80,7 @@ class SpaceTimeAStarConfig:
             abs_tol=1e-9,
         ):
             raise ValueError("time_horizon must contain an integer number of time steps")
-        if (
+        if self.connectivity == 6 and (
             not math.isclose(
                 self.resolution / (self.cruise_speed * self.time_step),
                 round(self.resolution / (self.cruise_speed * self.time_step)),
@@ -95,6 +99,11 @@ class SpaceTimeAStarConfig:
 
     @property
     def movement_steps(self) -> int:
+        if self.connectivity == 26:
+            return max(
+                1,
+                math.ceil(self.resolution / (self.cruise_speed * self.time_step) - 1e-12),
+            )
         return round(self.resolution / (self.cruise_speed * self.time_step))
 
 
@@ -145,10 +154,11 @@ class SpaceTimeAStar3D:
                 return self._success(scenario, direct, 0, 1, parameters)
             return self._failure("no-free-grid-anchor", 0, 0, parameters)
 
-        queue: list[tuple[float, int, GridIndex, int, SpaceTimeState]] = []
+        queue: list[tuple[float, int, float, GridIndex, int, SpaceTimeState]] = []
         counter = itertools.count()
         parents: dict[SpaceTimeState, SpaceTimeState | None] = {}
         prefixes: dict[SpaceTimeState, tuple[TimedWaypoint, ...]] = {}
+        path_lengths: dict[SpaceTimeState, float] = {}
         for state, prefix in self._initial_states(
             scenario,
             grid,
@@ -160,12 +170,17 @@ class SpaceTimeAStar3D:
                 continue
             parents[state] = None
             prefixes[state] = prefix
+            path_lengths[state] = math.fsum(
+                distance(previous.position, current.position)
+                for previous, current in pairwise(prefix)
+            )
             heuristic = self._heuristic(grid.point(state[0]), scene.goal)
             heapq.heappush(
                 queue,
                 (
                     self._time(start_time, state[1]) + heuristic,
                     state[1],
+                    path_lengths[state] if self.config.connectivity == 26 else 0.0,
                     state[0],
                     next(counter),
                     state,
@@ -181,11 +196,21 @@ class SpaceTimeAStar3D:
         expanded = 0
         closed: set[SpaceTimeState] = set()
         while queue:
-            lower_bound, _, _, _, state = heapq.heappop(queue)
+            lower_bound, _, queued_length, _, _, state = heapq.heappop(queue)
             if state in closed:
                 continue
-            if incumbent is not None and lower_bound >= incumbent.arrival_time_s - 1e-9:
-                return self._success(scenario, incumbent, expanded, len(parents), parameters)
+            if self.config.connectivity == 26 and queued_length > path_lengths[state] + 1e-9:
+                continue
+            if incumbent is not None:
+                # The legacy mode retains its exact deterministic stopping contract. New diagonal
+                # motion also reviews equal-arrival candidates to prefer shorter geometry.
+                reached_bound = (
+                    lower_bound > incumbent.arrival_time_s + 1e-9
+                    if self.config.connectivity == 26
+                    else lower_bound >= incumbent.arrival_time_s - 1e-9
+                )
+                if reached_bound:
+                    return self._success(scenario, incumbent, expanded, len(parents), parameters)
             if expanded >= self.config.max_expansions:
                 return self._failure(
                     "expansion-budget-exhausted", expanded, len(parents), parameters
@@ -203,21 +228,40 @@ class SpaceTimeAStar3D:
                 start_time,
                 horizon_time,
             )
-            if goal_path is not None and (
-                incumbent is None or goal_path.arrival_time_s < incumbent.arrival_time_s - 1e-9
-            ):
-                incumbent = goal_path
+            if goal_path is not None:
+                earlier = (
+                    incumbent is None or goal_path.arrival_time_s < incumbent.arrival_time_s - 1e-9
+                )
+                shorter_tie = (
+                    self.config.connectivity == 26
+                    and incumbent is not None
+                    and abs(goal_path.arrival_time_s - incumbent.arrival_time_s) <= 1e-9
+                    and self._path_length(goal_path) < self._path_length(incumbent) - 1e-9
+                )
+                if earlier or shorter_tie:
+                    incumbent = goal_path
 
             for successor in self._successors(scenario, grid, state, start_time):
-                if successor in parents:
+                candidate_length = path_lengths[state] + distance(
+                    grid.point(state[0]), grid.point(successor[0])
+                )
+                if successor in closed or (
+                    successor in parents
+                    and (
+                        self.config.connectivity == 6
+                        or candidate_length >= path_lengths[successor] - 1e-9
+                    )
+                ):
                     continue
                 parents[successor] = state
+                path_lengths[successor] = candidate_length
                 heuristic = self._heuristic(grid.point(successor[0]), scene.goal)
                 heapq.heappush(
                     queue,
                     (
                         self._time(start_time, successor[1]) + heuristic,
                         successor[1],
+                        candidate_length if self.config.connectivity == 26 else 0.0,
                         successor[0],
                         next(counter),
                         successor,
@@ -229,18 +273,34 @@ class SpaceTimeAStar3D:
         return self._failure("time-horizon-exhausted", expanded, len(parents), parameters)
 
     def _parameters(self, start_time: float) -> dict[str, PredictiveScalar]:
-        return {
+        parameters: dict[str, PredictiveScalar] = {
             "resolution": self.config.resolution,
             "time_step": self.config.time_step,
             "cruise_speed": self.config.cruise_speed,
             "time_horizon": self.config.time_horizon,
             "max_expansions": self.config.max_expansions,
             "start_time": start_time,
-            "connectivity": 6,
+            "connectivity": self.config.connectivity,
             "movement_steps": self.config.movement_steps,
             "wait_action": True,
             "work_unit": "expanded-spacetime-states",
         }
+        if self.config.connectivity == 26:
+            parameters.update(
+                {
+                    "movement_timing": "ceil-distance-over-speed-time-step",
+                    "fixed_cruise_speed": False,
+                    "secondary_objective": "path-length-at-equal-arrival",
+                }
+            )
+        return parameters
+
+    @staticmethod
+    def _path_length(path: TimedPath) -> float:
+        return math.fsum(
+            distance(previous.position, current.position)
+            for previous, current in pairwise(path.waypoints)
+        )
 
     def _time(self, start_time: float, step: int) -> float:
         return start_time + step * self.config.time_step
@@ -362,6 +422,19 @@ class SpaceTimeAStar3D:
         candidates.sort()
         return candidates
 
+    def _movement_neighbors(self, grid: VoxelGrid, index: GridIndex) -> list[GridIndex]:
+        if self.config.connectivity == 6:
+            return self._axis_neighbors(grid, index)
+        candidates: list[GridIndex] = []
+        for delta in itertools.product((-1, 0, 1), repeat=3):
+            if delta == (0, 0, 0):
+                continue
+            neighbor: GridIndex = (index[0] + delta[0], index[1] + delta[1], index[2] + delta[2])
+            if grid.contains(neighbor):
+                candidates.append(neighbor)
+        candidates.sort()
+        return candidates
+
     def _successors(
         self,
         scenario: DynamicScenario,
@@ -383,17 +456,29 @@ class SpaceTimeAStar3D:
         ):
             successors.append((index, wait_step))
 
-        movement_step = step + self.config.movement_steps
-        if movement_step <= self.config.horizon_steps:
-            for neighbor in self._axis_neighbors(grid, index):
-                if _spacetime_segment_is_free(
-                    scenario,
-                    point,
-                    grid.point(neighbor),
-                    self._time(start_time, step),
-                    self._time(start_time, movement_step),
-                ):
-                    successors.append((neighbor, movement_step))
+        for neighbor in self._movement_neighbors(grid, index):
+            neighbor_point = grid.point(neighbor)
+            movement_steps = (
+                max(
+                    1,
+                    math.ceil(
+                        distance(point, neighbor_point)
+                        / (self.config.cruise_speed * self.config.time_step)
+                        - 1e-12
+                    ),
+                )
+                if self.config.connectivity == 26
+                else self.config.movement_steps
+            )
+            movement_step = step + movement_steps
+            if movement_step <= self.config.horizon_steps and _spacetime_segment_is_free(
+                scenario,
+                point,
+                neighbor_point,
+                self._time(start_time, step),
+                self._time(start_time, movement_step),
+            ):
+                successors.append((neighbor, movement_step))
         successors.sort(key=lambda item: (item[1], item[0]))
         return successors
 
@@ -483,11 +568,13 @@ class SpaceTimeAStar3D:
                 observed = distance(previous.position, current.position) / (
                     current.time_s - previous.time_s
                 )
-                if not math.isclose(
-                    observed,
-                    self.config.cruise_speed,
-                    rel_tol=1e-9,
-                    abs_tol=1e-9,
+                if self.config.connectivity == 26:
+                    if observed > self.config.cruise_speed * (1.0 + 1e-9):
+                        raise AssertionError(
+                            "predictive moving actions must not exceed cruise speed"
+                        )
+                elif not math.isclose(
+                    observed, self.config.cruise_speed, rel_tol=1e-9, abs_tol=1e-9
                 ):
                     raise AssertionError(
                         "predictive moving actions must use the fixed cruise speed"

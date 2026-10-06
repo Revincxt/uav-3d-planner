@@ -57,6 +57,11 @@ MAX_EXPANDED_STATES = 240_000
 SMOOTHING_TURN_RADIUS_M = 6.0
 SMOOTHING_SAMPLE_SPACING_M = 0.5
 TRAJECTORY_POSTPROCESSOR = "certified-fillet-plus-discrete-execution-envelope-v2"
+SPACE_TIME_CONNECTIVITY = 6
+TRAJECTORY_SHORTCUT = False
+TRAJECTORY_PRESERVE_ALTITUDE = False
+TRAJECTORY_LOCAL_CURVES = False
+TRAJECTORY_SCHEDULE_DYNAMIC_WAITS = False
 EXECUTION_ENVELOPE = DiscreteExecutionEnvelope(
     max_speed_mps=8.0,
     max_abs_climb_rate_mps=3.0,
@@ -381,6 +386,10 @@ def _postprocess_trajectory(
             sample_spacing_m=SMOOTHING_SAMPLE_SPACING_M,
             max_speed_mps=CRUISE_SPEED_MPS,
             execution_envelope=EXECUTION_ENVELOPE,
+            shortcut=TRAJECTORY_SHORTCUT,
+            preserve_altitude=TRAJECTORY_PRESERVE_ALTITUDE,
+            curve_method="bspline" if TRAJECTORY_LOCAL_CURVES else "fillet",
+            schedule_dynamic_waits=TRAJECTORY_SCHEDULE_DYNAMIC_WAITS,
         )
     return PredictiveSmoothingResult(
         timed_path=raw_timed_path,
@@ -520,6 +529,10 @@ def _reactive_episode(
         "smoothingTurnRadiusM": SMOOTHING_TURN_RADIUS_M,
         "smoothingSampleSpacingM": SMOOTHING_SAMPLE_SPACING_M,
     }
+    if TRAJECTORY_SHORTCUT:
+        parameters["trajectoryShortcut"] = 1
+    if TRAJECTORY_PRESERVE_ALTITUDE:
+        parameters["trajectoryPreserveAltitude"] = 1
     return PredictiveEpisode(
         scenario.scenario_id,
         dynamic_scenario_fingerprint(scenario),
@@ -542,6 +555,7 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
         cruise_speed=CRUISE_SPEED_MPS,
         time_horizon=PLANNING_HORIZON_S,
         max_expansions=MAX_EXPANDED_STATES,
+        connectivity=SPACE_TIME_CONNECTIVITY,
     )
     result = SpaceTimeAStar3D(config).plan(scenario)
     raw_timed_path = result.timed_path or TimedPath(
@@ -604,6 +618,12 @@ def _predictive_episode(scenario: DynamicScenario) -> PredictiveEpisode:
         "smoothingTurnRadiusM": SMOOTHING_TURN_RADIUS_M,
         "smoothingSampleSpacingM": SMOOTHING_SAMPLE_SPACING_M,
     }
+    if TRAJECTORY_SHORTCUT:
+        parameters["trajectoryShortcut"] = 1
+    if TRAJECTORY_PRESERVE_ALTITUDE:
+        parameters["trajectoryPreserveAltitude"] = 1
+    if SPACE_TIME_CONNECTIVITY != 6:
+        parameters["spaceTimeConnectivity"] = SPACE_TIME_CONNECTIVITY
     return PredictiveEpisode(
         scenario.scenario_id,
         dynamic_scenario_fingerprint(scenario),
@@ -900,7 +920,7 @@ def _export_metrics(metrics: PredictiveEpisodeMetrics) -> dict[str, object]:
 def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[str, object]:
     protocol = _protocol()
     smoothing = episode.smoothing
-    return {
+    exported = {
         "runId": predictive_run_id(
             episode.scenario_fingerprint,
             episode.planner_id,
@@ -1006,6 +1026,16 @@ def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[s
             else None
         ),
     }
+    if TRAJECTORY_PRESERVE_ALTITUDE:
+        smoothing_record = exported["smoothing"]
+        assert isinstance(smoothing_record, dict)
+        smoothing_record.update(
+            {
+                "optimizationAxes": ["x", "y"],
+                "altitudePolicy": "preserve-raw-z-time-profile",
+            }
+        )
+    return exported
 
 
 def _export_scenario(

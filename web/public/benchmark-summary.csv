@@ -1,4 +1,0 @@
-source_commit,protocol_id,generated_at,planner_id,budget_id,path_runs,path_scenes,path_successes,timing_runs,timing_scenes,timing_successes,success_rate,success_ci95_low,success_ci95_high,planning_time_median_ms,raw_path_excess_median_pct,smoothed_path_excess_median_pct,minimum_clearance_median_m
-cfe9c377cfa3b8a496c794df0f3619ade81e6e3f,static-city-descriptive-v2,2026-08-05T07:03:32+00:00,astar-3d,astar-r4-e120000,4,4,4,12,4,12,1.0,1.0,1.0,357.6851875986904,38.247391404034424,32.939891226402494,1.4611038290728666
-cfe9c377cfa3b8a496c794df0f3619ade81e6e3f,static-city-descriptive-v2,2026-08-05T07:03:32+00:00,lazy-theta-star,theta-r4-e120000,4,4,4,12,4,12,1.0,1.0,1.0,275.07712494116277,28.222187463088165,27.454451878045116,1.2418428492991302
-cfe9c377cfa3b8a496c794df0f3619ade81e6e3f,static-city-descriptive-v2,2026-08-05T07:03:32+00:00,rrt-star,rrt-s3000,20,4,20,12,4,12,1.0,1.0,1.0,832.9470829339698,51.0481725849653,33.60156829058084,1.59667628468579

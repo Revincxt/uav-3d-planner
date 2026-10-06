@@ -1,3 +1,5 @@
+import type { CityMetadata, CityMission } from "./city-schema";
+
 export type Vec3 = [number, number, number];
 export type PlannerId = "astar-3d" | "lazy-theta-star" | "rrt-star";
 
@@ -5,6 +7,7 @@ export interface Building {
   id: string;
   min: Vec3;
   max: Vec3;
+  footprint?: number[][][];
 }
 
 export interface NoFlyZone {
@@ -28,6 +31,10 @@ export interface PlannerResult {
   smoothing: {
     outcome: "bspline" | "shortcut" | "shortcut-fallback" | "not-run";
     collisionFree: boolean;
+    optimizationAxes?: ["x", "y"];
+    altitudePolicy?: "preserve-raw-altitude-profile-v1";
+    altitudeProfileMaxErrorM?: number;
+    altitudeProfileProgress?: number[];
   };
   metrics: {
     planningTimeMs: number;
@@ -41,6 +48,8 @@ export interface DemoScenario {
   id: string;
   label: string;
   description: string;
+  city?: CityMetadata;
+  mission?: CityMission;
   scenarioSeed: number | null;
   fingerprint: string;
   bounds: { min: Vec3; max: Vec3 };
@@ -65,4 +74,3 @@ export interface DemoBundle {
   planners: Array<{ id: PlannerId; label: string }>;
   scenarios: DemoScenario[];
 }
-

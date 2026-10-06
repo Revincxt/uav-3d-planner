@@ -3,7 +3,6 @@ import type {
   Bounds3,
   Building,
   MovingSphereDefinition,
-  MovingSphereKeyframe,
   MovingSphereState,
   StaticNoFlyZone,
   TemporaryNoFlyZone,
@@ -42,6 +41,11 @@ export interface PredictiveProtocol {
   reactiveMaxWorkPerReplan: number;
   predictiveMaxExpandedStatesPerMission: number;
   trajectoryPostprocessor: string;
+  spaceTimeConnectivity?: 26;
+  trajectoryShortcut?: true;
+  trajectoryPreserveAltitude?: true;
+  trajectoryCurveDegree?: 5;
+  trajectoryDynamicScheduling?: "certified-move-block-departures";
   executionEnvelope: PredictiveExecutionEnvelope;
   continuousDynamicsCertified: false;
   metricDomains: {
@@ -89,6 +93,8 @@ export interface PredictiveFrame {
 
 export interface PredictiveSmoothing {
   method: string;
+  optimizationAxes?: ["x", "y"];
+  altitudePolicy?: "preserve-raw-z-time-profile";
   applied: boolean;
   certified: boolean;
   collisionCertified: boolean;
@@ -217,6 +223,8 @@ export interface PredictiveRun {
 }
 
 export interface PredictiveScenario {
+  city?: import("./city-schema").CityMetadata;
+  mission?: import("./city-schema").CityMission;
   id: string;
   label: string;
   description: string;

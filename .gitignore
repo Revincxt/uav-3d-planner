@@ -7,7 +7,8 @@
 __pycache__/
 *.egg-info/
 *.py[cod]
-build/
+# Root-level Python build output; web/build contains source tooling.
+/build/
 dist/
 htmlcov/
 artifacts/*
@@ -15,3 +16,7 @@ artifacts/*
 web/node_modules/
 web/dist/
 
+# Restored automatically from byte-exact archives in data/studies/.
+/web/public/demo-data.json
+/web/public/dynamic-data.json
+/web/public/predictive-data.json

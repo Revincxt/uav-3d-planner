@@ -1,9 +1,21 @@
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { validateExecutionSequence } from "../shared/execution-sequence.mjs";
 
 const TOLERANCE = 1e-6;
 const inputPath = resolve(process.cwd(), process.argv[2] ?? "public/predictive-data.json");
+const MANHATTAN_V2_PROTOCOL_ID = "manhattan-space-time-v2";
+const MANHATTAN_V3_PROTOCOL_ID = "manhattan-space-time-v3";
+const MANHATTAN_SHORTCUT_PROTOCOL_IDS = new Set([MANHATTAN_V2_PROTOCOL_ID, MANHATTAN_V3_PROTOCOL_ID]);
+const MANHATTAN_PROTOCOL_IDS = new Set(["manhattan-space-time-v1", ...MANHATTAN_SHORTCUT_PROTOCOL_IDS]);
+const MANHATTAN_V2_POSTPROCESSOR = "spacetime-shortcut-fillet-plus-sampling-stable-discrete-envelope-v3";
+const MANHATTAN_V3_POSTPROCESSOR = "horizontal-spacetime-shortcut-fillet-altitude-preserving-envelope-v4";
+const MANHATTAN_CURVE_POSTPROCESSOR = "horizontal-local-quintic-bspline-altitude-preserving-envelope-v5";
+const FROZEN_ENVELOPE = { maxSpeedMps: 8, maxAbsClimbRateMps: 3, maxDiscreteAccelerationProxyMps2: 4, reversalThresholdDeg: 150, maxExecutionTimeS: 90 };
+const MANHATTAN_ENVELOPE = { ...FROZEN_ENVELOPE, maxSpeedMps: 15, maxExecutionTimeS: 900 };
+const MANHATTAN_IDS = ["manhattan-westside-delivery", "manhattan-medical-transfer", "manhattan-midtown-rooftops", "manhattan-riverfront-logistics", "manhattan-westside-backhaul", "manhattan-medical-return", "manhattan-eastside-backhaul", "manhattan-riverfront-return"];
+const matchesEnvelope = (value, expected) => Object.entries(expected).every(([key, entry]) => sameNumber(value[key], entry));
 
 function fail(message) {
   throw new Error(`predictive-data.json: ${message}`);
@@ -84,6 +96,11 @@ function samePoint(left, right) {
   return left.every((coordinate, index) => sameNumber(coordinate, right[index]));
 }
 
+function sameStationaryPosition(left, right) {
+  // Match Python geometry.almost_equal, not coordinate-scaled display tolerance.
+  return Math.hypot(...left.map((coordinate, index) => coordinate - right[index])) <= 1e-9;
+}
+
 function inBounds(point, bounds) {
   return point.every(
     (coordinate, index) =>
@@ -126,6 +143,9 @@ function parseBounds(value, label) {
 
 function parseProtocol(value) {
   const entry = object(value, "protocol");
+  if (entry.id !== "predictive-space-time-v4" && !MANHATTAN_PROTOCOL_IDS.has(entry.id)) {
+    fail("protocol.id must be predictive-space-time-v4 or manhattan-space-time-v1/v2/v3");
+  }
   const protocol = {
     id: text(entry.id, "protocol.id"),
     timeStepS: positive(entry.timeStepS, "protocol.timeStepS"),
@@ -153,6 +173,31 @@ function parseProtocol(value) {
       "protocol.continuousDynamicsCertified",
     ),
   };
+  if (MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(protocol.id)) {
+    if (entry.spaceTimeConnectivity !== 26) fail("protocol.spaceTimeConnectivity must be 26 for Manhattan v2/v3");
+    if (entry.trajectoryShortcut !== true) fail("protocol.trajectoryShortcut must be true for Manhattan v2/v3");
+    const supportedPostprocessors = protocol.id === MANHATTAN_V3_PROTOCOL_ID
+      ? [MANHATTAN_V3_POSTPROCESSOR, MANHATTAN_CURVE_POSTPROCESSOR] : [MANHATTAN_V2_POSTPROCESSOR];
+    if (!supportedPostprocessors.includes(protocol.trajectoryPostprocessor)) {
+      fail("protocol.trajectoryPostprocessor disagrees with the declared Manhattan postprocessor");
+    }
+    protocol.spaceTimeConnectivity = 26;
+    protocol.trajectoryShortcut = true;
+  }
+  if (protocol.id === MANHATTAN_V3_PROTOCOL_ID) {
+    if (entry.trajectoryPreserveAltitude !== true) {
+      fail("protocol.trajectoryPreserveAltitude must be true for Manhattan v3");
+    }
+    protocol.trajectoryPreserveAltitude = true;
+    if (entry.trajectoryDynamicScheduling !== undefined) {
+      if (entry.trajectoryDynamicScheduling !== "certified-move-block-departures") fail("Unsupported dynamic execution scheduling");
+      protocol.trajectoryDynamicScheduling = entry.trajectoryDynamicScheduling;
+    }
+    if (protocol.trajectoryPostprocessor === MANHATTAN_CURVE_POSTPROCESSOR) {
+      if (entry.trajectoryCurveDegree !== 5) fail("protocol.trajectoryCurveDegree must be 5 for local B-spline curves");
+      protocol.trajectoryCurveDegree = 5;
+    }
+  }
   if (protocol.continuousDynamicsCertified) {
     fail("protocol.continuousDynamicsCertified must remain false");
   }
@@ -164,6 +209,14 @@ function parseProtocol(value) {
   }
   if (protocol.planningHorizonS > protocol.maxTimeS) {
     fail("protocol.planningHorizonS cannot exceed maxTimeS");
+  }
+  const expectedEnvelope = MANHATTAN_PROTOCOL_IDS.has(protocol.id) ? MANHATTAN_ENVELOPE : FROZEN_ENVELOPE;
+  if (!matchesEnvelope(protocol.executionEnvelope, expectedEnvelope)) {
+    fail("protocol.executionEnvelope disagrees with the declared protocol");
+  }
+  if (!sameNumber(protocol.cruiseSpeedMps, protocol.executionEnvelope.maxSpeedMps) ||
+      !sameNumber(protocol.maxTimeS, protocol.executionEnvelope.maxExecutionTimeS)) {
+    fail("protocol speed and mission horizon must agree with its execution envelope");
   }
   return protocol;
 }
@@ -269,6 +322,20 @@ function sameTimedPath(left, right) {
   );
 }
 
+function validateAltitudeProfile(raw, geometry, label) {
+  if (Math.abs(raw.at(-1).timeS - geometry.at(-1).timeS) > TOLERANCE) {
+    fail(`${label} altitude preservation requires the same absolute-time domain`);
+  }
+  // Checking both profiles' knots is exact for the serialized piecewise-linear z(t).
+  // Use an absolute 1e-6 metre tolerance, never the relative coordinate comparator.
+  const times = new Set([...raw, ...geometry].map((point) => point.timeS));
+  for (const timeS of times) {
+    if (Math.abs(interpolate(raw, timeS)[2] - interpolate(geometry, timeS)[2]) > TOLERANCE) {
+      fail(`${label} geometry must preserve raw z(t) at every altitude profile knot`);
+    }
+  }
+}
+
 function waitIntervals(value, label, bounds, points) {
   const waits = list(value, label).map((raw, index) => {
     const entry = object(raw, `${label}[${index}]`);
@@ -284,13 +351,13 @@ function waitIntervals(value, label, bounds, points) {
       fail(`${label}[${index}] extends beyond timedPath`);
     }
     if (
-      !samePoint(interpolate(points, interval.startTimeS), interval.position) ||
-      !samePoint(interpolate(points, interval.endTimeS), interval.position) ||
+      !sameStationaryPosition(interpolate(points, interval.startTimeS), interval.position) ||
+      !sameStationaryPosition(interpolate(points, interval.endTimeS), interval.position) ||
       points.some(
         (point) =>
           point.timeS > interval.startTimeS &&
           point.timeS < interval.endTimeS &&
-          !samePoint(point.position, interval.position),
+          !sameStationaryPosition(point.position, interval.position),
       )
     ) {
       fail(`${label}[${index}] is not stationary in timedPath`);
@@ -470,16 +537,9 @@ function executionEnvelope(value, label) {
   if (parsed.allowReversals || parsed.continuousDynamicsCertified) {
     fail(`${label} must forbid reversals and must not claim continuous-dynamics certification`);
   }
-  const frozen = {
-    maxSpeedMps: 8,
-    maxAbsClimbRateMps: 3,
-    maxDiscreteAccelerationProxyMps2: 4,
-    reversalThresholdDeg: 150,
-    maxExecutionTimeS: 90,
-  };
-  Object.entries(frozen).forEach(([key, expected]) => {
-    if (!sameNumber(parsed[key], expected)) fail(`${label}.${key} disagrees with v0.7`);
-  });
+  if (!matchesEnvelope(parsed, FROZEN_ENVELOPE) && !matchesEnvelope(parsed, MANHATTAN_ENVELOPE)) {
+    fail(`${label} disagrees with v0.7 or the Manhattan execution envelope`);
+  }
   return parsed;
 }
 
@@ -608,7 +668,7 @@ function executionMetadata(value, label) {
   return parsed;
 }
 
-function smoothing(value, label) {
+function smoothing(value, label, allowShortcut, preserveAltitude) {
   const entry = object(value, label);
   const before =
     entry.maxTurnAngleBeforeDeg === null
@@ -647,11 +707,42 @@ function smoothing(value, label) {
     ),
     execution: executionMetadata(entry.execution, `${label}.execution`),
   };
+  if (preserveAltitude) {
+    const axes = list(entry.optimizationAxes, `${label}.optimizationAxes`);
+    if (axes.length !== 2 || axes[0] !== "x" || axes[1] !== "y") {
+      fail(`${label}.optimizationAxes must be exactly ['x', 'y'] for Manhattan v3`);
+    }
+    if (entry.altitudePolicy !== "preserve-raw-z-time-profile") {
+      fail(`${label}.altitudePolicy must preserve the raw z(t) profile for Manhattan v3`);
+    }
+    parsed.optimizationAxes = ["x", "y"];
+    parsed.altitudePolicy = "preserve-raw-z-time-profile";
+  }
   if (parsed.collisionCertified !== parsed.certified) {
     fail(`${label}.collisionCertified must agree with certified`);
   }
   if (parsed.applied && !parsed.certified) fail(`${label} applied output must be certified`);
-  if (parsed.applied !== (parsed.appliedTurnRadiusM !== null)) {
+  const shortcutOnly = parsed.method === "spacetime-shortcut" || parsed.method === "spacetime-shortcut-fillet-fallback";
+  const shortcutFillet = parsed.method === "spacetime-shortcut-plus-sampled-circular-fillet" ||
+    parsed.method === "spacetime-shortcut-plus-local-quintic-bspline";
+  if (parsed.method === "spacetime-shortcut-plus-local-quintic-bspline" && !preserveAltitude) {
+    fail(`${label} local B-spline curves require altitude preservation`);
+  }
+  if ((shortcutOnly || shortcutFillet) && !allowShortcut) {
+    fail(`${label} shortcut methods require the Manhattan v2/v3 protocol`);
+  }
+  if (allowShortcut && !shortcutOnly && !shortcutFillet && parsed.method !== "not-run-uncertified-raw-path") {
+    fail(`${label}.method is unsupported for the Manhattan v2/v3 postprocessor`);
+  }
+  if (shortcutOnly) {
+    if (parsed.appliedTurnRadiusM !== null || parsed.roundedCornerCount !== 0) {
+      fail(`${label} LOS-only shortcut method requires no fillet radius or rounded corners`);
+    }
+  } else if (shortcutFillet) {
+    if (!parsed.applied || parsed.appliedTurnRadiusM === null || parsed.roundedCornerCount === 0) {
+      fail(`${label} shortcut-plus-fillet method requires applied fillets, a radius and rounded corners`);
+    }
+  } else if (parsed.applied !== (parsed.appliedTurnRadiusM !== null)) {
     fail(`${label}.appliedTurnRadiusM must be present exactly when smoothing is applied`);
   }
   if (
@@ -664,7 +755,7 @@ function smoothing(value, label) {
     fail(`${label}.roundedCornerCount must be zero when smoothing is not applied`);
   }
   // acos is ill-conditioned at a 180-degree reversal; permit only micro-degree drift.
-  if (before !== null && after !== null && after > before + 1e-5) {
+  if (!(allowShortcut && (shortcutOnly || shortcutFillet)) && before !== null && after !== null && after > before + 1e-5) {
     fail(`${label} cannot increase maximum turn angle`);
   }
   if (
@@ -729,7 +820,7 @@ function metrics(value, label) {
 function stationarySegments(points) {
   const waits = [];
   for (let index = 1; index < points.length; index += 1) {
-    if (samePoint(points[index - 1].position, points[index].position)) {
+    if (sameStationaryPosition(points[index - 1].position, points[index].position)) {
       waits.push({
         startTimeS: points[index - 1].timeS,
         endTimeS: points[index].timeS,
@@ -903,7 +994,7 @@ function validateMetricsAgainstPath(value, label, scenario, points, frames = nul
   return outcome;
 }
 
-function run(value, label, scenario, planner) {
+function run(value, label, scenario, planner, allowShortcut, preserveAltitude, scheduled) {
   const entry = object(value, label);
   const statuses = new Set(["success", "no-path", "timeout", "invalid"]);
   if (!statuses.has(entry.status)) fail(`${label}.status is unsupported`);
@@ -928,13 +1019,19 @@ function run(value, label, scenario, planner) {
     `${label}.geometryTimedPath`,
     scenario.bounds,
   );
+  if (preserveAltitude) {
+    if (parameters.trajectoryPreserveAltitude !== 1) {
+      fail(`${label}.parameters.trajectoryPreserveAltitude must be 1 for Manhattan v3`);
+    }
+    validateAltitudeProfile(rawPoints, geometryPoints, label);
+  }
   if (
     !samePoint(rawPoints[0].position, scenario.start) ||
     !samePoint(geometryPoints[0].position, scenario.start)
   ) {
     fail(`${label} raw and geometry paths must start at scenario start`);
   }
-  const postprocess = smoothing(entry.smoothing, `${label}.smoothing`);
+  const postprocess = smoothing(entry.smoothing, `${label}.smoothing`, allowShortcut, preserveAltitude);
   if (
     postprocess.rawWaypointCount !== rawPoints.length ||
     postprocess.outputWaypointCount !== geometryPoints.length
@@ -1046,7 +1143,7 @@ function run(value, label, scenario, planner) {
       !sameNumber(postprocess.execution.originalDurationS, geometryPoints.at(-1).timeS)) {
     fail(`${label}.smoothing.execution.originalDurationS disagrees with geometry path`);
   }
-  if (postprocess.execution.qualification !== null &&
+  if (!scheduled && postprocess.execution.qualification !== null &&
       postprocess.execution.qualification.diagnostics.segmentCount !== geometryPoints.length - 1) {
     fail(`${label}.smoothing.execution qualification waypoint count is inconsistent`);
   }
@@ -1056,33 +1153,16 @@ function run(value, label, scenario, planner) {
       `${label}.executionTimedPath`,
       scenario.bounds,
     );
-    if (
-      executionPoints.length !== geometryPoints.length ||
-      executionPoints.some(
-        (point, index) => !samePoint(point.position, geometryPoints[index].position),
-      )
-    ) {
-      fail(`${label} execution retiming must preserve geometry and waypoint count`);
-    }
-    for (let index = 1; index < executionPoints.length; index += 1) {
-      const geometryDuration = geometryPoints[index].timeS - geometryPoints[index - 1].timeS;
-      const executionDuration = executionPoints[index].timeS - executionPoints[index - 1].timeS;
-      if (executionDuration + TOLERANCE < geometryDuration) {
-        fail(`${label} execution retiming shortened segment ${index - 1}`);
-      }
-      if (
-        samePoint(geometryPoints[index - 1].position, geometryPoints[index].position) &&
-        !sameNumber(executionDuration, geometryDuration)
-      ) {
-        fail(`${label} execution retiming changed wait duration at segment ${index - 1}`);
-      }
-    }
+    try { validateExecutionSequence(geometryPoints, executionPoints, scheduled); }
+    catch (error) { fail(`${label}: ${error.message}`); }
+    if (postprocess.execution.qualification.diagnostics.segmentCount !== executionPoints.length - 1)
+      fail(`${label} qualification count disagrees with execution path`);
     if (
       !sameNumber(
         postprocess.execution.candidateDurationS,
         executionPoints.at(-1).timeS,
       ) ||
-      !sameNumber(stationaryDuration(executionPoints), stationaryDuration(geometryPoints))
+      (!scheduled && !sameNumber(stationaryDuration(executionPoints), stationaryDuration(geometryPoints)))
     ) {
       fail(`${label} execution duration metadata or preserved wait time is inconsistent`);
     }
@@ -1097,7 +1177,7 @@ function run(value, label, scenario, planner) {
         (total, interval) => total + interval.endTimeS - interval.startTimeS,
         0,
       ),
-      stationaryDuration(geometryPoints),
+      stationaryDuration(executionPoints),
     )) {
       fail(`${label}.executionWaitIntervals do not preserve total wait duration`);
     }
@@ -1130,7 +1210,7 @@ function run(value, label, scenario, planner) {
   return { runId, plannerId: planner.id };
 }
 
-function scenario(value, label, planners) {
+function scenario(value, label, planners, declaredProtocol) {
   const entry = object(value, label);
   const bounds = parseBounds(entry.bounds, `${label}.bounds`);
   const start = vec3(entry.start, `${label}.start`);
@@ -1152,6 +1232,18 @@ function scenario(value, label, planners) {
       !inBounds(max, bounds)
     ) {
       fail(`${label}.buildings[${index}] is invalid`);
+    }
+    if (building.footprint !== undefined) {
+      list(building.footprint, `${label}.buildings[${index}].footprint`).forEach((ring, ringIndex) => {
+        const points = list(ring, `${label}.buildings[${index}].footprint[${ringIndex}]`);
+        if (points.length < 4) fail(`${label}: footprint rings require at least four vertices`);
+        points.forEach((point, pointIndex) => {
+          const xy = vec2(point, `${label}.buildings[${index}].footprint[${ringIndex}][${pointIndex}]`);
+          if (xy.some((coordinate, axis) => coordinate < bounds.min[axis] - TOLERANCE || coordinate > bounds.max[axis] + TOLERANCE)) {
+            fail(`${label}: footprint vertices must lie inside the city bounds`);
+          }
+        });
+      });
     }
     return { id: building.id };
   });
@@ -1189,6 +1281,10 @@ function scenario(value, label, planners) {
   const fingerprint = text(entry.fingerprint, `${label}.fingerprint`);
   if (!/^sha256:[0-9a-f]{64}$/.test(fingerprint)) fail(`${label}.fingerprint must be a digest`);
   const cohort = entry.cohort === undefined ? null : text(entry.cohort, `${label}.cohort`);
+  const city = entry.city === undefined ? null : object(entry.city, `${label}.city`);
+  if (city && (city.sourceKind !== "nyc-open-data" || city.collisionModel !== "conservative-aabb" || !/^(?:sha256:)?[0-9a-f]{64}$/.test(city.sourceSha256))) {
+    fail(`${label}.city must declare its NYC source and conservative building collision geometry`);
+  }
   const parsedScenario = {
     id: text(entry.id, `${label}.id`),
     fingerprint,
@@ -1214,7 +1310,30 @@ function scenario(value, label, planners) {
     if (!planner) fail(`${label}.runs[${index}].plannerId is undeclared`);
     if (seen.has(plannerId)) fail(`${label} contains duplicate run for ${plannerId}`);
     seen.add(plannerId);
-    return run(runEntry, `${label}.runs[${index}]`, parsedScenario, planner);
+    const expectedEnvelope = MANHATTAN_PROTOCOL_IDS.has(declaredProtocol.id) ? MANHATTAN_ENVELOPE : FROZEN_ENVELOPE;
+    const rawSmoothing = object(runEntry.smoothing, `${label}.runs[${index}].smoothing`);
+    const rawExecution = object(rawSmoothing.execution, `${label}.runs[${index}].smoothing.execution`);
+    if (!matchesEnvelope(object(rawExecution.envelope, `${label}.runs[${index}].smoothing.execution.envelope`), expectedEnvelope)) {
+      fail(`${label}: run execution envelope disagrees with the declared protocol`);
+    }
+    if (MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(declaredProtocol.id)) {
+      const parameters = object(runEntry.parameters, `${label}.runs[${index}].parameters`);
+      if (parameters.trajectoryShortcut !== 1) fail(`${label}: parameters.trajectoryShortcut must be 1 for Manhattan v2/v3`);
+      if (declaredProtocol.trajectoryCurveDegree === 5 && parameters.trajectoryCurveDegree !== 5) {
+        fail(`${label}: parameters.trajectoryCurveDegree must be 5 for local B-spline curves`);
+      }
+      if (plannerId === "space-time-astar-4d") {
+        if (parameters.spaceTimeConnectivity !== 26) fail(`${label}: parameters.spaceTimeConnectivity must be 26 for Manhattan v2/v3`);
+      } else if (parameters.spaceTimeConnectivity !== undefined) {
+        fail(`${label}: spaceTimeConnectivity is only valid for the 4D planner`);
+      }
+    }
+    return run(
+      runEntry, `${label}.runs[${index}]`, parsedScenario, planner,
+      MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(declaredProtocol.id),
+      declaredProtocol.id === MANHATTAN_V3_PROTOCOL_ID,
+      declaredProtocol.trajectoryDynamicScheduling === "certified-move-block-departures",
+    );
   });
   if (runs.length !== planners.size || [...planners.keys()].some((id) => !seen.has(id))) {
     fail(`${label} must contain exactly one run for every declared planner`);
@@ -1224,6 +1343,8 @@ function scenario(value, label, planners) {
     id: parsedScenario.id,
     fingerprint,
     cohort,
+    city,
+    bounds,
     buildingCount: buildings.length,
     staticZoneCount: staticNoFlyZones.length,
     dynamicHazards,
@@ -1248,12 +1369,24 @@ function validateBundle(value) {
   const generatedAt = text(root.generatedAt, "generatedAt");
   if (!Number.isFinite(Date.parse(generatedAt))) fail("generatedAt must be an ISO timestamp");
   const sourceCommit = text(root.sourceCommit, "sourceCommit");
-  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sourceCommit)) {
-    fail("sourceCommit must be a full lowercase Git object ID");
-  }
   const protocol = parseProtocol(root.protocol);
-  if (protocol.id !== "predictive-space-time-v4") {
-    fail("protocol.id must be predictive-space-time-v4");
+  if (MANHATTAN_PROTOCOL_IDS.has(protocol.id)) {
+    if (!/^local-snapshot:sha256:[0-9a-f]{64}$/.test(sourceCommit)) {
+      fail("Manhattan sourceCommit must explicitly identify a local SHA-256 snapshot");
+    }
+    const provenance = object(root.sourceProvenance, "sourceProvenance");
+    if (provenance.kind !== "local-snapshot" || provenance.sha256 !== sourceCommit.slice("local-snapshot:".length)) {
+      fail("sourceProvenance must agree with the local snapshot digest");
+    }
+    const files = list(provenance.files, "sourceProvenance.files");
+    if (!files.length) fail("sourceProvenance.files cannot be empty");
+    for (const file of files) {
+      const entry = object(file, "sourceProvenance.files entry");
+      text(entry.path, "sourceProvenance file path");
+      if (!/^sha256:[0-9a-f]{64}$/.test(text(entry.sha256, "sourceProvenance file sha256"))) fail("source file digest is invalid");
+    }
+  } else if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sourceCommit)) {
+    fail("sourceCommit must be a full lowercase Git object ID");
   }
 
   const plannerEntries = uniqueIdObjects(root.planners, "planners").map((planner, index) => ({
@@ -1278,7 +1411,7 @@ function validateBundle(value) {
   }
   const planners = new Map(plannerEntries.map((planner) => [planner.id, planner]));
   const scenarios = list(root.scenarios, "scenarios").map((entry, index) =>
-    scenario(entry, `scenarios[${index}]`, planners),
+    scenario(entry, `scenarios[${index}]`, planners, protocol),
   );
   const expectedScenarioIds = [
     "wait-then-straight",
@@ -1292,11 +1425,14 @@ function validateBundle(value) {
     "braided-skyway",
     "harbor-switchback",
   ];
-  if (
-    scenarios.length !== expectedScenarioIds.length ||
-    expectedScenarioIds.some((id) => !scenarios.some((entry) => entry.id === id))
-  ) {
-    fail("the public v0.7 protocol requires the ten declared scenarios");
+  const declaredIds = MANHATTAN_PROTOCOL_IDS.has(protocol.id) ? MANHATTAN_IDS : expectedScenarioIds;
+  if (scenarios.length !== declaredIds.length || declaredIds.some((id) => !scenarios.some((entry) => entry.id === id))) {
+    fail(MANHATTAN_PROTOCOL_IDS.has(protocol.id)
+      ? "the Manhattan protocol requires its eight declared missions"
+      : "the public v0.7 protocol requires the ten declared scenarios");
+  }
+  if (MANHATTAN_PROTOCOL_IDS.has(protocol.id) && scenarios.some((entry) => !entry.city || entry.buildingCount < 1000 || entry.city.buildingCount !== entry.buildingCount)) {
+    fail("Manhattan missions require NYC provenance and the complete dense city geometry");
   }
   if (new Set(scenarios.map((entry) => entry.id)).size !== scenarios.length) fail("scenario IDs must be unique");
   if (new Set(scenarios.map((entry) => entry.fingerprint)).size !== scenarios.length) {
@@ -1309,11 +1445,12 @@ function validateBundle(value) {
       entry.staticZoneCount >= 1 &&
       entry.dynamicHazards >= 2,
   );
-  if (!complexDemo) {
+  if (!complexDemo && !MANHATTAN_PROTOCOL_IDS.has(protocol.id)) {
     fail("at least one demo scenario must have 14 buildings, a static NFZ, and two dynamic hazards");
   }
   const runIds = scenarios.flatMap((entry) => entry.runs.map((record) => record.runId));
-  if (runIds.length !== 40) fail("the public v0.7 protocol requires exactly 40 planner runs");
+  const expectedRunCount = MANHATTAN_PROTOCOL_IDS.has(protocol.id) ? 32 : 40;
+  if (runIds.length !== expectedRunCount) fail(`the ${protocol.id} protocol requires exactly ${expectedRunCount} planner runs`);
   if (new Set(runIds).size !== runIds.length) fail("runId values must be unique across the bundle");
 
   const downloads = object(root.downloads, "downloads");
@@ -1325,9 +1462,10 @@ function validateBundle(value) {
     fail("downloads must contain exactly recordsCsv and scenarioManifest");
   }
   return {
+    protocolId: protocol.id,
     scenarioCount: scenarios.length,
     runCount: runIds.length,
-    complexDemoId: complexDemo.id,
+    complexDemoId: complexDemo?.id ?? null,
     artifacts: [
       artifact(downloads.recordsCsv, "downloads.recordsCsv", "predictive-records.csv"),
       artifact(
@@ -1339,7 +1477,7 @@ function validateBundle(value) {
   };
 }
 
-async function verifyArtifact(reference) {
+async function verifyArtifact(reference, protocolId) {
   const artifactPath = resolve(dirname(inputPath), reference.path);
   const [contents, metadata] = await Promise.all([readFile(artifactPath), stat(artifactPath)]);
   const digest = `sha256:${createHash("sha256").update(contents).digest("hex")}`;
@@ -1361,11 +1499,16 @@ async function verifyArtifact(reference) {
     if (manifest.schemaVersion !== 3) {
       fail("predictive-scenario-manifest.json schemaVersion must be 3");
     }
-    if (manifest.protocolId !== "predictive-space-time-v4") {
-      fail("predictive-scenario-manifest.json protocolId must be predictive-space-time-v4");
+    if (manifest.protocolId !== protocolId) {
+      fail("predictive-scenario-manifest.json protocolId must agree with the bundle");
     }
-    if (manifest.datasetId !== "predictive-execution-envelope-v0.7") {
-      fail("predictive-scenario-manifest.json datasetId must be predictive-execution-envelope-v0.7");
+    const regionId = manifest.city?.planningRegion?.id;
+    const datasetId = MANHATTAN_PROTOCOL_IDS.has(protocolId)
+      ? regionId === "midtown-expanded-v3" ? "manhattan-urban-missions-v3"
+        : regionId === "midtown-landscape-v2" ? "manhattan-urban-missions-v2" : "manhattan-urban-missions-v1"
+      : "predictive-execution-envelope-v0.7";
+    if (manifest.datasetId !== datasetId) {
+      fail("predictive-scenario-manifest.json datasetId must agree with the declared protocol");
     }
   }
 }
@@ -1378,7 +1521,7 @@ try {
   fail(`invalid JSON (${error instanceof Error ? error.message : String(error)})`);
 }
 const result = validateBundle(value);
-await Promise.all(result.artifacts.map(verifyArtifact));
+await Promise.all(result.artifacts.map((reference) => verifyArtifact(reference, result.protocolId)));
 console.log(
   `Validated ${result.scenarioCount} predictive scenarios, ${result.runCount} runs, complex demo ${result.complexDemoId}, and ${result.artifacts.length} referenced artifacts.`,
 );

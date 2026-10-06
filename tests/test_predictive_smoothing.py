@@ -9,7 +9,7 @@ from uav3d.dynamic import DynamicScenario, MovingSphere, TemporaryCylinder
 from uav3d.dynamic_collision import minimum_dynamic_separation
 from uav3d.kinematics import DiscreteExecutionEnvelope, diagnose_timed_path_kinematics
 from uav3d.predictive import TimedPath, TimedWaypoint
-from uav3d.predictive_smoothing import smooth_predictive_timed_path
+from uav3d.predictive_smoothing import _within_speed_limit, smooth_predictive_timed_path
 from uav3d.scene import AABB, Bounds3D, Scene
 
 
@@ -48,6 +48,48 @@ def _right_angle_path() -> TimedPath:
             TimedWaypoint(4.0, (12.0, 12.0, 5.0), "move"),
         )
     )
+
+
+def test_speed_limit_handles_short_segments_on_an_absolute_clock_without_accepting_overspeed():
+    start_time = 203.86218164329213
+    length = 0.0002790399921327155
+    # Actual curve replay clock after several accumulated sub-segment durations.
+    arrival = 203.86220024595823
+    assert length / (arrival - start_time) > 15.0 + 15e-9
+    raw = TimedPath(
+        (
+            TimedWaypoint(start_time, (0, 0, 5), "start"),
+            TimedWaypoint(arrival, (length, 0, 5), "move"),
+        )
+    )
+    assert _within_speed_limit(raw, 15)
+    assert not _within_speed_limit(raw, 14.9999)
+    for observed_speed in (15.0001, 16.0):
+        too_fast = TimedPath(
+            (
+                raw.waypoints[0],
+                TimedWaypoint(start_time + length / observed_speed, (length, 0, 5), "move"),
+            )
+        )
+        assert not _within_speed_limit(too_fast, 15)
+
+
+def test_short_curve_segments_keep_raw_fallback_collision_and_speed_checks():
+    start = (4.0, 4.0, 5.0)
+    goal = (4.0002790399921327, 4.0, 5.0)
+    start_time = 203.86218164329213
+    duration = math.dist(start, goal) / 15
+    raw = TimedPath(
+        (
+            TimedWaypoint(start_time, start, "start"),
+            TimedWaypoint(start_time + duration, goal, "move"),
+        )
+    )
+    result = smooth_predictive_timed_path(_scenario(start=start, goal=goal), raw, max_speed_mps=15)
+    assert result.certified
+    assert result.timed_path == raw
+    with pytest.raises(ValueError, match="exceeds max_speed_mps"):
+        smooth_predictive_timed_path(_scenario(start=start, goal=goal), raw, max_speed_mps=14.9999)
 
 
 def test_open_right_angle_is_rounded_and_certified() -> None:

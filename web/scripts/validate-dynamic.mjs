@@ -125,9 +125,6 @@ if (data.schemaVersion !== 1) fail("schemaVersion must be 1");
 if (data.verificationStatus !== "DYNAMIC_DEMO_NON_CONFIRMATORY") {
   fail("verificationStatus must be DYNAMIC_DEMO_NON_CONFIRMATORY");
 }
-if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(data.sourceCommit ?? "")) {
-  fail("sourceCommit must be a full lowercase Git object ID");
-}
 if (typeof data.generatedAt !== "string" || !Number.isFinite(Date.parse(data.generatedAt))) {
   fail("generatedAt must be an ISO timestamp");
 }
@@ -137,11 +134,60 @@ for (const key of [
   "timeStepS", "replanIntervalS", "cruiseSpeedMps", "maxTimeS", "resolutionM",
 ]) positive(protocol[key], `protocol.${key}`);
 positiveInteger(protocol.maxExpansions, "protocol.maxExpansions");
-if (
-  protocol.timeStepS !== 1 || protocol.replanIntervalS !== 4 ||
-  protocol.cruiseSpeedMps !== 8 || protocol.maxTimeS !== 180 ||
-  protocol.resolutionM !== 4 || protocol.maxExpansions !== 120_000
-) fail("protocol does not match the declared deterministic replay configuration");
+const replayProtocols = {
+  "dynamic-replanning-demo-v1": [1, 4, 8, 180, 4, 120_000],
+  "dynamic-replanning-v1": [1, 4, 8, 180, 4, 120_000],
+  "manhattan-reactive-demo-v1": [2, 10, 14, 600, 50, 20_000],
+  "manhattan-reactive-demo-v2": [2, 10, 14, 600, 50, 20_000],
+  "manhattan-reactive-demo-v3": [2, 10, 14, 600, 50, 20_000],
+};
+const manhattanProtocols = new Set([
+  "manhattan-reactive-demo-v1", "manhattan-reactive-demo-v2", "manhattan-reactive-demo-v3",
+]);
+const shortcutProtocols = new Set(["manhattan-reactive-demo-v2", "manhattan-reactive-demo-v3"]);
+const expectedProtocol = replayProtocols[protocol.id];
+const actualProtocol = [protocol.timeStepS, protocol.replanIntervalS, protocol.cruiseSpeedMps,
+  protocol.maxTimeS, protocol.resolutionM, protocol.maxExpansions];
+if (!expectedProtocol || actualProtocol.some((value, index) => value !== expectedProtocol[index])) {
+  fail("protocol does not match the declared deterministic replay configuration");
+}
+if (shortcutProtocols.has(protocol.id) && protocol.pathShortcut !== 1) {
+  fail("protocol.pathShortcut must be 1 for Manhattan v2/v3");
+}
+if (protocol.id === "manhattan-reactive-demo-v3" && protocol.preserveAltitude !== 1) {
+  fail("protocol.preserveAltitude must be 1 for Manhattan v3");
+}
+if (protocol.id === "manhattan-reactive-demo-v3" &&
+    (protocol.smoothTurns !== undefined || protocol.turnScaleM !== undefined || protocol.curveSampleSpacingM !== undefined)) {
+  if (protocol.smoothTurns !== 1) fail("protocol.smoothTurns must be 1 for local B-spline curves");
+  positive(protocol.turnScaleM, "protocol.turnScaleM");
+  positive(protocol.curveSampleSpacingM, "protocol.curveSampleSpacingM");
+}
+if (manhattanProtocols.has(protocol.id)) {
+  if (!/^local-snapshot:sha256:[0-9a-f]{64}$/.test(data.sourceCommit ?? "")) {
+    fail("Manhattan sourceCommit must identify a local source snapshot");
+  }
+  const provenance = object(data.sourceProvenance, "sourceProvenance");
+  if (provenance.kind !== "local-snapshot" || provenance.sha256 !== data.sourceCommit.slice(15)) {
+    fail("sourceProvenance disagrees with the local source snapshot");
+  }
+  const files = array(provenance.files, "sourceProvenance.files");
+  if (files.length === 0) fail("sourceProvenance.files cannot be empty");
+  const paths = new Set();
+  for (const [index, rawFile] of files.entries()) {
+    const file = object(rawFile, `sourceProvenance.files[${index}]`);
+    const path = text(file.path, `sourceProvenance.files[${index}].path`);
+    if (path.startsWith("/") || path.split("/").includes("..") || paths.has(path)
+      || !/^sha256:[0-9a-f]{64}$/.test(file.sha256 ?? "")) {
+      fail("sourceProvenance.files must contain unique relative paths and SHA-256 digests");
+    }
+    paths.add(path);
+  }
+  const digest = `sha256:${createHash("sha256").update(JSON.stringify(files)).digest("hex")}`;
+  if (digest !== provenance.sha256) fail("source snapshot manifest digest disagrees");
+} else if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(data.sourceCommit ?? "")) {
+  fail("sourceCommit must be a full lowercase Git object ID");
+}
 
 const planners = uniqueObjects(data.planners, "planners");
 if (
@@ -154,6 +200,9 @@ if (
 const plannerIds = new Set(declaredPlanners.map(([id]) => id));
 const scenarios = array(data.scenarios, "scenarios");
 if (scenarios.length === 0) fail("at least one scenario is required");
+if (manhattanProtocols.has(protocol.id) && scenarios.length !== 8) {
+  fail("the Manhattan protocol requires the eight declared simulation missions");
+}
 const scenarioIds = new Set();
 const fingerprints = new Set();
 let runCount = 0;
@@ -200,6 +249,23 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
   if (vehicleRadius + safetyMargin <= 0) fail(`${sceneLabel}.constraints are invalid`);
 
   const obstacleIds = [];
+  if (manhattanProtocols.has(protocol.id)) {
+    const width = bounds.max[0] - bounds.min[0], depth = bounds.max[1] - bounds.min[1];
+    const regionId = scene.city?.planningRegion?.id;
+    const completeExtent = regionId === "midtown-expanded-v3"
+      ? width >= 3500 && width <= 3700 && depth >= 3700 && depth <= 3900
+      : regionId === "midtown-landscape-v2"
+        ? width >= 3500 && depth >= 1800 && width / depth >= 1.7 && width / depth <= 2
+        : width >= 2000 && depth >= 2000;
+    if (scene.city?.sourceKind !== "nyc-open-data" || scene.city.collisionModel !== "conservative-aabb"
+      || !/^(?:sha256:)?[0-9a-f]{64}$/.test(scene.city.sourceSha256 ?? "")
+      || !scene.city.sourceUrl?.startsWith("https://services6.arcgis.com/")
+      || !Array.isArray(scene.buildings) || scene.buildings.length < 1000
+      || scene.city.buildingCount !== scene.buildings.length
+      || !completeExtent) {
+      fail(`${sceneLabel} must retain the full physical Manhattan district and source provenance`);
+    }
+  }
   for (const [index, building] of uniqueObjects(scene.buildings, `${sceneLabel}.buildings`).entries()) {
     const min = vector(building.min, 3, `${sceneLabel}.buildings[${index}].min`);
     const max = vector(building.max, 3, `${sceneLabel}.buildings[${index}].max`);
@@ -207,6 +273,19 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
       min.some((coordinate, axis) => coordinate >= max[axis]) ||
       !inBounds(min, bounds) || !inBounds(max, bounds)
     ) fail(`${sceneLabel}.buildings[${index}] is invalid`);
+    if (building.footprint !== undefined || manhattanProtocols.has(protocol.id)) {
+      const footprint = array(building.footprint, `${sceneLabel}.buildings[${index}].footprint`);
+      if (footprint.length === 0) fail(`${sceneLabel}.buildings[${index}] requires an exterior ring`);
+      for (const [ringIndex, rawRing] of footprint.entries()) {
+        const ring = array(rawRing, `${sceneLabel}.buildings[${index}].footprint[${ringIndex}]`);
+        if (ring.length < 4 || ring.some((point) => !Array.isArray(point) || point.length !== 2
+          || point.some((coordinate, axis) => !Number.isFinite(coordinate)
+            || coordinate < min[axis] - 1e-5 || coordinate > max[axis] + 1e-5))
+          || ring[0].some((value, axis) => value !== ring.at(-1)[axis])) {
+          fail(`${sceneLabel}.buildings[${index}] has an invalid source footprint ring`);
+        }
+      }
+    }
     obstacleIds.push(building.id);
   }
   const parseZone = (rawZone, label) => {
@@ -315,6 +394,17 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
     const parameters = object(run.parameters, `${runLabel}.parameters`);
     if (Object.keys(parameters).length === 0) fail(`${runLabel}.parameters cannot be empty`);
     for (const [key, value] of Object.entries(parameters)) finite(value, `${runLabel}.parameters.${key}`);
+    if (shortcutProtocols.has(protocol.id) && parameters.pathShortcut !== 1) {
+      fail(`${runLabel}.parameters.pathShortcut must be 1 for Manhattan v2/v3`);
+    }
+    if (protocol.id === "manhattan-reactive-demo-v3" && parameters.preserveAltitude !== 1) {
+      fail(`${runLabel}.parameters.preserveAltitude must be 1 for Manhattan v3`);
+    }
+    if (protocol.id === "manhattan-reactive-demo-v3" && protocol.smoothTurns === 1 &&
+        (parameters.smoothTurns !== 1 || parameters.turnScaleM !== protocol.turnScaleM ||
+         parameters.curveSampleSpacingM !== protocol.curveSampleSpacingM)) {
+      fail(`${runLabel}.parameters must match the local B-spline curve protocol`);
+    }
 
     const metrics = object(run.metrics, `${runLabel}.metrics`);
     const success = bool(metrics.success, `${runLabel}.metrics.success`);
@@ -378,9 +468,13 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
       });
       const planned = parsePath(frame.path, `${frameLabel}.path`);
       const executed = parsePath(frame.executedPath, `${frameLabel}.executedPath`);
+      const localEscape = protocol.horizontalEscape === 1 && parameters.horizontalEscape === 1 &&
+        planned.length === 2 && frame.replanReason === "safety-gate" &&
+        Math.abs(planned[0][2] - planned[1][2]) <= 1e-5 &&
+        Math.hypot(...planned[1].map((v, i) => v - planned[0][i])) <= protocol.cruiseSpeedMps * protocol.timeStepS + 1e-5;
       if (
         planned.length > 0 &&
-        (!samePoint(planned[0], vehicle) || !samePoint(planned.at(-1), goal))
+        (!samePoint(planned[0], vehicle) || (!localEscape && ![goal, ...(scene.mission?.taskPoints ?? []).map(task => task.position)].some(target => samePoint(planned.at(-1), target))))
       ) fail(`${frameLabel}.path endpoints are inconsistent`);
       if (
         executed.length === 0 || !samePoint(executed[0], start) ||

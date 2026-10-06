@@ -1,0 +1,3757 @@
+{
+  "scope": "serialized-altitude-profiles-not-a-continuous-flight-dynamics-certificate",
+  "toleranceM": 1e-06,
+  "summaries": [
+    {
+      "study": "static",
+      "runs": 24,
+      "availableRuns": 24,
+      "maxZDifferenceScope": "normalized-3D-arc-observation-only",
+      "medianMaxZDifferenceM": 8.488798826653266,
+      "maxZDifferenceM": 25.844697177139807,
+      "medianRawVerticalTravelM": 467.95601,
+      "medianGeometryVerticalTravelM": 467.95601,
+      "criticalHeightsPreservedRuns": 24,
+      "altitudeBoundsPreservedRuns": 24,
+      "noVerticalTravelIncreaseRuns": 24,
+      "explicitProgressAltitudePreservedRuns": 24
+    },
+    {
+      "study": "reactive",
+      "runs": 24
+    },
+    {
+      "study": "predictive",
+      "runs": 32,
+      "availableRuns": 32,
+      "maxZDifferenceScope": "exact-piecewise-linear-absolute-time",
+      "medianMaxZDifferenceM": 6.188116685734713e-11,
+      "maxZDifferenceM": 1.2965983842150308e-10,
+      "medianRawVerticalTravelM": 743.57913,
+      "medianGeometryVerticalTravelM": 743.57913,
+      "criticalHeightsPreservedRuns": 32,
+      "altitudeBoundsPreservedRuns": 32,
+      "noVerticalTravelIncreaseRuns": 32,
+      "absoluteTimeAltitudePreservedRuns": 32,
+      "executionGeometryPositionSequencePreservedRuns": 27,
+      "executionGeometryKnotsPreservedRuns": 32
+    }
+  ],
+  "records": [
+    {
+      "study": "static",
+      "scenario": "midtown-medical-link",
+      "planner": "astar-3d",
+      "rawPathSHA256": "0d30517d56c9f0107d9b344e713757c1edb84c4e11d9b8b6ebd79ef9b7ba2634",
+      "raw": {
+        "minM": 32.99311,
+        "maxM": 150.0,
+        "verticalTravelM": 195.03969,
+        "criticalHeightsM": [
+          32.99311,
+          150.0,
+          100.0,
+          128.0328
+        ]
+      },
+      "geometry": {
+        "minM": 32.99311,
+        "maxM": 150.0,
+        "verticalTravelM": 195.03969,
+        "criticalHeightsM": [
+          32.99311,
+          150.0,
+          100.0,
+          128.0328
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 22.08456948260833,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 0.0,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "midtown-medical-link",
+      "planner": "lazy-theta-star",
+      "rawPathSHA256": "e7026696057bc012cf23d0e3b4ad7a8c101c85c740c3a3a0d4c38aa79cee71bf",
+      "raw": {
+        "minM": 32.99311,
+        "maxM": 150.0,
+        "verticalTravelM": 195.03969,
+        "criticalHeightsM": [
+          32.99311,
+          150.0,
+          100.0,
+          128.0328
+        ]
+      },
+      "geometry": {
+        "minM": 32.99311,
+        "maxM": 150.0,
+        "verticalTravelM": 195.03969,
+        "criticalHeightsM": [
+          32.99311,
+          150.0,
+          100.0,
+          128.0328
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 9.975954921463597,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.8421709430404007e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "midtown-medical-link",
+      "planner": "rrt-star",
+      "rawPathSHA256": "08ef53482c9a98c34e022a5c0dcc12e5029b7e601e13ab6267c784e77df007b9",
+      "raw": {
+        "minM": 32.99311,
+        "maxM": 128.5703279500873,
+        "verticalTravelM": 177.75301990309683,
+        "criticalHeightsM": [
+          32.99311,
+          100.0,
+          87.21366299853888,
+          128.5703279500873,
+          100.0,
+          128.0328
+        ]
+      },
+      "geometry": {
+        "minM": 32.99311,
+        "maxM": 128.5703279500873,
+        "verticalTravelM": 177.75301990309683,
+        "criticalHeightsM": [
+          32.99311,
+          100.0,
+          87.21366299853888,
+          128.5703279500873,
+          100.0,
+          128.0328
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 0.39728303876404425,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.842170943040401e-14,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "chelsea-midtown-delivery",
+      "planner": "astar-3d",
+      "rawPathSHA256": "789da0d163268fa30c10504d4bd379ce059968e0a59dfe2eee68b1185df65cbe",
+      "raw": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 286.34873,
+        "criticalHeightsM": [
+          36.288,
+          203.89818,
+          85.15963
+        ]
+      },
+      "geometry": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 286.34873,
+        "criticalHeightsM": [
+          36.288,
+          203.89818,
+          85.15963
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 14.073889008007825,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.8421709430404007e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "chelsea-midtown-delivery",
+      "planner": "lazy-theta-star",
+      "rawPathSHA256": "b70dbcf9b3b08b90a8f5f23088582f1e2f49097a94db65d096ff68ad138f8ea6",
+      "raw": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 286.34873,
+        "criticalHeightsM": [
+          36.288,
+          203.89818,
+          85.15963
+        ]
+      },
+      "geometry": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 286.34873,
+        "criticalHeightsM": [
+          36.288,
+          203.89818,
+          85.15963
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 5.561035074874013,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 1.7053025658242404e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "chelsea-midtown-delivery",
+      "planner": "rrt-star",
+      "rawPathSHA256": "0946f177997e0498769b798561699339b5e4a5993460bdf2f0709af91f8e0cd7",
+      "raw": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 305.23460429944146,
+        "criticalHeightsM": [
+          36.288,
+          100.0,
+          92.42248923474578,
+          101.86542638446652,
+          100.0,
+          203.89818,
+          85.15963
+        ]
+      },
+      "geometry": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 305.23460429944146,
+        "criticalHeightsM": [
+          36.288,
+          100.0,
+          92.42248923474578,
+          101.86542638446652,
+          100.0,
+          203.89818,
+          85.15963
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 1.3841351656243148,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 1.4210854715202004e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "hudson-inspection",
+      "planner": "astar-3d",
+      "rawPathSHA256": "c517eb71e054dad4b1a6c06e1ff25b7f8e5402dc6285bddc8fbfc9db30ba23d1",
+      "raw": {
+        "minM": 99.21688,
+        "maxM": 150.0,
+        "verticalTravelM": 110.52792,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          150.0,
+          99.21688
+        ]
+      },
+      "geometry": {
+        "minM": 99.21688,
+        "maxM": 150.0,
+        "verticalTravelM": 110.52792,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          150.0,
+          99.21688
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 12.333805806560378,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 3.410605131648481e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "hudson-inspection",
+      "planner": "lazy-theta-star",
+      "rawPathSHA256": "d105fbf02aec9e9d310b03be2a8345ba3cf359d469eb10eed88dd905a279c463",
+      "raw": {
+        "minM": 99.21688,
+        "maxM": 150.0,
+        "verticalTravelM": 110.52792,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          150.0,
+          99.21688
+        ]
+      },
+      "geometry": {
+        "minM": 99.21688,
+        "maxM": 150.0,
+        "verticalTravelM": 110.52792,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          150.0,
+          99.21688
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 8.785173871139307,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 4.263256414560601e-14,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "hudson-inspection",
+      "planner": "rrt-star",
+      "rawPathSHA256": "909b9ec650bc18961625107d13c05051a1c2b75b5f360355e71a34cae9f2230d",
+      "raw": {
+        "minM": 70.96854993119568,
+        "maxM": 135.19160859075484,
+        "verticalTravelM": 183.29551107543153,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          135.19160859075484,
+          70.96854993119568,
+          106.91731953857345,
+          103.26227970595953,
+          104.79058518863215,
+          86.9973406119747,
+          100.0,
+          98.50442753111476,
+          99.21688
+        ]
+      },
+      "geometry": {
+        "minM": 70.96854993119568,
+        "maxM": 135.19160859075484,
+        "verticalTravelM": 183.29551107543153,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          135.19160859075484,
+          70.96854993119568,
+          106.91731953857345,
+          103.26227970595953,
+          104.79058518863215,
+          86.9973406119747,
+          100.0,
+          98.50442753111476,
+          99.21688
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 0.7728611230411673,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 8.526512829121202e-14,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "flatiron-eastside-logistics",
+      "planner": "astar-3d",
+      "rawPathSHA256": "c3533645f6bc108a4c07dc128a5055b1332954d449a64b5e497fc97cda803ace",
+      "raw": {
+        "minM": 56.00856,
+        "maxM": 250.0,
+        "verticalTravelM": 584.9177999999999,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          146.44882,
+          250.0,
+          56.00856
+        ]
+      },
+      "geometry": {
+        "minM": 56.00856,
+        "maxM": 250.0,
+        "verticalTravelM": 584.9177999999999,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          146.44882,
+          250.0,
+          56.00856
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 25.844697177139807,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 9.094947017729282e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "flatiron-eastside-logistics",
+      "planner": "lazy-theta-star",
+      "rawPathSHA256": "bf1626220604ed8db15fb1f9ade69cd001868c85dc83c8049c528e7c5e94f9e3",
+      "raw": {
+        "minM": 56.00856,
+        "maxM": 250.0,
+        "verticalTravelM": 584.9177999999999,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          146.44882,
+          250.0,
+          56.00856
+        ]
+      },
+      "geometry": {
+        "minM": 56.00856,
+        "maxM": 250.0,
+        "verticalTravelM": 584.9177999999999,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          146.44882,
+          250.0,
+          56.00856
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 8.192423782167225,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 3.979039320256561e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "flatiron-eastside-logistics",
+      "planner": "rrt-star",
+      "rawPathSHA256": "96ce61e838cf07732b1b528ca0925a165c184de342e2b11d61fe00ba30bef1af",
+      "raw": {
+        "minM": 56.00856,
+        "maxM": 212.3408680881043,
+        "verticalTravelM": 471.02107968536416,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          100.19055468232744,
+          100.0,
+          184.07139707225036,
+          100.0,
+          212.3408680881043,
+          56.00856
+        ]
+      },
+      "geometry": {
+        "minM": 56.00856,
+        "maxM": 212.3408680881043,
+        "verticalTravelM": 471.02107968536416,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          100.19055468204316,
+          100.0,
+          184.07139707225036,
+          100.0,
+          212.3408680881043,
+          56.00856
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 3.3695145888821116,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 1.9895196601282805e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "midtown-west-backhaul",
+      "planner": "astar-3d",
+      "rawPathSHA256": "f25fc27ca3f86d39ba682637c59d52d7406f3e5c2c5bbc544c5e8a089cc71d8e",
+      "raw": {
+        "minM": 31.532719999999998,
+        "maxM": 200.0,
+        "verticalTravelM": 544.63279,
+        "criticalHeightsM": [
+          54.48151,
+          200.0,
+          100.0,
+          165.32351,
+          100.0,
+          150.0,
+          31.532719999999998
+        ]
+      },
+      "geometry": {
+        "minM": 31.532719999999998,
+        "maxM": 200.0,
+        "verticalTravelM": 544.63279,
+        "criticalHeightsM": [
+          54.48151,
+          200.0,
+          100.0,
+          165.32351,
+          100.0,
+          150.0,
+          31.532719999999998
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 18.37124312456089,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.5579538487363607e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "midtown-west-backhaul",
+      "planner": "lazy-theta-star",
+      "rawPathSHA256": "31bf973720ce8c9d5202023cf554eac1029e6ebcd3b6698aaec53f64b252c43f",
+      "raw": {
+        "minM": 31.532719999999998,
+        "maxM": 200.0,
+        "verticalTravelM": 613.98577,
+        "criticalHeightsM": [
+          54.48151,
+          200.0,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          31.532719999999998
+        ]
+      },
+      "geometry": {
+        "minM": 31.532719999999998,
+        "maxM": 200.0,
+        "verticalTravelM": 613.98577,
+        "criticalHeightsM": [
+          54.48151,
+          200.0,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          31.532719999999998
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 5.575179481551714,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.2737367544323206e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "midtown-west-backhaul",
+      "planner": "rrt-star",
+      "rawPathSHA256": "db41ec5c568ee546c0773162926be4ffa44710a26d9efc43327e07a276d40623",
+      "raw": {
+        "minM": 31.532719999999998,
+        "maxM": 165.32351,
+        "verticalTravelM": 376.32654883216827,
+        "criticalHeightsM": [
+          54.48151,
+          126.81123676230874,
+          100.0,
+          165.32351,
+          100.0,
+          139.0356426537754,
+          31.532719999999998
+        ]
+      },
+      "geometry": {
+        "minM": 31.532719999999998,
+        "maxM": 165.32351,
+        "verticalTravelM": 376.32654883216827,
+        "criticalHeightsM": [
+          54.48151,
+          126.81123676230874,
+          100.0,
+          165.32351,
+          100.0,
+          139.0356426537754,
+          31.532719999999998
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 1.4955799699876593,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.2737367544323206e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "eastside-medical-return",
+      "planner": "astar-3d",
+      "rawPathSHA256": "6904030cfa0258ecd8f33e19f9471a1a7a1be697287bcdb50a5d3d1c462f62b1",
+      "raw": {
+        "minM": 89.06621,
+        "maxM": 200.0,
+        "verticalTravelM": 479.05183,
+        "criticalHeightsM": [
+          89.06621,
+          150.0,
+          100.12226,
+          200.0,
+          134.4336,
+          150.0,
+          107.42832,
+          182.592,
+          113.0976
+        ]
+      },
+      "geometry": {
+        "minM": 89.06621,
+        "maxM": 200.0,
+        "verticalTravelM": 479.05183,
+        "criticalHeightsM": [
+          89.06621,
+          150.0,
+          100.12226,
+          200.0,
+          134.4336,
+          150.0,
+          107.42832,
+          182.592,
+          113.0976
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 20.742135619501937,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.8421709430404007e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "eastside-medical-return",
+      "planner": "lazy-theta-star",
+      "rawPathSHA256": "7e91948cf2ad220879060be927d99ed587cfa602cefe70c2ebc4f19ee607c05a",
+      "raw": {
+        "minM": 89.06621,
+        "maxM": 200.0,
+        "verticalTravelM": 513.86783,
+        "criticalHeightsM": [
+          89.06621,
+          150.0,
+          100.12226,
+          200.0,
+          134.4336,
+          150.0,
+          107.42832,
+          200.0,
+          113.0976
+        ]
+      },
+      "geometry": {
+        "minM": 89.06621,
+        "maxM": 200.0,
+        "verticalTravelM": 513.86783,
+        "criticalHeightsM": [
+          89.06621,
+          150.0,
+          100.12226,
+          200.0,
+          134.4336,
+          150.0,
+          107.42832,
+          200.0,
+          113.0976
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 7.355495133052045,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 1.4210854715202004e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "eastside-medical-return",
+      "planner": "rrt-star",
+      "rawPathSHA256": "a18ced179044ce0a00fee02ba5942cf97b8773b3d05906ef332f1666b9400625",
+      "raw": {
+        "minM": 89.06621,
+        "maxM": 201.16064856327728,
+        "verticalTravelM": 475.4135745572752,
+        "criticalHeightsM": [
+          89.06621,
+          121.09527073308811,
+          100.0,
+          106.25491648615215,
+          105.09338381638415,
+          135.73743552973357,
+          100.12226,
+          201.16064856327728,
+          134.4336,
+          139.02598478277062,
+          107.42832,
+          182.592,
+          113.0976
+        ]
+      },
+      "geometry": {
+        "minM": 89.06621,
+        "maxM": 201.16064856327728,
+        "verticalTravelM": 475.4135745572752,
+        "criticalHeightsM": [
+          89.06621,
+          121.09527073308811,
+          100.0,
+          106.25491648615215,
+          105.09338381638415,
+          135.73743552973357,
+          100.12226,
+          201.16064856327728,
+          134.4336,
+          139.02598478277062,
+          107.42832,
+          182.592,
+          113.0976
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 2.113519012160012,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 1.9895196601282805e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "midtown-supply-backhaul",
+      "planner": "astar-3d",
+      "rawPathSHA256": "30d52884acc77d1070b3cd6accdcaf5498dd8b2c6b45f592a6665979bd8d0d97",
+      "raw": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 467.95601,
+        "criticalHeightsM": [
+          169.65019,
+          200.0,
+          120.78161,
+          150.0,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "geometry": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 467.95601,
+        "criticalHeightsM": [
+          169.65019,
+          200.0,
+          120.78161,
+          150.0,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 14.00854850827207,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 1.9895196601282805e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "midtown-supply-backhaul",
+      "planner": "lazy-theta-star",
+      "rawPathSHA256": "d8549b649dd858d7b7b6d7a3254163801076e0a6279f5cd979581a8f5dcc54a4",
+      "raw": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 467.95601,
+        "criticalHeightsM": [
+          169.65019,
+          200.0,
+          120.78161,
+          150.0,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "geometry": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 467.95601,
+        "criticalHeightsM": [
+          169.65019,
+          200.0,
+          120.78161,
+          150.0,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 10.621852014948217,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 3.979039320256561e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "midtown-supply-backhaul",
+      "planner": "rrt-star",
+      "rawPathSHA256": "45852e84228ec77fc9dd19e9c2cc7ae959faca5c3e8fa02b2f590053bac3c8d5",
+      "raw": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 350.8118099016986,
+        "criticalHeightsM": [
+          169.65019,
+          119.56820008410035,
+          120.56430003494964,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "geometry": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 350.8118099016986,
+        "criticalHeightsM": [
+          169.65019,
+          119.56820008410035,
+          120.56430003494964,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 0.5141019615114004,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.2737367544323206e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "east-to-hudson-priority",
+      "planner": "astar-3d",
+      "rawPathSHA256": "8787224c0aa50c578a60dcbd410fd0a58b1332f4e871670853ae863218fa6362",
+      "raw": {
+        "minM": 42.765,
+        "maxM": 450.0,
+        "verticalTravelM": 613.7342,
+        "criticalHeightsM": [
+          443.5008,
+          450.0,
+          100.0,
+          200.0,
+          42.765
+        ]
+      },
+      "geometry": {
+        "minM": 42.765,
+        "maxM": 450.0,
+        "verticalTravelM": 613.7342,
+        "criticalHeightsM": [
+          443.5008,
+          450.0,
+          100.0,
+          200.0,
+          42.765
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 17.81235378766658,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 8.526512829121202e-14,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "east-to-hudson-priority",
+      "planner": "lazy-theta-star",
+      "rawPathSHA256": "f562c6ddd557dad9b41a4b664a9d3bf383b74b181a9d5ffcb1d7954013b4439c",
+      "raw": {
+        "minM": 42.765,
+        "maxM": 450.0,
+        "verticalTravelM": 713.7342,
+        "criticalHeightsM": [
+          443.5008,
+          450.0,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          42.765
+        ]
+      },
+      "geometry": {
+        "minM": 42.765,
+        "maxM": 450.0,
+        "verticalTravelM": 713.7342,
+        "criticalHeightsM": [
+          443.5008,
+          450.0,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          42.765
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 14.86925814579024,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 4.263256414560601e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "static",
+      "scenario": "east-to-hudson-priority",
+      "planner": "rrt-star",
+      "rawPathSHA256": "e5f4af4d9756b840ed08c3579e6aa4bc75564e75f7041e91e439e2de6f3e61b7",
+      "raw": {
+        "minM": 42.765,
+        "maxM": 443.5008,
+        "verticalTravelM": 649.2297994963758,
+        "criticalHeightsM": [
+          443.5008,
+          100.0,
+          196.96935,
+          97.11841846189775,
+          124.39606821008562,
+          42.765
+        ]
+      },
+      "geometry": {
+        "minM": 42.765,
+        "maxM": 443.5008,
+        "verticalTravelM": 649.2297994963758,
+        "criticalHeightsM": [
+          443.5008,
+          100.0,
+          196.96935,
+          97.11841846189775,
+          124.39606821008562,
+          42.765
+        ]
+      },
+      "arcAlignmentObservationMaxZDifferenceM": 0.38071692655285005,
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0,
+      "explicitProgressMaxZDifferenceM": 2.7000623958883807e-13,
+      "explicitProgressAltitudePreserved": true
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-medical-link-reactive",
+      "planner": "repeated-astar-3d",
+      "execution": {
+        "minM": 32.99311,
+        "maxM": 150.0,
+        "verticalTravelM": 295.03969,
+        "criticalHeightsM": [
+          32.99311,
+          150.0,
+          100.0,
+          150.0,
+          100.0,
+          128.0328
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-medical-link-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "execution": {
+        "minM": 32.99311,
+        "maxM": 150.0,
+        "verticalTravelM": 318.954716558332,
+        "criticalHeightsM": [
+          32.99311,
+          61.957513279166,
+          50.0,
+          150.0,
+          100.0,
+          150.0,
+          100.0,
+          128.0328
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-medical-link-reactive",
+      "planner": "dstar-lite-3d",
+      "execution": {
+        "minM": 32.99311,
+        "maxM": 150.0,
+        "verticalTravelM": 295.03969,
+        "criticalHeightsM": [
+          32.99311,
+          100.0,
+          50.0,
+          150.0,
+          100.0,
+          128.0328
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "chelsea-midtown-delivery-reactive",
+      "planner": "repeated-astar-3d",
+      "execution": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 286.34873,
+        "criticalHeightsM": [
+          36.288,
+          203.89818,
+          85.15963
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "chelsea-midtown-delivery-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "execution": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 286.34873,
+        "criticalHeightsM": [
+          36.288,
+          203.89818,
+          85.15963
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "chelsea-midtown-delivery-reactive",
+      "planner": "dstar-lite-3d",
+      "execution": {
+        "minM": 36.288,
+        "maxM": 203.89818,
+        "verticalTravelM": 286.34873,
+        "criticalHeightsM": [
+          36.288,
+          203.89818,
+          85.15963
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "hudson-inspection-reactive",
+      "planner": "repeated-astar-3d",
+      "execution": {
+        "minM": 99.21688,
+        "maxM": 150.0,
+        "verticalTravelM": 110.52792,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          150.0,
+          99.21688
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "hudson-inspection-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "execution": {
+        "minM": 99.21688,
+        "maxM": 150.0,
+        "verticalTravelM": 128.469539144132,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          150.0,
+          141.029190427934,
+          150.0,
+          99.21688
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "hudson-inspection-reactive",
+      "planner": "dstar-lite-3d",
+      "execution": {
+        "minM": 99.21688,
+        "maxM": 150.0,
+        "verticalTravelM": 210.52792,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          150.0,
+          100.0,
+          150.0,
+          99.21688
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "flatiron-eastside-logistics-reactive",
+      "planner": "repeated-astar-3d",
+      "execution": {
+        "minM": 56.00856,
+        "maxM": 250.0,
+        "verticalTravelM": 684.9177999999999,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          150.0,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          146.44882,
+          250.0,
+          56.00856
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "flatiron-eastside-logistics-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "execution": {
+        "minM": 56.00856,
+        "maxM": 237.369697258306,
+        "verticalTravelM": 659.657194516612,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          150.0,
+          100.0,
+          200.0,
+          100.0,
+          150.0,
+          146.44882,
+          237.369697258306,
+          56.00856
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "flatiron-eastside-logistics-reactive",
+      "planner": "dstar-lite-3d",
+      "execution": {
+        "minM": 56.00856,
+        "maxM": 250.0,
+        "verticalTravelM": 577.81544,
+        "criticalHeightsM": [
+          75.912,
+          104.868,
+          100.0,
+          200.0,
+          100.0,
+          250.0,
+          56.00856
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-west-backhaul-reactive",
+      "planner": "repeated-astar-3d",
+      "execution": {
+        "minM": 31.53272,
+        "maxM": 200.0,
+        "verticalTravelM": 544.63279,
+        "criticalHeightsM": [
+          54.48151,
+          200.0,
+          100.0,
+          165.32351,
+          100.0,
+          150.0,
+          31.53272
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-west-backhaul-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "execution": {
+        "minM": 31.53272,
+        "maxM": 200.0,
+        "verticalTravelM": 644.63279,
+        "criticalHeightsM": [
+          54.48151,
+          200.0,
+          100.0,
+          165.32351,
+          100.0,
+          150.0,
+          50.0,
+          100.0,
+          31.53272
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-west-backhaul-reactive",
+      "planner": "dstar-lite-3d",
+      "execution": {
+        "minM": 31.53272,
+        "maxM": 200.0,
+        "verticalTravelM": 703.821052956032,
+        "criticalHeightsM": [
+          54.48151,
+          50.0,
+          175.112621478016,
+          150.0,
+          200.0,
+          100.0,
+          165.32351,
+          100.0,
+          150.0,
+          100.0,
+          150.0,
+          31.53272
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "eastside-medical-return-reactive",
+      "planner": "repeated-astar-3d",
+      "execution": {
+        "minM": 89.06621,
+        "maxM": 200.0,
+        "verticalTravelM": 479.05183,
+        "criticalHeightsM": [
+          89.06621,
+          150.0,
+          100.12226,
+          200.0,
+          134.4336,
+          150.0,
+          107.42832,
+          182.592,
+          113.0976
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "eastside-medical-return-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "execution": {
+        "minM": 89.06621,
+        "maxM": 200.0,
+        "verticalTravelM": 479.05183,
+        "criticalHeightsM": [
+          89.06621,
+          150.0,
+          100.12226,
+          200.0,
+          134.4336,
+          150.0,
+          107.42832,
+          182.592,
+          113.0976
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "eastside-medical-return-reactive",
+      "planner": "dstar-lite-3d",
+      "execution": {
+        "minM": 89.06621,
+        "maxM": 200.0,
+        "verticalTravelM": 495.124544405708,
+        "criticalHeightsM": [
+          89.06621,
+          150.0,
+          100.0,
+          150.485777202854,
+          150.0,
+          200.0,
+          134.4336,
+          150.0,
+          100.0,
+          182.592,
+          113.0976
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-supply-backhaul-reactive",
+      "planner": "repeated-astar-3d",
+      "execution": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 467.95601,
+        "criticalHeightsM": [
+          169.65019,
+          200.0,
+          120.78161,
+          150.0,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-supply-backhaul-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "execution": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 467.95601,
+        "criticalHeightsM": [
+          169.65019,
+          200.0,
+          120.78161,
+          150.0,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "midtown-supply-backhaul-reactive",
+      "planner": "dstar-lite-3d",
+      "execution": {
+        "minM": 36.7391,
+        "maxM": 207.95426,
+        "verticalTravelM": 548.81961,
+        "criticalHeightsM": [
+          169.65019,
+          150.0,
+          200.0,
+          100.0,
+          150.0,
+          100.0,
+          207.95426,
+          36.7391
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "east-to-hudson-priority-reactive",
+      "planner": "repeated-astar-3d",
+      "execution": {
+        "minM": 42.765,
+        "maxM": 450.0,
+        "verticalTravelM": 613.7342,
+        "criticalHeightsM": [
+          443.5008,
+          450.0,
+          100.0,
+          200.0,
+          42.765
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "east-to-hudson-priority-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "execution": {
+        "minM": 42.765,
+        "maxM": 450.0,
+        "verticalTravelM": 710.50343714926,
+        "criticalHeightsM": [
+          443.5008,
+          450.0,
+          100.0,
+          196.96935,
+          148.739205445471,
+          149.27662621472,
+          100.0,
+          100.877847805381,
+          100.0,
+          150.0,
+          42.765
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "reactive",
+      "scenario": "east-to-hudson-priority-reactive",
+      "planner": "dstar-lite-3d",
+      "execution": {
+        "minM": 42.765,
+        "maxM": 450.0,
+        "verticalTravelM": 625.14915848252,
+        "criticalHeightsM": [
+          443.5008,
+          450.0,
+          100.0,
+          200.0,
+          146.460094683818,
+          150.0,
+          145.775377213997,
+          147.942951139075,
+          42.765
+        ]
+      },
+      "scope": "execution-only-no-serialized-raw-altitude-reference"
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-westside-delivery",
+      "planner": "repeated-astar-3d",
+      "rawPathSHA256": "9327e5a54be936f0560e8261e8e9506a3f008524bd333ac7200828b4c26a83e2",
+      "raw": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 653.09232464406,
+        "criticalHeightsM": [
+          90.0,
+          180.0,
+          60.0,
+          66.58210312577,
+          60.0,
+          69.10297145838,
+          65.55841726212,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "geometry": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 653.09232464406,
+        "criticalHeightsM": [
+          90.0,
+          180.0,
+          60.0,
+          66.58210312577,
+          60.0,
+          69.10297145838,
+          65.55841726212,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 653.09232464406,
+        "criticalHeightsM": [
+          90.0,
+          180.0,
+          60.0,
+          66.58210312577,
+          60.0,
+          69.10297145838,
+          65.55841726212,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-westside-delivery",
+      "planner": "dstar-lite-reset-3d",
+      "rawPathSHA256": "203fb9198787631d5c04536b8b7ab888bb6db2028e1706a8fca6fb9fc2a7c1ad",
+      "raw": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 588.70407146792,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          60.0,
+          61.15429422805,
+          60.0,
+          66.77823650591,
+          60.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "geometry": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 588.70407146792,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          60.0,
+          61.15429422805,
+          60.0,
+          66.77823650591,
+          60.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 5.326228347257711e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 588.70407146792,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          60.0,
+          61.15429422805,
+          60.0,
+          66.77823650591,
+          60.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-westside-delivery",
+      "planner": "dstar-lite-reuse-3d",
+      "rawPathSHA256": "203fb9198787631d5c04536b8b7ab888bb6db2028e1706a8fca6fb9fc2a7c1ad",
+      "raw": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 588.70407146792,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          60.0,
+          61.15429422805,
+          60.0,
+          66.77823650591,
+          60.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "geometry": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 588.70407146792,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          60.0,
+          61.15429422805,
+          60.0,
+          66.77823650591,
+          60.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 5.326228347257711e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 588.70407146792,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          60.0,
+          61.15429422805,
+          60.0,
+          66.77823650591,
+          60.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-westside-delivery",
+      "planner": "space-time-astar-4d",
+      "rawPathSHA256": "600c5e42041afe9e2d0d39ef2ac60fcbb9dc8d0ec76f10edb8113b845b5c1ea5",
+      "raw": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 512.83901,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          90.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "geometry": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 512.83901,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          90.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 6.374989425239619e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 60.0,
+        "maxM": 240.0,
+        "verticalTravelM": 512.83901,
+        "criticalHeightsM": [
+          90.0,
+          60.0,
+          120.0,
+          90.0,
+          120.0,
+          90.0,
+          240.0,
+          90.0,
+          122.83901
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-medical-transfer",
+      "planner": "repeated-astar-3d",
+      "rawPathSHA256": "1963ce72ba6e6e7e965d1cb2279cedd0a267245e28fe93d74ae41c7510f7552f",
+      "raw": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 736.72036,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          141.55982,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "geometry": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 736.72036,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          141.55982,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 736.72036,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          141.55982,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-medical-transfer",
+      "planner": "dstar-lite-reset-3d",
+      "rawPathSHA256": "ec570b80772e072204f57ad1508bfd5ed4388ea6033e5a3aaeedb2d0078ab53a",
+      "raw": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 803.3119999999999,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          120.0,
+          191.736,
+          180.0,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "geometry": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 803.3119999999999,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          120.0,
+          191.736,
+          180.0,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 803.3119999999999,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          120.0,
+          191.736,
+          180.0,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-medical-transfer",
+      "planner": "dstar-lite-reuse-3d",
+      "rawPathSHA256": "ec570b80772e072204f57ad1508bfd5ed4388ea6033e5a3aaeedb2d0078ab53a",
+      "raw": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 803.3119999999999,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          120.0,
+          191.736,
+          180.0,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "geometry": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 803.3119999999999,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          120.0,
+          191.736,
+          180.0,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 803.3119999999999,
+        "criticalHeightsM": [
+          110.0,
+          139.92,
+          120.0,
+          240.0,
+          120.0,
+          191.736,
+          180.0,
+          240.0,
+          110.0,
+          240.0,
+          130.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-medical-transfer",
+      "planner": "space-time-astar-4d",
+      "rawPathSHA256": "f6443a19066abc1c684cc77fbdd6285782c9dc2ac544d8ca996537a21cd77c19",
+      "raw": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 589.3747599999999,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          173.7528,
+          240.0,
+          141.55982,
+          240.0,
+          110.0,
+          180.0,
+          130.0
+        ]
+      },
+      "geometry": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 589.3747599999999,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          173.7528,
+          240.0,
+          141.55982,
+          240.0,
+          110.0,
+          180.0,
+          130.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 6.494360604847316e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 589.3747599999999,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          173.7528,
+          240.0,
+          141.55982,
+          240.0,
+          110.0,
+          180.0,
+          130.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-midtown-rooftops",
+      "planner": "repeated-astar-3d",
+      "rawPathSHA256": "1415ec741d46935c624ea0d6ae13a7c941bbf9109910113297f7705f601a7673",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 1.2876455457444536e-10,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-midtown-rooftops",
+      "planner": "dstar-lite-reset-3d",
+      "rawPathSHA256": "0bb3183aeee8b99fa6688d7a2dfe7f64c3ad2329191686bd9b9357586ac221c2",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-midtown-rooftops",
+      "planner": "dstar-lite-reuse-3d",
+      "rawPathSHA256": "0bb3183aeee8b99fa6688d7a2dfe7f64c3ad2329191686bd9b9357586ac221c2",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 845.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          180.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-midtown-rooftops",
+      "planner": "space-time-astar-4d",
+      "rawPathSHA256": "3b17709b44bc3954d6703d9c85f895fba797ca4d5f34bbb7b76f5b6690af924e",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 725.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          120.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 725.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          120.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 8.557776709494647e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 725.45214,
+        "criticalHeightsM": [
+          90.0,
+          104.868,
+          90.0,
+          120.0,
+          91.44766,
+          120.0,
+          92.64247,
+          180.0,
+          151.60298,
+          180.0,
+          90.0,
+          180.0,
+          146.44882,
+          240.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-riverfront-logistics",
+      "planner": "repeated-astar-3d",
+      "rawPathSHA256": "25a8d0115ad52696fcca37c0298eb56de92e4e0a87e082370bb837a6c164d76b",
+      "raw": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 960.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          180.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "geometry": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 960.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          180.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": false,
+      "execution": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 960.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          180.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-riverfront-logistics",
+      "planner": "dstar-lite-reset-3d",
+      "rawPathSHA256": "ea9b137afb0dddd9bcd3915a802fbddac389fe4fba03c786c9de22837dd6bd41",
+      "raw": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 840.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "geometry": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 840.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": false,
+      "execution": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 840.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-riverfront-logistics",
+      "planner": "dstar-lite-reuse-3d",
+      "rawPathSHA256": "ea9b137afb0dddd9bcd3915a802fbddac389fe4fba03c786c9de22837dd6bd41",
+      "raw": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 840.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "geometry": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 840.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": false,
+      "execution": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 840.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-riverfront-logistics",
+      "planner": "space-time-astar-4d",
+      "rawPathSHA256": "92eeede2a758e1025f6fed5e115ce8418af3db03dde6cb89ac885abaf70a4a10",
+      "raw": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 800.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "geometry": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 800.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 9.532641342957504e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": false,
+      "execution": {
+        "minM": 100.0,
+        "maxM": 300.0,
+        "verticalTravelM": 800.5111,
+        "criticalHeightsM": [
+          109.7448,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          110.6592,
+          180.0,
+          145.40335,
+          300.0,
+          128.50829,
+          240.0,
+          192.58626,
+          205.0805
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-westside-backhaul",
+      "planner": "repeated-astar-3d",
+      "rawPathSHA256": "f98b950fcca4263430e2e8625fd54885e782edd2dc6feda97396b9e2276699ee",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 559.11338,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          120.0,
+          90.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 559.11338,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          120.0,
+          90.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 559.11338,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          120.0,
+          90.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-westside-backhaul",
+      "planner": "dstar-lite-reset-3d",
+      "rawPathSHA256": "51d079ac65d0b935bb77661d6ce8988b3043a14a11556b93a8c088b1c5042214",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 7.030109827610431e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-westside-backhaul",
+      "planner": "dstar-lite-reuse-3d",
+      "rawPathSHA256": "51d079ac65d0b935bb77661d6ce8988b3043a14a11556b93a8c088b1c5042214",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 7.030109827610431e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-westside-backhaul",
+      "planner": "space-time-astar-4d",
+      "rawPathSHA256": "599d2b4b013d43054dfa9d9ec31e62c1f9ecbcd785248c0e48671ffc5dd2773d",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 1.2965983842150308e-10,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 708.46636,
+        "criticalHeightsM": [
+          90.0,
+          240.0,
+          92.9808,
+          180.0,
+          165.32351,
+          180.0,
+          90.0,
+          120.0,
+          117.46251,
+          180.0,
+          90.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-medical-return",
+      "planner": "repeated-astar-3d",
+      "rawPathSHA256": "ad23a0930704d27ac00c6adbf420c44ea4c1d2ee1b31d62ccf060b50015c0512",
+      "raw": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 666.15994,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "geometry": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 666.15994,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 8.957101726991823e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 666.15994,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-medical-return",
+      "planner": "dstar-lite-reset-3d",
+      "rawPathSHA256": "37ce00a8b7504d11daf074fda39c9ef693a09f0c6aa8b1168f069cb2e961b6fc",
+      "raw": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 757.29274,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "geometry": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 757.29274,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 1.0862777344300412e-10,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 757.29274,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-medical-return",
+      "planner": "dstar-lite-reuse-3d",
+      "rawPathSHA256": "37ce00a8b7504d11daf074fda39c9ef693a09f0c6aa8b1168f069cb2e961b6fc",
+      "raw": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 757.29274,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "geometry": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 757.29274,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 1.0862777344300412e-10,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 757.29274,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          120.0,
+          120.48797,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-medical-return",
+      "planner": "space-time-astar-4d",
+      "rawPathSHA256": "d4e6c873c0bac813a06c27077e7dfe610885e3c3df2285c2152f406c87ac9dd8",
+      "raw": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 756.3168000000001,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "geometry": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 756.3168000000001,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 1.0842882147699129e-10,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": false,
+      "execution": {
+        "minM": 110.0,
+        "maxM": 240.0,
+        "verticalTravelM": 756.3168000000001,
+        "criticalHeightsM": [
+          110.0,
+          180.0,
+          110.0,
+          180.0,
+          110.0,
+          240.0,
+          134.4336,
+          180.0,
+          110.0,
+          182.592,
+          130.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-eastside-backhaul",
+      "planner": "repeated-astar-3d",
+      "rawPathSHA256": "901ddcd8a6aa421a360e6895ce44cfa49ed3d55a5487596474cb55cc6ebb9de0",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 658.7865899999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.78161,
+          240.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 658.7865899999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.78161,
+          240.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 7.855760486563668e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 658.7865899999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.78161,
+          240.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-eastside-backhaul",
+      "planner": "dstar-lite-reset-3d",
+      "rawPathSHA256": "a4075df05644c4725ca8e86e9ec51999961e766e9cc50b74bce0ddddbbd2bcdf",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 540.3498099999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.0,
+          180.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 540.3498099999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.0,
+          180.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 7.855760486563668e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 540.3498099999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.0,
+          180.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-eastside-backhaul",
+      "planner": "dstar-lite-reuse-3d",
+      "rawPathSHA256": "a4075df05644c4725ca8e86e9ec51999961e766e9cc50b74bce0ddddbbd2bcdf",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 540.3498099999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.0,
+          180.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 540.3498099999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.0,
+          180.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 7.855760486563668e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 240.0,
+        "verticalTravelM": 540.3498099999999,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          120.0,
+          180.0,
+          90.0,
+          240.0,
+          90.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-eastside-backhaul",
+      "planner": "space-time-astar-4d",
+      "rawPathSHA256": "eadc4b772e17f2ee593a4c18bb221a1ec424ea51a9dc8ff8dcf975ecb03e5318",
+      "raw": {
+        "minM": 90.0,
+        "maxM": 207.95426,
+        "verticalTravelM": 356.25833,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          90.0,
+          207.95426,
+          90.0,
+          110.0
+        ]
+      },
+      "geometry": {
+        "minM": 90.0,
+        "maxM": 207.95426,
+        "verticalTravelM": 356.25833,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          90.0,
+          207.95426,
+          90.0,
+          110.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 6.001243946229806e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 90.0,
+        "maxM": 207.95426,
+        "verticalTravelM": 356.25833,
+        "criticalHeightsM": [
+          169.65019,
+          180.0,
+          90.0,
+          207.95426,
+          90.0,
+          110.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-riverfront-return",
+      "planner": "repeated-astar-3d",
+      "rawPathSHA256": "1e08a8293d8494151f21d00fe0b383124f1654069ce37b1be532f1dd22c2105a",
+      "raw": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 750.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0
+        ]
+      },
+      "geometry": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 750.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 750.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-riverfront-return",
+      "planner": "dstar-lite-reset-3d",
+      "rawPathSHA256": "5c68468b45237675e30124cbe97f33fbfc7c17237af1c999037d01372eb68760",
+      "raw": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 870.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          100.0,
+          120.0
+        ]
+      },
+      "geometry": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 870.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          100.0,
+          120.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 870.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          100.0,
+          120.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-riverfront-return",
+      "planner": "dstar-lite-reuse-3d",
+      "rawPathSHA256": "5c68468b45237675e30124cbe97f33fbfc7c17237af1c999037d01372eb68760",
+      "raw": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 870.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          100.0,
+          120.0
+        ]
+      },
+      "geometry": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 870.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          100.0,
+          120.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 0.0,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 870.4378999999999,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          196.96935,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          180.0,
+          100.0,
+          120.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    },
+    {
+      "study": "predictive",
+      "scenario": "manhattan-riverfront-return",
+      "planner": "space-time-astar-4d",
+      "rawPathSHA256": "94f429eba2d0076f8f7eb3b1ec167251f3a6129fd5f973a452208cb9546e212c",
+      "raw": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 836.4992,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          240.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0
+        ]
+      },
+      "geometry": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 836.4992,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          240.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0
+        ]
+      },
+      "absoluteTimeMaxZDifferenceM": 9.272582701669307e-11,
+      "absoluteTimeAltitudePreserved": true,
+      "executionGeometryKnotsPreserved": true,
+      "executionGeometryPositionSequencePreserved": true,
+      "execution": {
+        "minM": 100.0,
+        "maxM": 480.0,
+        "verticalTravelM": 836.4992,
+        "criticalHeightsM": [
+          443.5008,
+          480.0,
+          100.0,
+          240.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0,
+          100.0,
+          120.0
+        ]
+      },
+      "criticalHeightsPreserved": true,
+      "altitudeBoundsPreserved": true,
+      "noVerticalTravelIncrease": true,
+      "verticalTravelDeltaM": 0.0
+    }
+  ]
+}

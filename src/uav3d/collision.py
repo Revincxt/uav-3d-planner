@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections import OrderedDict
 from collections.abc import Sequence
 from itertools import pairwise
 
@@ -10,6 +11,55 @@ from uav3d.geometry import Point3, clamp, distance, lerp
 from uav3d.scene import AABB, Cylinder, Scene
 
 EPSILON = 1e-9
+_BUILDING_CELL_M = 80.0
+_BUILDING_INDEX_CACHE: OrderedDict[
+    int, tuple[tuple[AABB, ...], dict[tuple[int, int], tuple[int, ...]]]
+] = OrderedDict()
+
+
+def _candidate_buildings(scene: Scene, a: Point3, b: Point3, padding: float) -> Sequence[AABB]:
+    """Conservative broad phase; all final collision/clearance queries remain exact.
+
+    Immutable building tuples are cached by identity, avoiding an O(n) tuple hash
+    for every graph edge. Strong references prevent recycled identities, and a
+    bounded cache avoids retaining every historical scene.
+    """
+    buildings = scene.buildings
+    if len(buildings) <= 32:
+        return buildings
+    key = id(buildings)
+    cached = _BUILDING_INDEX_CACHE.get(key)
+    if cached is None or cached[0] is not buildings:
+        cells: dict[tuple[int, int], list[int]] = {}
+        for index, building in enumerate(buildings):
+            x0 = math.floor(building.minimum[0] / _BUILDING_CELL_M)
+            x1 = math.floor(building.maximum[0] / _BUILDING_CELL_M)
+            y0 = math.floor(building.minimum[1] / _BUILDING_CELL_M)
+            y1 = math.floor(building.maximum[1] / _BUILDING_CELL_M)
+            for x in range(x0, x1 + 1):
+                for y in range(y0, y1 + 1):
+                    cells.setdefault((x, y), []).append(index)
+        immutable = {cell: tuple(indices) for cell, indices in cells.items()}
+        cached = (buildings, immutable)
+        _BUILDING_INDEX_CACHE[key] = cached
+        if len(_BUILDING_INDEX_CACHE) > 32:
+            _BUILDING_INDEX_CACHE.popitem(last=False)
+    else:
+        _BUILDING_INDEX_CACHE.move_to_end(key)
+    radius = max(0.0, padding) + EPSILON * (1 + max(abs(b[axis] - a[axis]) for axis in range(3)))
+    x0 = math.floor((min(a[0], b[0]) - radius) / _BUILDING_CELL_M)
+    x1 = math.floor((max(a[0], b[0]) + radius) / _BUILDING_CELL_M)
+    y0 = math.floor((min(a[1], b[1]) - radius) / _BUILDING_CELL_M)
+    y1 = math.floor((max(a[1], b[1]) + radius) / _BUILDING_CELL_M)
+    # A long diagonal query can span most of the city; scanning the original
+    # tuple is cheaper in that case and has identical narrow-phase semantics.
+    if (x1 - x0 + 1) * (y1 - y0 + 1) > len(cached[1]) * 2:
+        return buildings
+    indices: set[int] = set()
+    for x in range(x0, x1 + 1):
+        for y in range(y0, y1 + 1):
+            indices.update(cached[1].get((x, y), ()))
+    return tuple(buildings[index] for index in sorted(indices))
 
 
 def _inside_inset_bounds(scene: Scene, point: Point3, clearance: float) -> bool:
@@ -41,7 +91,10 @@ def point_is_free(scene: Scene, point: Point3, clearance: float | None = None) -
     padding = scene.required_clearance if clearance is None else clearance
     if not _inside_inset_bounds(scene, point, padding):
         return False
-    if any(_point_in_aabb(point, building, padding) for building in scene.buildings):
+    if any(
+        _point_in_aabb(point, building, padding)
+        for building in _candidate_buildings(scene, point, point, padding)
+    ):
         return False
     return not any(_point_in_cylinder(point, zone, padding) for zone in scene.no_fly_zones)
 
@@ -102,7 +155,10 @@ def segment_is_free(scene: Scene, a: Point3, b: Point3, clearance: float | None 
     padding = scene.required_clearance if clearance is None else clearance
     if not _inside_inset_bounds(scene, a, padding) or not _inside_inset_bounds(scene, b, padding):
         return False
-    if any(_segment_intersects_aabb(a, b, building, padding) for building in scene.buildings):
+    if any(
+        _segment_intersects_aabb(a, b, building, padding)
+        for building in _candidate_buildings(scene, a, b, padding)
+    ):
         return False
     return not any(_segment_intersects_cylinder(a, b, zone, padding) for zone in scene.no_fly_zones)
 
@@ -135,7 +191,15 @@ def point_clearance(scene: Scene, point: Point3) -> float:
         *(value - lower for value, lower in zip(point, scene.bounds.minimum, strict=True)),
         *(upper - value for value, upper in zip(point, scene.bounds.maximum, strict=True)),
     )
-    obstacle_clearances = [_distance_to_aabb(point, building) for building in scene.buildings]
+    # Boundary distance is already an upper bound on the nearest surface. Any
+    # building that could improve it must intersect this horizontal search box.
+    # This avoids a full-city scan for every dense trajectory audit sample.
+    if boundary_clearance <= 0:
+        return boundary_clearance - scene.drone_radius
+    obstacle_clearances = [
+        _distance_to_aabb(point, building)
+        for building in _candidate_buildings(scene, point, point, boundary_clearance)
+    ]
     obstacle_clearances.extend(_distance_to_cylinder(point, zone) for zone in scene.no_fly_zones)
     geometric = min([boundary_clearance, *obstacle_clearances])
     return geometric - scene.drone_radius

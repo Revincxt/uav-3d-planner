@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "validate:data": "node scripts/validate-demo.mjs && node scripts/validate-benchmark.mjs && node scripts/validate-dynamic.mjs && node scripts/validate-predictive.mjs",
+    "archive:data": "node scripts/study-data.mjs --pack",
+    "validate:data": "node scripts/study-data.mjs && node scripts/validate-demo.mjs && node scripts/validate-dynamic.mjs && node scripts/validate-predictive.mjs && node scripts/validate-city-study.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node scripts/study-data.mjs && vitest run",
     "build": "pnpm validate:data && pnpm typecheck && vite build"
   },
   "dependencies": {

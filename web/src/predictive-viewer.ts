@@ -3,6 +3,22 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { addZoneVisual, fitMapCamera, ringPoints, type ZoneVisual } from "./viewer-geometry";
+import { cityMissionBounds } from "./city-scene";
+import { enuToThree } from "./coordinates";
+import { RetainedCity } from "./retained-city";
+import { RouteOverview, pathPrefix, routeColor, timedPosition, type OverviewRoute } from "./route-overview";
+import { DroneFollow } from "./drone-follow";
+import { positionEncounterCamera } from "./encounter-view";
+import { createTrafficAircraft, sizeTrafficAircraft, updateTrafficAircraft } from "./traffic-aircraft";
+import { revealReplayWindow } from "./replay-line";
+import { sameSharedWorld } from "./shared-world";
+import { finalFlight, type FinalFlight } from "./final-flight";
+import { disposeRenderObject } from "./render-resources";
+import { createEndpointMarker, sceneLineStyle, vehicleGeometry } from "./scene-style";
+import { addMissionTaskMarkers, avoidDroneMarkerOverlap, orientMissionTaskGates, sizeMissionTaskMarkers } from "./mission-tasks";
+import { updateMapSurround } from "./map-surround";
+import { configureMapNavigation, FrameRenderer, mapFramingPadding, MIN_MAP_ELEVATION_RAD, positionTopOverview, positionWesternOverview } from "./map-navigation";
 
 import type {
   MovingSphereDefinition,
@@ -16,7 +32,7 @@ import type {
 } from "./predictive-schema";
 
 export type ViewPreset = "isometric" | "xy" | "xz" | "yz" | "fit";
-export type ViewerLayer = "buildings" | "zones" | "dynamic" | "raw";
+export type ViewerLayer = "buildings" | "zones" | "dynamic";
 
 const WITNESS_TIME_TOLERANCE_S = 1e-7;
 
@@ -57,185 +73,86 @@ export function isMinimumSeparationEvidenceTime(
   );
 }
 
-interface ZoneVisual {
-  fill: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>;
-  outline: THREE.Group;
-}
 
 interface ThemePalette {
   background: number;
-  ground: number;
-  blockSurface: number;
-  blockEdge: number;
-  roadMarking: number;
-  gridMajor: number;
-  gridMinor: number;
-  buildingLow: number;
-  buildingHigh: number;
-  buildingRoof: number;
-  buildingEdge: number;
   foreground: number;
-  staticZone: number;
-  temporaryZone: number;
   movingSphere: number;
   witnessVehicle: number;
   witnessSurface: number;
   witnessConnector: number;
   safetyEnvelope: number;
-  rawPath: number;
   plannedPath: number;
   executedPath: number;
   goal: number;
 }
 
 const LIGHT_PALETTE: ThemePalette = {
-  background: 0xf1f1ec,
-  ground: 0xd7d9d4,
-  blockSurface: 0xe9e9e3,
-  blockEdge: 0xb8bbb4,
-  roadMarking: 0xf5f3e9,
-  gridMajor: 0x9fa6a2,
-  gridMinor: 0xc2c7c2,
-  buildingLow: 0xb7bebc,
-  buildingHigh: 0x657176,
-  buildingRoof: 0xd5d9d5,
-  buildingEdge: 0x4d585d,
-  foreground: 0x1b252b,
-  staticZone: 0x9b4239,
-  temporaryZone: 0xb2742f,
-  movingSphere: 0x6f578a,
-  witnessVehicle: 0x0f7468,
-  witnessSurface: 0x9b4239,
-  witnessConnector: 0x7b552f,
-  safetyEnvelope: 0xa96c29,
-  rawPath: 0x697176,
-  plannedPath: 0x245a85,
-  executedPath: 0x0f7468,
-  goal: 0xf7f7f3,
+  background: 0xffffff,
+  foreground: 0x313b35,
+  movingSphere: 0x98535b,
+  witnessVehicle: 0x12722e,
+  witnessSurface: 0xcc4545,
+  witnessConnector: 0xb67d3f,
+  safetyEnvelope: 0xd79445,
+  plannedPath: 0x28a745,
+  executedPath: 0x12722e,
+  goal: 0x3f4540,
 };
-
-const DARK_PALETTE: ThemePalette = {
-  background: 0x1e2427,
-  ground: 0x282f31,
-  blockSurface: 0x353d3e,
-  blockEdge: 0x596364,
-  roadMarking: 0xa9a99d,
-  gridMajor: 0x697274,
-  gridMinor: 0x424a4c,
-  buildingLow: 0x687376,
-  buildingHigh: 0xaab3b3,
-  buildingRoof: 0xc7cdca,
-  buildingEdge: 0xd1d5d3,
-  foreground: 0xf0f1ed,
-  staticZone: 0xe08779,
-  temporaryZone: 0xe0ae69,
-  movingSphere: 0xb69ac5,
-  witnessVehicle: 0x6fc0ad,
-  witnessSurface: 0xe08779,
-  witnessConnector: 0xe0ae69,
-  safetyEnvelope: 0xe0ae69,
-  rawPath: 0xa9b0b3,
-  plannedPath: 0x82acd4,
-  executedPath: 0x6fc0ad,
-  goal: 0x252c2e,
-};
-
-function enuToThree(point: Vec3): Vec3 {
-  return [point[0], point[2], -point[1]];
-}
 
 function disposeObject(object: THREE.Object3D): void {
-  object.traverse((child) => {
-    if ("geometry" in child && child.geometry instanceof THREE.BufferGeometry) {
-      child.geometry.dispose();
-    }
-    if ("material" in child) {
-      const materials = child.material as THREE.Material | THREE.Material[];
-      for (const material of Array.isArray(materials) ? materials : [materials]) {
-        material.dispose();
-      }
-    }
-  });
-}
-
-function timedPosition(waypoints: TimedWaypoint[], timeS: number): Vec3 {
-  const first = waypoints[0]!;
-  const last = waypoints.at(-1)!;
-  if (timeS <= first.timeS) return first.position;
-  if (timeS >= last.timeS) return last.position;
-  for (let index = 1; index < waypoints.length; index += 1) {
-    const right = waypoints[index]!;
-    const left = waypoints[index - 1]!;
-    if (timeS <= right.timeS) {
-      const fraction = (timeS - left.timeS) / (right.timeS - left.timeS);
-      return left.position.map(
-        (coordinate, axis) => coordinate + (right.position[axis]! - coordinate) * fraction,
-      ) as Vec3;
-    }
-  }
-  return last.position;
+  disposeRenderObject(object);
 }
 
 function movingPosition(definition: MovingSphereDefinition, timeS: number): Vec3 {
   return timedPosition(definition.keyframes, timeS);
 }
 
-function pathPrefix(waypoints: TimedWaypoint[], timeS: number): Vec3[] {
-  const prefix = waypoints
-    .filter((waypoint) => waypoint.timeS <= timeS)
-    .map((waypoint) => waypoint.position);
-  const current = timedPosition(waypoints, timeS);
-  const last = prefix.at(-1);
-  if (!last || last.some((coordinate, axis) => Math.abs(coordinate - current[axis]!) > 1e-9)) {
-    prefix.push(current);
-  }
-  return prefix;
-}
-
 function flattenPoints(points: Vec3[]): number[] {
   return points.flatMap((point) => enuToThree(point));
 }
 
-function ringPoints(radius: number, height: number, segments = 64): THREE.Vector3[] {
-  return Array.from({ length: segments }, (_, index) => {
-    const angle = (index / segments) * Math.PI * 2;
-    return new THREE.Vector3(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
-  });
-}
 
 export class PredictiveViewer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.OrthographicCamera();
   private readonly controls: OrbitControls;
+  private readonly frames = new FrameRenderer(() => this.drawFrame());
   private readonly content = new THREE.Group();
   private readonly buildingsGroup = new THREE.Group();
   private readonly zonesGroup = new THREE.Group();
   private readonly dynamicGroup = new THREE.Group();
   private readonly primaryPathGroup = new THREE.Group();
-  private readonly rawPathGroup = new THREE.Group();
   private readonly evidenceGroup = new THREE.Group();
   private readonly resizeObserver: ResizeObserver;
-  private readonly colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
-  private readonly onColorSchemeChange = (): void => this.rebuild();
   private readonly layerVisibility: Record<ViewerLayer, boolean> = {
     buildings: true,
     zones: true,
     dynamic: true,
-    raw: true,
   };
   private scenario: PredictiveScenario | null = null;
   private run: PredictiveRun | null = null;
-  private pathMode: PredictivePathMode = "geometry";
+  private flight: FinalFlight | null = null;
   private currentTimeS = 0;
   private currentView: ViewPreset = "isometric";
+  private mapScope: "city" | "mission" = "city";
+  private cityBounds = new THREE.Box3();
   private temporaryZones = new Map<string, ZoneVisual>();
   private movingSpheres = new Map<string, THREE.Object3D>();
+  private trafficForecasts = new Map<string, Line2>();
+  private forecastWindows = new Map<string, ReturnType<typeof revealReplayWindow>>();
+  private observationBounds?: THREE.Box3;
   private lineMaterials = new Set<LineMaterial>();
   private vehicle: THREE.Mesh | null = null;
   private primaryPath: Line2 | null = null;
   private executedPath: Line2 | null = null;
-  private rawPath: Line2 | null = null;
+  private cityLayer?: RetainedCity;
+  private overview?: RouteOverview;
+  private follow?: DroneFollow;
+  private playbackTimeS = 0;
+  onFollowChange?: (enabled: boolean) => void;
+  private sun?: THREE.DirectionalLight;
 
   constructor(private readonly container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -243,46 +160,73 @@ export class PredictiveViewer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
     this.container.append(this.renderer.domElement);
     this.content.add(
       this.buildingsGroup,
       this.zonesGroup,
       this.dynamicGroup,
-      this.rawPathGroup,
       this.primaryPathGroup,
       this.evidenceGroup,
     );
     this.scene.add(this.content);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = false;
-    this.controls.screenSpacePanning = true;
-    this.controls.addEventListener("change", () => this.render());
+    configureMapNavigation(this.controls);
+    this.controls.addEventListener("change", () => this.frames.request());
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
-    this.colorScheme.addEventListener("change", this.onColorSchemeChange);
   }
 
   setScenario(scenario: PredictiveScenario): void {
+    const first = !this.scenario;
+    const shared = sameSharedWorld(this.scenario?.mission, scenario.mission);
     this.scenario = scenario;
     this.run = null;
+    this.flight = null;
     this.currentTimeS = 0;
-    this.buildScene();
-    this.setView("isometric");
+    if (shared) {
+      const tasks = this.content.getObjectByName("mission-task-points");
+      if (tasks) { tasks.removeFromParent(); disposeObject(tasks); }
+      addMissionTaskMarkers(this.content, scenario.mission);
+    } else this.buildScene();
+    if (first) this.setView("isometric");
+    else if (this.observationBounds && !this.follow?.routeId) this.observeEncounter(scenario.mission?.challenge?.focusPosition ?? scenario.start);
+  }
+
+  setRoutes(routes: OverviewRoute[], activeId: string): void {
+    this.overview ??= new RouteOverview();
+    this.scene.add(this.overview.group);
+    this.overview.setRoutes(routes, activeId, this.container.clientWidth, this.container.clientHeight);
+    orientMissionTaskGates(this.content, routes.find(route => route.id === activeId)?.points ?? [], routeColor(routes.findIndex(route => route.id === activeId)));
+    if (this.primaryPath) this.primaryPath.visible = false;
+    if (this.executedPath) this.executedPath.visible = false;
+    if (this.vehicle) this.vehicle.visible = false;
+    this.content.traverse(object => { if (object.name.startsWith("endpoint-")) object.visible = false; });
+    this.render();
+  }
+
+  focusRoute(id: string): void { this.overview?.setFocus(id); this.render(); }
+  setPlaying(playing: boolean): void { this.overview?.setPlaying(playing); this.render(); }
+  get followedRouteId(): string | null { return this.follow?.routeId ?? null; }
+
+  setFollowRoute(id: string | null): void {
+    if (id === null) { this.follow?.stop(); this.resize(); return; }
+    const drone = this.overview?.vehicle(id);
+    if (!drone) return;
+    this.follow ??= new DroneFollow(this.controls);
+    this.follow.setBuildings(this.scenario?.buildings ?? []);
+    this.follow.onChange = active => this.onFollowChange?.(active);
+    this.follow.start(id, drone.position, this.overview!.heading(id, this.playbackTimeS), this.container.clientWidth, this.container.clientHeight);
+    this.render();
   }
 
   setRun(run: PredictiveRun): void {
+    const flight = finalFlight(run);
     this.run = run;
+    this.flight = flight;
     this.replacePathLines();
     this.replaceMinimumSeparationEvidence();
     this.setTime(0);
-  }
-
-  setPathMode(mode: PredictivePathMode): void {
-    if (this.pathMode === mode) return;
-    this.pathMode = mode;
-    this.replacePathLines();
-    this.replaceMinimumSeparationEvidence();
-    this.setTime(this.currentTimeS);
   }
 
   setLayerVisibility(layer: ViewerLayer, visible: boolean): void {
@@ -293,9 +237,15 @@ export class PredictiveViewer {
 
   setTime(timeS: number): void {
     if (!this.scenario || !this.run) return;
+    this.playbackTimeS = timeS;
+    this.overview?.setTime(timeS);
+    let animatedShadows = Boolean(
+      this.vehicle?.castShadow && this.vehicle.visible && this.primaryPathGroup.visible,
+    );
     const path = this.activePath;
     const duration = path.at(-1)!.timeS;
     this.currentTimeS = Math.max(0, Math.min(timeS, duration));
+    const hazardTime = this.scenario.mission?.sharedWorld ? Math.max(0, timeS) : this.currentTimeS;
     const vehiclePosition = timedPosition(path, this.currentTimeS);
     this.vehicle?.position.fromArray(enuToThree(vehiclePosition));
     this.orientVehicle(path, this.currentTimeS);
@@ -303,21 +253,36 @@ export class PredictiveViewer {
     for (const zone of this.scenario.temporaryNoFlyZones) {
       const visual = this.temporaryZones.get(zone.id);
       if (!visual) continue;
-      const active = zone.activeFromS <= this.currentTimeS && this.currentTimeS < zone.activeUntilS;
-      visual.fill.material.opacity = active ? 0.18 : 0.018;
+      animatedShadows ||= this.zonesGroup.visible && visual.fill.castShadow;
+      const active = zone.activeFromS <= hazardTime && hazardTime < zone.activeUntilS;
+      visual.fill.visible = visual.outline.visible = active;
+      visual.fill.material.opacity = active ? 0.18 : 0.025;
       visual.outline.traverse((child) => {
         if (child instanceof THREE.Line && child.material instanceof THREE.LineBasicMaterial) {
-          child.material.opacity = active ? 0.88 : 0.24;
+          child.material.opacity = active ? 0.72 : 0.2;
         }
       });
     }
 
     for (const definition of this.scenario.movingSpheres) {
+      const forecast = this.trafficForecasts?.get(definition.id);
+      if (forecast) {
+        const window = this.forecastWindows?.get(definition.id);
+        const end = Math.min(hazardTime + 20, definition.keyframes.at(-1)!.timeS);
+        forecast.visible = this.run.predictive && (Boolean(this.scenario.mission?.sharedWorld) || this.currentTimeS < duration) && end > hazardTime;
+        if (window) { window.start.value = hazardTime; window.end.value = end; }
+      }
       const mesh = this.movingSpheres.get(definition.id);
-      if (mesh) mesh.position.fromArray(enuToThree(movingPosition(definition, this.currentTimeS)));
+      if (mesh) {
+        mesh.position.fromArray(enuToThree(movingPosition(definition, hazardTime)));
+        if (this.scenario.city) updateTrafficAircraft(mesh, definition, hazardTime);
+        if (this.dynamicGroup.visible) {
+          mesh.traverseVisible((child) => { animatedShadows ||= child.castShadow; });
+        }
+      }
     }
 
-    this.executedPath = this.replaceLine(
+    if (!this.overview) this.executedPath = this.replaceLine(
       this.primaryPathGroup,
       this.executedPath,
       pathPrefix(path, this.currentTimeS),
@@ -325,79 +290,73 @@ export class PredictiveViewer {
       3.7,
       false,
       1,
+      1,
     );
     this.evidenceGroup.visible = isMinimumSeparationEvidenceTime(
-      minimumSeparationEvidence(this.scenario, this.run, this.pathMode),
+      minimumSeparationEvidence(this.scenario, this.run, "execution"),
       this.currentTimeS,
     );
+    if (animatedShadows) this.renderer.shadowMap.needsUpdate = true;
     this.render();
   }
 
   setView(preset: ViewPreset): void {
     if (!this.scenario) return;
-    this.currentView = preset === "fit" ? "isometric" : preset;
-    const { min, max } = this.scenario.bounds;
-    const center = new THREE.Vector3(
-      (min[0] + max[0]) / 2,
-      (min[2] + max[2]) / 2,
-      -(min[1] + max[1]) / 2,
-    );
-    const span = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+    this.observationBounds = undefined;
+    this.follow?.stop();
+    if (preset !== "fit") this.currentView = preset;
+    const bounds = this.sceneBounds();
+    const center = bounds.getCenter(new THREE.Vector3());
+    const extent = bounds.getSize(new THREE.Vector3());
+    const span = Math.max(extent.x, extent.y, extent.z);
     if (this.currentView === "xy") {
-      this.camera.position.set(center.x, center.y + span * 2.2, center.z + 0.001);
-      this.camera.up.set(0, 0, -1);
+      positionTopOverview(this.camera, center, span, 2.2);
     } else if (this.currentView === "xz") {
-      this.camera.position.set(center.x, center.y, center.z + span * 2.2);
+      this.camera.position.set(center.x, center.y + Math.tan(MIN_MAP_ELEVATION_RAD) * span * 2.2, center.z + span * 2.2);
       this.camera.up.set(0, 1, 0);
     } else if (this.currentView === "yz") {
-      this.camera.position.set(center.x + span * 2.2, center.y, center.z);
+      this.camera.position.set(center.x - span * 2.2, center.y + Math.tan(MIN_MAP_ELEVATION_RAD) * span * 2.2, center.z);
       this.camera.up.set(0, 1, 0);
     } else {
-      this.camera.position.set(
-        center.x + span * 1.18,
-        center.y + span * 0.94,
-        center.z + span * 1.18,
-      );
-      this.camera.up.set(0, 1, 0);
+      positionWesternOverview(this.camera, center, span);
     }
+    this.camera.zoom = 1;
     this.controls.target.copy(center);
     this.controls.update();
     this.resize();
   }
 
+  setMapScope(scope: "city" | "mission"): void {
+    if (scope === this.mapScope && !this.follow?.routeId) return;
+    this.mapScope = scope;
+    this.setView("fit");
+  }
+
+  observeEncounter(position: Vec3): void {
+    this.follow?.stop();
+    this.observationBounds = positionEncounterCamera(this.camera, this.controls, position);
+    this.resize();
+  }
+
   dispose(): void {
+    this.follow?.stop();
+    this.frames.cancel();
     this.resizeObserver.disconnect();
-    this.colorScheme.removeEventListener("change", this.onColorSchemeChange);
     this.controls.dispose();
     this.clearContent();
+    this.cityLayer?.dispose();
+    this.overview?.dispose();
+    this.sun?.shadow.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
 
   private get palette(): ThemePalette {
-    return this.colorScheme.matches ? DARK_PALETTE : LIGHT_PALETTE;
+    return LIGHT_PALETTE;
   }
 
   private get activePath(): TimedWaypoint[] {
-    if (!this.run) return [];
-    if (this.pathMode === "raw") return this.run.rawTimedPath;
-    if (this.pathMode === "execution" && this.run.executionTimedPath !== null) {
-      return this.run.executionTimedPath;
-    }
-    return this.run.geometryTimedPath;
-  }
-
-  private rebuild(): void {
-    if (!this.scenario) return;
-    const run = this.run;
-    const timeS = this.currentTimeS;
-    const view = this.currentView;
-    this.buildScene();
-    this.setView(view);
-    if (run) {
-      this.setRun(run);
-      this.setTime(timeS);
-    }
+    return this.flight?.path ?? [];
   }
 
   private buildScene(): void {
@@ -405,87 +364,37 @@ export class PredictiveViewer {
     this.clearContent();
     const palette = this.palette;
     this.scene.background = new THREE.Color(palette.background);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, palette.ground, 1.55));
-    const sun = new THREE.DirectionalLight(0xffffff, 2.05);
-    const lightTarget = new THREE.Vector3(
-      (this.scenario.bounds.min[0] + this.scenario.bounds.max[0]) / 2,
-      (this.scenario.bounds.min[2] + this.scenario.bounds.max[2]) / 2,
-      -(this.scenario.bounds.min[1] + this.scenario.bounds.max[1]) / 2,
+    this.cityLayer ??= new RetainedCity();
+    this.cityBounds = this.cityLayer.mount(this.content, this.scenario, texture => {
+      if (texture) this.renderer.initTexture(texture);
+      this.frames.request();
+    });
+    if (!this.sun) {
+      this.scene.add(new THREE.HemisphereLight(0xffffff, 0xa3a3a3, 1.2));
+      this.sun = new THREE.DirectionalLight(0xffffff, 2);
+      this.scene.add(this.sun);
+    }
+    const sun = this.sun;
+    const lightTarget = this.cityBounds.getCenter(new THREE.Vector3());
+    const cityExtent = this.cityBounds.getSize(new THREE.Vector3());
+    const sceneSpan = Math.max(cityExtent.x, cityExtent.z);
+    sun.position.set(
+      lightTarget.x - sceneSpan * 0.6,
+      lightTarget.y + sceneSpan * 1.2,
+      lightTarget.z + sceneSpan * 0.7,
     );
-    sun.position.set(lightTarget.x - 50, lightTarget.y + 110, lightTarget.z + 70);
     sun.target.position.copy(lightTarget);
     this.content.add(sun.target);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.bias = -0.0004;
-    const sceneSpan = Math.max(
-      this.scenario.bounds.max[0] - this.scenario.bounds.min[0],
-      this.scenario.bounds.max[1] - this.scenario.bounds.min[1],
-    );
     sun.shadow.camera.left = -sceneSpan;
     sun.shadow.camera.right = sceneSpan;
     sun.shadow.camera.top = sceneSpan;
     sun.shadow.camera.bottom = -sceneSpan;
+    sun.shadow.camera.far = sceneSpan * 5;
     this.scene.add(sun);
 
-    this.addGround();
-    const buildingHeights = this.scenario.buildings.map((building) => building.max[2]);
-    const minHeight = buildingHeights.length > 0 ? Math.min(...buildingHeights) : 0;
-    const maxHeight = buildingHeights.length > 0 ? Math.max(...buildingHeights) : 0;
-    for (const building of this.scenario.buildings) {
-      const size = building.max.map((value, index) => value - building.min[index]!) as Vec3;
-      const center = building.min.map((value, index) => value + size[index]! / 2) as Vec3;
-      const heightFraction =
-        maxHeight > minHeight ? (building.max[2] - minHeight) / (maxHeight - minHeight) : 0.5;
-      const color = new THREE.Color(palette.buildingLow).lerp(
-        new THREE.Color(palette.buildingHigh),
-        heightFraction,
-      );
-      const geometry = new THREE.BoxGeometry(size[0], size[2], size[1]);
-      const parcel = new THREE.Mesh(
-        new THREE.BoxGeometry(size[0] + 2.4, 0.14, size[1] + 2.4),
-        new THREE.MeshStandardMaterial({
-          color: palette.blockSurface,
-          roughness: 1,
-          metalness: 0,
-        }),
-      );
-      parcel.position.set(center[0], this.scenario.bounds.min[2] + 0.07, -center[1]);
-      parcel.receiveShadow = true;
-      this.buildingsGroup.add(parcel);
-      const mesh = new THREE.Mesh(
-        geometry,
-        new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0.02 }),
-      );
-      mesh.position.fromArray(enuToThree(center));
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      this.buildingsGroup.add(mesh);
-      const edges = new THREE.LineSegments(
-        new THREE.EdgesGeometry(geometry, 24),
-        new THREE.LineBasicMaterial({
-          color: palette.buildingEdge,
-          transparent: true,
-          opacity: 0.46,
-        }),
-      );
-      edges.position.copy(mesh.position);
-      this.buildingsGroup.add(edges);
-
-      const roof = new THREE.Mesh(
-        new THREE.PlaneGeometry(size[0] * 0.86, size[1] * 0.86),
-        new THREE.MeshBasicMaterial({
-          color: palette.buildingRoof,
-          transparent: true,
-          opacity: 0.2,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-        }),
-      );
-      roof.rotation.x = -Math.PI / 2;
-      roof.position.set(center[0], building.max[2] + 0.025, -center[1]);
-      this.buildingsGroup.add(roof);
-    }
 
     for (const zone of this.scenario.staticNoFlyZones) this.addZone(zone, "static");
     for (const zone of this.scenario.temporaryNoFlyZones) {
@@ -495,32 +404,40 @@ export class PredictiveViewer {
 
     this.addEndpoint(this.scenario.start, "start");
     this.addEndpoint(this.scenario.goal, "goal");
+    addMissionTaskMarkers(this.content, this.scenario.mission);
     this.vehicle = new THREE.Mesh(
-      new THREE.ConeGeometry(1.35, 3.8, 5),
+      vehicleGeometry(Boolean(this.scenario.city)),
       new THREE.MeshStandardMaterial({
         color: palette.foreground,
         emissive: palette.background,
         emissiveIntensity: 0.12,
+        depthTest: true,
+        depthWrite: true,
       }),
     );
+    this.vehicle.position.fromArray(enuToThree(this.scenario.start));
+    this.vehicle.name = "vehicle";
+    this.vehicle.visible = !this.overview;
+    this.vehicle.receiveShadow = true;
     this.vehicle.castShadow = true;
     this.primaryPathGroup.add(this.vehicle);
     this.updateLayerVisibility();
+    this.renderer.shadowMap.needsUpdate = true;
   }
 
   private clearContent(): void {
+    this.trafficForecasts?.clear();
+    this.forecastWindows?.clear();
     this.temporaryZones.clear();
     this.movingSpheres.clear();
     this.lineMaterials.clear();
     this.vehicle = null;
     this.primaryPath = null;
     this.executedPath = null;
-    this.rawPath = null;
     for (const group of [
       this.buildingsGroup,
       this.zonesGroup,
       this.dynamicGroup,
-      this.rawPathGroup,
       this.primaryPathGroup,
       this.evidenceGroup,
     ]) {
@@ -530,11 +447,11 @@ export class PredictiveViewer {
       }
     }
     for (const child of [...this.content.children]) {
+      if (child === this.cityLayer?.group) continue;
       if (![
         this.buildingsGroup,
         this.zonesGroup,
         this.dynamicGroup,
-        this.rawPathGroup,
         this.primaryPathGroup,
         this.evidenceGroup,
       ].includes(child as THREE.Group)) {
@@ -542,182 +459,53 @@ export class PredictiveViewer {
         disposeObject(child);
       }
     }
-    for (const child of [...this.scene.children]) {
-      if (child !== this.content && child instanceof THREE.Light) {
-        this.scene.remove(child);
-        disposeObject(child);
-      }
-    }
-  }
-
-  private addGround(): void {
-    if (!this.scenario) return;
-    const palette = this.palette;
-    const width = this.scenario.bounds.max[0] - this.scenario.bounds.min[0];
-    const depth = this.scenario.bounds.max[1] - this.scenario.bounds.min[1];
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(width, depth),
-      new THREE.MeshStandardMaterial({ color: palette.ground, roughness: 1 }),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.set(
-      this.scenario.bounds.min[0] + width / 2,
-      this.scenario.bounds.min[2],
-      -(this.scenario.bounds.min[1] + depth / 2),
-    );
-    ground.receiveShadow = true;
-    this.content.add(ground);
-    const divisions = Math.max(8, Math.round(Math.max(width, depth) / 8));
-    const grid = new THREE.GridHelper(
-      Math.max(width, depth),
-      divisions,
-      palette.gridMajor,
-      palette.gridMinor,
-    );
-    grid.position.copy(ground.position);
-    grid.position.y += 0.025;
-    if (Array.isArray(grid.material)) {
-      for (const material of grid.material) {
-        material.transparent = true;
-        material.opacity = 0.62;
-      }
-    } else {
-      grid.material.transparent = true;
-      grid.material.opacity = 0.62;
-    }
-    this.content.add(grid);
-
-    const boundaryPoints = [
-      new THREE.Vector3(this.scenario.bounds.min[0], 0, -this.scenario.bounds.min[1]),
-      new THREE.Vector3(this.scenario.bounds.max[0], 0, -this.scenario.bounds.min[1]),
-      new THREE.Vector3(this.scenario.bounds.max[0], 0, -this.scenario.bounds.max[1]),
-      new THREE.Vector3(this.scenario.bounds.min[0], 0, -this.scenario.bounds.max[1]),
-    ];
-    const boundary = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(boundaryPoints),
-      new THREE.LineBasicMaterial({ color: palette.blockEdge, transparent: true, opacity: 0.9 }),
-    );
-    boundary.position.y = this.scenario.bounds.min[2] + 0.055;
-    this.content.add(boundary);
-
-    const roadMarks = new THREE.Group();
-    const spacing = Math.max(16, Math.round(Math.max(width, depth) / 6));
-    const markMaterial = new THREE.LineDashedMaterial({
-      color: palette.roadMarking,
-      transparent: true,
-      opacity: 0.52,
-      dashSize: 2.2,
-      gapSize: 2.2,
-    });
-    for (let east = this.scenario.bounds.min[0] + spacing; east < this.scenario.bounds.max[0]; east += spacing) {
-      const line = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(east, this.scenario.bounds.min[2] + 0.045, -this.scenario.bounds.min[1]),
-          new THREE.Vector3(east, this.scenario.bounds.min[2] + 0.045, -this.scenario.bounds.max[1]),
-        ]),
-        markMaterial.clone(),
-      );
-      line.computeLineDistances();
-      roadMarks.add(line);
-    }
-    for (let north = this.scenario.bounds.min[1] + spacing; north < this.scenario.bounds.max[1]; north += spacing) {
-      const line = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(this.scenario.bounds.min[0], this.scenario.bounds.min[2] + 0.045, -north),
-          new THREE.Vector3(this.scenario.bounds.max[0], this.scenario.bounds.min[2] + 0.045, -north),
-        ]),
-        markMaterial.clone(),
-      );
-      line.computeLineDistances();
-      roadMarks.add(line);
-    }
-    markMaterial.dispose();
-    this.content.add(roadMarks);
   }
 
   private addZone(zone: StaticNoFlyZone, role: "static" | "temporary"): ZoneVisual {
-    const palette = this.palette;
-    const color = role === "static" ? palette.staticZone : palette.temporaryZone;
-    const height = zone.zMaxM - zone.zMinM;
-    const geometry = new THREE.CylinderGeometry(zone.radiusM, zone.radiusM, height, 64, 1, true);
-    const fill = new THREE.Mesh(
-      geometry,
-      new THREE.MeshStandardMaterial({
-        color,
-        transparent: true,
-        opacity: role === "static" ? 0.12 : 0.018,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        roughness: 0.8,
-      }),
-    );
-    fill.position.set(zone.center[0], zone.zMinM + height / 2, -zone.center[1]);
-    this.zonesGroup.add(fill);
-
-    const outline = new THREE.Group();
-    outline.position.copy(fill.position);
-    const outlineMaterial = new THREE.LineBasicMaterial({
-      color,
-      transparent: true,
-      opacity: role === "static" ? 0.82 : 0.24,
-    });
-    const lower = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(ringPoints(zone.radiusM, -height / 2)),
-      outlineMaterial.clone(),
-    );
-    const upper = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(ringPoints(zone.radiusM, height / 2)),
-      outlineMaterial.clone(),
-    );
-    outline.add(lower, upper);
-    for (let index = 0; index < 4; index += 1) {
-      const angle = (index / 4) * Math.PI * 2;
-      const x = Math.cos(angle) * zone.radiusM;
-      const z = Math.sin(angle) * zone.radiusM;
-      outline.add(
-        new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(x, -height / 2, z),
-            new THREE.Vector3(x, height / 2, z),
-          ]),
-          outlineMaterial.clone(),
-        ),
-      );
-    }
-    outlineMaterial.dispose();
-    this.zonesGroup.add(outline);
-    return { fill, outline };
+    return addZoneVisual(this.zonesGroup, zone, role === "temporary");
   }
 
   private addMovingSphere(definition: MovingSphereDefinition): void {
+    if (this.scenario?.city) {
+      const aircraft = createTrafficAircraft(definition);
+      updateTrafficAircraft(aircraft, definition, 0);
+      this.movingSpheres.set(definition.id, aircraft);
+      this.dynamicGroup.add(aircraft);
+      const forecast = this.replaceLine(this.dynamicGroup, null,
+        definition.keyframes.map(point => point.position),
+        0xb56d32, 2.2, true, 0.55)!;
+      forecast.name = `traffic-forecast:${definition.id}`;
+      forecast.visible = false;
+      (this.forecastWindows ??= new Map()).set(definition.id, revealReplayWindow(forecast.geometry,
+        definition.keyframes.map(point => point.timeS), forecast.material));
+      (this.trafficForecasts ??= new Map()).set(definition.id, forecast);
+      return;
+    }
     const palette = this.palette;
     const visual = new THREE.Group();
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(definition.radiusM, 24, 16),
       new THREE.MeshStandardMaterial({
         color: palette.movingSphere,
-        transparent: true,
-        opacity: 0.78,
         roughness: 0.72,
       }),
     );
     mesh.castShadow = true;
+    mesh.receiveShadow = true;
     visual.add(mesh);
     const haloMaterial = new THREE.LineBasicMaterial({
       color: palette.movingSphere,
       transparent: true,
-      opacity: 0.78,
+      opacity: 0.5,
+      depthTest: true,
+      depthWrite: false,
     });
     const horizontalHalo = new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints(ringPoints(definition.radiusM * 1.45, 0, 48)),
       haloMaterial,
     );
-    const verticalHalo = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(ringPoints(definition.radiusM * 1.45, 0, 48)),
-      haloMaterial.clone(),
-    );
-    verticalHalo.rotation.z = Math.PI / 2;
-    visual.add(horizontalHalo, verticalHalo);
+    visual.add(horizontalHalo);
+    visual.position.fromArray(enuToThree(definition.keyframes[0]!.position));
     this.movingSpheres.set(definition.id, visual);
     this.dynamicGroup.add(visual);
     this.replaceLine(
@@ -725,23 +513,21 @@ export class PredictiveViewer {
       null,
       definition.keyframes.map((keyframe) => keyframe.position),
       palette.movingSphere,
-      1.5,
+      1.15,
       true,
-      0.56,
+      0.22,
     );
   }
 
   private addEndpoint(point: Vec3, role: "start" | "goal"): void {
+    if (this.overview) return;
     const palette = this.palette;
-    const geometry =
-      role === "start" ? new THREE.SphereGeometry(1.15, 20, 14) : new THREE.OctahedronGeometry(1.55);
-    const material = new THREE.MeshStandardMaterial({
-      color: role === "start" ? palette.executedPath : palette.goal,
-      emissive: role === "start" ? palette.executedPath : palette.foreground,
-      emissiveIntensity: role === "start" ? 0.08 : 0.04,
-    });
-    const marker = new THREE.Mesh(geometry, material);
+    const marker = createEndpointMarker(role, Boolean(this.scenario?.city),
+      role === "start" ? palette.executedPath : palette.goal,
+      role === "start" ? palette.executedPath : palette.foreground, role === "start" ? 0.08 : 0.04);
     marker.position.fromArray(enuToThree(point));
+    marker.name = `endpoint-${role}`;
+    marker.receiveShadow = true;
     this.primaryPathGroup.add(marker);
   }
 
@@ -760,7 +546,7 @@ export class PredictiveViewer {
   private replaceMinimumSeparationEvidence(): void {
     this.clearMinimumSeparationEvidence();
     if (!this.scenario || !this.run) return;
-    const evidence = minimumSeparationEvidence(this.scenario, this.run, this.pathMode);
+    const evidence = minimumSeparationEvidence(this.scenario, this.run, "execution");
     if (evidence === null) return;
 
     const { witness } = evidence;
@@ -769,24 +555,22 @@ export class PredictiveViewer {
       0.22,
       Math.min(0.72, evidence.safetyEnvelopeRadiusM * 0.28),
     );
-    const overlayMaterial = (color: number): THREE.MeshBasicMaterial =>
-      new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false });
+    const pointMaterial = (color: number): THREE.MeshStandardMaterial =>
+      new THREE.MeshStandardMaterial({ color, roughness: 0.7, depthTest: true, depthWrite: true });
 
     const vehiclePoint = new THREE.Mesh(
       new THREE.SphereGeometry(markerRadius, 18, 12),
-      overlayMaterial(palette.witnessVehicle),
+      pointMaterial(palette.witnessVehicle),
     );
     vehiclePoint.name = "minimum-separation-vehicle-point";
     vehiclePoint.position.fromArray(enuToThree(witness.vehiclePosition));
-    vehiclePoint.renderOrder = 9;
 
     const obstacleSurfacePoint = new THREE.Mesh(
       new THREE.OctahedronGeometry(markerRadius * 1.12),
-      overlayMaterial(palette.witnessSurface),
+      pointMaterial(palette.witnessSurface),
     );
     obstacleSurfacePoint.name = "minimum-separation-obstacle-surface-point";
     obstacleSurfacePoint.position.fromArray(enuToThree(witness.obstaclePosition));
-    obstacleSurfacePoint.renderOrder = 9;
 
     const envelope = new THREE.Mesh(
       new THREE.SphereGeometry(evidence.safetyEnvelopeRadiusM, 18, 12),
@@ -795,13 +579,12 @@ export class PredictiveViewer {
         wireframe: true,
         transparent: true,
         opacity: 0.58,
-        depthTest: false,
+        depthTest: true,
         depthWrite: false,
       }),
     );
     envelope.name = "declared-safety-margin-envelope";
     envelope.position.copy(vehiclePoint.position);
-    envelope.renderOrder = 8;
 
     const connector = this.replaceLine(
       this.evidenceGroup,
@@ -816,10 +599,6 @@ export class PredictiveViewer {
       connector.name = evidence.connectorDashed
         ? "minimum-separation-connector-approximate"
         : "minimum-separation-connector-exact";
-      const connectorMaterial = connector.material as LineMaterial;
-      connectorMaterial.depthTest = false;
-      connectorMaterial.depthWrite = false;
-      connector.renderOrder = 8;
     }
 
     this.evidenceGroup.add(envelope, vehiclePoint, obstacleSurfacePoint);
@@ -829,23 +608,14 @@ export class PredictiveViewer {
   private replacePathLines(): void {
     if (!this.run) return;
     const path = this.activePath;
-    this.primaryPath = this.replaceLine(
+    if (!this.overview) this.primaryPath = this.replaceLine(
       this.primaryPathGroup,
       this.primaryPath,
       path.map((waypoint) => waypoint.position),
       this.palette.plannedPath,
-      2.5,
+      3.1,
       false,
-      0.78,
-    );
-    this.rawPath = this.replaceLine(
-      this.rawPathGroup,
-      this.rawPath,
-      this.run.rawTimedPath.map((waypoint) => waypoint.position),
-      this.palette.rawPath,
-      1.55,
-      true,
-      0.72,
+      0.92,
     );
     this.updateLayerVisibility();
   }
@@ -855,9 +625,10 @@ export class PredictiveViewer {
     previous: Line2 | null,
     points: Vec3[],
     color: number,
-    widthPx: number,
+    weight: number,
     dashed: boolean,
     opacity: number,
+    coincidentOrder = 0,
   ): Line2 | null {
     if (previous) {
       if (points.length < 2) {
@@ -868,12 +639,10 @@ export class PredictiveViewer {
       const material = previous.material as LineMaterial;
       geometry.setPositions(flattenPoints(points));
       material.color.setHex(color);
-      material.linewidth = widthPx;
-      material.dashed = dashed;
-      material.opacity = opacity;
-      material.transparent = opacity < 1;
+      Object.assign(material, sceneLineStyle(Boolean(this.scenario?.city), weight, dashed, opacity));
       material.needsUpdate = true;
       previous.visible = true;
+      previous.renderOrder = coincidentOrder;
       if (dashed) previous.computeLineDistances();
       return previous;
     }
@@ -881,15 +650,8 @@ export class PredictiveViewer {
     const geometry = new LineGeometry();
     geometry.setPositions(flattenPoints(points));
     const material = new LineMaterial({
+      ...sceneLineStyle(Boolean(this.scenario?.city), weight, dashed, opacity),
       color,
-      linewidth: widthPx,
-      dashed,
-      dashSize: 2.2,
-      gapSize: 1.4,
-      transparent: opacity < 1,
-      opacity,
-      depthTest: true,
-      depthWrite: false,
     });
     material.resolution.set(
       Math.max(1, this.container.clientWidth),
@@ -898,7 +660,7 @@ export class PredictiveViewer {
     this.lineMaterials.add(material);
     const line = new Line2(geometry, material);
     if (dashed) line.computeLineDistances();
-    line.renderOrder = dashed ? 3 : 4;
+    line.renderOrder = coincidentOrder;
     group.add(line);
     return line;
   }
@@ -917,11 +679,14 @@ export class PredictiveViewer {
   }
 
   private updateLayerVisibility(): void {
+    if (this.buildingsGroup.visible !== this.layerVisibility.buildings
+      || this.dynamicGroup.visible !== this.layerVisibility.dynamic) {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     this.buildingsGroup.visible = this.layerVisibility.buildings;
+    if (this.cityLayer) this.cityLayer.buildings.visible = this.layerVisibility.buildings;
     this.zonesGroup.visible = this.layerVisibility.zones;
     this.dynamicGroup.visible = this.layerVisibility.dynamic;
-    this.rawPathGroup.visible =
-      this.layerVisibility.raw && this.pathMode !== "raw" && Boolean(this.run?.smoothing.applied);
   }
 
   private resize(): void {
@@ -929,25 +694,66 @@ export class PredictiveViewer {
     const height = Math.max(1, this.container.clientHeight);
     this.renderer.setSize(width, height, false);
     for (const material of this.lineMaterials) material.resolution.set(width, height);
-    const aspect = width / height;
-    const widthSpan = this.scenario
-      ? this.scenario.bounds.max[0] - this.scenario.bounds.min[0]
-      : 100;
-    const depthSpan = this.scenario
-      ? this.scenario.bounds.max[1] - this.scenario.bounds.min[1]
-      : 100;
-    const vertical = Math.max(widthSpan, depthSpan) * 0.78;
-    this.camera.left = (-vertical * aspect) / 2;
-    this.camera.right = (vertical * aspect) / 2;
-    this.camera.top = vertical / 2;
-    this.camera.bottom = -vertical / 2;
-    this.camera.near = 0.1;
-    this.camera.far = Math.max(widthSpan, depthSpan) * 12;
-    this.camera.updateProjectionMatrix();
+    this.overview?.resize(width, height);
+    if (!this.follow?.resize(width, height))
+      fitMapCamera(this.camera, this.sceneBounds(), width, height,
+        this.observationBounds ? 1.12 : mapFramingPadding(this.mapScope, this.currentView === "isometric"));
     this.render();
   }
 
-  private render(): void {
-    this.renderer.render(this.scene, this.camera);
+  private sceneBounds(): THREE.Box3 {
+    if (this.observationBounds) return this.observationBounds.clone();
+    if (!this.scenario) return new THREE.Box3(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 50, 50));
+    if (this.scenario.city) {
+      const bounds = cityMissionBounds(this.scenario, this.scenario.runs.flatMap((run) =>
+        (run.executionTimedPath ?? []).map((waypoint) => waypoint.position)));
+      if (this.mapScope === "city") bounds.union(this.cityBounds);
+      if (this.mapScope === "city" && this.overview) bounds.union(this.overview.bounds);
+      return bounds;
+    }
+    const { min, max } = this.scenario.bounds;
+    const bounds = new THREE.Box3(
+      new THREE.Vector3(min[0], min[2], -max[1]),
+      new THREE.Vector3(max[0], max[2], -min[1]),
+    );
+    for (const building of this.scenario.buildings) {
+      bounds.expandByPoint(new THREE.Vector3(building.min[0], building.min[2], -building.max[1]));
+      bounds.expandByPoint(new THREE.Vector3(building.max[0], building.max[2], -building.min[1]));
+    }
+    for (const zone of [...this.scenario.staticNoFlyZones, ...this.scenario.temporaryNoFlyZones]) {
+      bounds.expandByPoint(new THREE.Vector3(zone.center[0] - zone.radiusM, zone.zMinM, -zone.center[1] - zone.radiusM));
+      bounds.expandByPoint(new THREE.Vector3(zone.center[0] + zone.radiusM, zone.zMaxM, -zone.center[1] + zone.radiusM));
+    }
+    for (const sphere of this.scenario.movingSpheres) {
+      for (const keyframe of sphere.keyframes) {
+        const position = new THREE.Vector3(...enuToThree(keyframe.position));
+        bounds.expandByPoint(position.clone().addScalar(sphere.radiusM * 1.45));
+        bounds.expandByPoint(position.clone().addScalar(-sphere.radiusM * 1.45));
+      }
+    }
+    for (const run of this.scenario.runs) {
+      for (const waypoint of run.executionTimedPath ?? []) bounds.expandByPoint(new THREE.Vector3(...enuToThree(waypoint.position)));
+    }
+    if (this.mapScope === "city") bounds.union(this.cityBounds);
+    return bounds;
+  }
+
+  private render(): void { this.frames.request(); }
+
+  private drawFrame(): void {
+    const drone = this.follow?.routeId ? this.overview?.vehicle(this.follow.routeId) : undefined;
+    if (drone && this.follow?.update(drone.position, this.overview!.heading(this.follow.routeId!, this.playbackTimeS), this.playbackTimeS)) this.frames.request();
+    const camera = drone ? this.follow!.camera : this.camera;
+    for (const aircraft of this.movingSpheres.values()) sizeTrafficAircraft(aircraft, camera, this.container.clientHeight);
+    this.overview?.updateSymbols(camera, this.container.clientHeight, this.follow?.routeId);
+    sizeMissionTaskMarkers(this.content, camera, this.container.clientHeight, Boolean(drone) || Boolean(this.observationBounds));
+    avoidDroneMarkerOverlap(this.content, this.overview?.vehicle(this.scenario?.id ?? ""));
+    const pixelRatio = this.renderer.getPixelRatio();
+    updateMapSurround(this.content, camera, this.container.clientWidth * pixelRatio,
+      this.container.clientHeight * pixelRatio, this.renderer.capabilities.getMaxAnisotropy());
+    const background = this.scene.background;
+    if (drone) this.scene.background = this.follow!.sky;
+    this.renderer.render(this.scene, camera);
+    this.scene.background = background;
   }
 }

@@ -1,3 +1,5 @@
+import type { CityMetadata, CityMission } from "./city-schema";
+
 export type Vec3 = [number, number, number];
 export type DynamicPlannerId =
   | "repeated-astar-3d"
@@ -17,6 +19,12 @@ export interface DynamicProtocol {
   maxTimeS: number;
   resolutionM: number;
   maxExpansions: number;
+  pathShortcut?: 1;
+  preserveAltitude?: 1;
+  smoothTurns?: 1;
+  turnScaleM?: number;
+  curveSampleSpacingM?: number;
+  horizontalEscape?: 1;
 }
 
 export interface ArtifactReference {
@@ -34,6 +42,7 @@ export interface Building {
   id: string;
   min: Vec3;
   max: Vec3;
+  footprint?: number[][][];
 }
 
 export interface StaticNoFlyZone {
@@ -125,6 +134,8 @@ export interface DynamicRun {
 }
 
 export interface DynamicScenario {
+  city?: CityMetadata;
+  mission?: CityMission;
   id: string;
   label: string;
   description: string;

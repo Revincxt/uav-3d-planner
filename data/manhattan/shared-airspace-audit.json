@@ -1,0 +1,297 @@
+{
+  "contract": "one-physical-world-one-clock-per-study",
+  "missionCountPerWorld": 8,
+  "control": "remove-aircraft-only-retain-city-fixed-zones-and-all-reservation-windows",
+  "sourceCommit": "local-snapshot:sha256:000c1d39fd6abbcdfcc467a33ce534e582e7218c5ee17b4b4d2c6bccce72ab3c",
+  "jointMissionDeconfliction": false,
+  "rows": [
+    {
+      "study": "dynamic",
+      "mission": "midtown-medical-link-reactive",
+      "planner": "repeated-astar-3d",
+      "counterfactualUnsafeSegments": 5,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 42.247,
+      "arrivalDifferenceS": 2.89
+    },
+    {
+      "study": "dynamic",
+      "mission": "midtown-medical-link-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "counterfactualUnsafeSegments": 5,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 42.405,
+      "arrivalDifferenceS": 2.937
+    },
+    {
+      "study": "dynamic",
+      "mission": "midtown-medical-link-reactive",
+      "planner": "dstar-lite-3d",
+      "counterfactualUnsafeSegments": 5,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 43.055,
+      "arrivalDifferenceS": 2.947
+    },
+    {
+      "study": "dynamic",
+      "mission": "chelsea-midtown-delivery-reactive",
+      "planner": "repeated-astar-3d",
+      "counterfactualUnsafeSegments": 3,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 73.133,
+      "arrivalDifferenceS": 1.543
+    },
+    {
+      "study": "dynamic",
+      "mission": "chelsea-midtown-delivery-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "counterfactualUnsafeSegments": 3,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 72.462,
+      "arrivalDifferenceS": 1.543
+    },
+    {
+      "study": "dynamic",
+      "mission": "chelsea-midtown-delivery-reactive",
+      "planner": "dstar-lite-3d",
+      "counterfactualUnsafeSegments": 3,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 71.693,
+      "arrivalDifferenceS": 1.543
+    },
+    {
+      "study": "dynamic",
+      "mission": "hudson-inspection-reactive",
+      "planner": "repeated-astar-3d",
+      "counterfactualUnsafeSegments": 25,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 87.587,
+      "arrivalDifferenceS": 1.542
+    },
+    {
+      "study": "dynamic",
+      "mission": "hudson-inspection-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "counterfactualUnsafeSegments": 5,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 111.74,
+      "arrivalDifferenceS": 0.539
+    },
+    {
+      "study": "dynamic",
+      "mission": "hudson-inspection-reactive",
+      "planner": "dstar-lite-3d",
+      "counterfactualUnsafeSegments": 25,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 28.737,
+      "arrivalDifferenceS": 1.121
+    },
+    {
+      "study": "dynamic",
+      "mission": "flatiron-eastside-logistics-reactive",
+      "planner": "repeated-astar-3d",
+      "counterfactualUnsafeSegments": 5,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 81.073,
+      "arrivalDifferenceS": 5.669
+    },
+    {
+      "study": "dynamic",
+      "mission": "flatiron-eastside-logistics-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "counterfactualUnsafeSegments": 5,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 83.622,
+      "arrivalDifferenceS": 5.841
+    },
+    {
+      "study": "dynamic",
+      "mission": "flatiron-eastside-logistics-reactive",
+      "planner": "dstar-lite-3d",
+      "counterfactualUnsafeSegments": 5,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 86.59,
+      "arrivalDifferenceS": 5.654
+    },
+    {
+      "study": "dynamic",
+      "mission": "midtown-west-backhaul-reactive",
+      "planner": "repeated-astar-3d",
+      "counterfactualUnsafeSegments": 7,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 107.075,
+      "arrivalDifferenceS": 5.976
+    },
+    {
+      "study": "dynamic",
+      "mission": "midtown-west-backhaul-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "counterfactualUnsafeSegments": 8,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 51.018,
+      "arrivalDifferenceS": 3.515
+    },
+    {
+      "study": "dynamic",
+      "mission": "midtown-west-backhaul-reactive",
+      "planner": "dstar-lite-3d",
+      "counterfactualUnsafeSegments": 7,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 70.437,
+      "arrivalDifferenceS": 4.937
+    },
+    {
+      "study": "dynamic",
+      "mission": "eastside-medical-return-reactive",
+      "planner": "repeated-astar-3d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 61.606,
+      "arrivalDifferenceS": 4.316
+    },
+    {
+      "study": "dynamic",
+      "mission": "eastside-medical-return-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 182.869,
+      "arrivalDifferenceS": 12.965
+    },
+    {
+      "study": "dynamic",
+      "mission": "eastside-medical-return-reactive",
+      "planner": "dstar-lite-3d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 96.409,
+      "arrivalDifferenceS": 6.815
+    },
+    {
+      "study": "dynamic",
+      "mission": "midtown-supply-backhaul-reactive",
+      "planner": "repeated-astar-3d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 1.831,
+      "arrivalDifferenceS": 0.0
+    },
+    {
+      "study": "dynamic",
+      "mission": "midtown-supply-backhaul-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 1.797,
+      "arrivalDifferenceS": 0.0
+    },
+    {
+      "study": "dynamic",
+      "mission": "midtown-supply-backhaul-reactive",
+      "planner": "dstar-lite-3d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 1.806,
+      "arrivalDifferenceS": 0.0
+    },
+    {
+      "study": "dynamic",
+      "mission": "east-to-hudson-priority-reactive",
+      "planner": "repeated-astar-3d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 126.477,
+      "arrivalDifferenceS": 6.303
+    },
+    {
+      "study": "dynamic",
+      "mission": "east-to-hudson-priority-reactive",
+      "planner": "repeated-lazy-theta-star",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 113.297,
+      "arrivalDifferenceS": 5.729
+    },
+    {
+      "study": "dynamic",
+      "mission": "east-to-hudson-priority-reactive",
+      "planner": "dstar-lite-3d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 133.168,
+      "arrivalDifferenceS": 7.661
+    },
+    {
+      "study": "predictive",
+      "mission": "manhattan-westside-delivery",
+      "planner": "space-time-astar-4d",
+      "counterfactualUnsafeSegments": 1,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 169.058,
+      "arrivalDifferenceS": 11.271
+    },
+    {
+      "study": "predictive",
+      "mission": "manhattan-medical-transfer",
+      "planner": "space-time-astar-4d",
+      "counterfactualUnsafeSegments": 2,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 67.082,
+      "arrivalDifferenceS": 0.0
+    },
+    {
+      "study": "predictive",
+      "mission": "manhattan-midtown-rooftops",
+      "planner": "space-time-astar-4d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 0.0,
+      "arrivalDifferenceS": -0.0
+    },
+    {
+      "study": "predictive",
+      "mission": "manhattan-riverfront-logistics",
+      "planner": "space-time-astar-4d",
+      "counterfactualUnsafeSegments": 1,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 71.888,
+      "arrivalDifferenceS": 4.793
+    },
+    {
+      "study": "predictive",
+      "mission": "manhattan-westside-backhaul",
+      "planner": "space-time-astar-4d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 0.0,
+      "arrivalDifferenceS": -0.0
+    },
+    {
+      "study": "predictive",
+      "mission": "manhattan-medical-return",
+      "planner": "space-time-astar-4d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 0.0,
+      "arrivalDifferenceS": 0.0
+    },
+    {
+      "study": "predictive",
+      "mission": "manhattan-eastside-backhaul",
+      "planner": "space-time-astar-4d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 0.0,
+      "arrivalDifferenceS": -0.0
+    },
+    {
+      "study": "predictive",
+      "mission": "manhattan-riverfront-return",
+      "planner": "space-time-astar-4d",
+      "counterfactualUnsafeSegments": 0,
+      "actualSharedWorldSafe": true,
+      "maxHorizontalReplayDifferenceM": 0.0,
+      "arrivalDifferenceS": -0.0
+    }
+  ]
+}

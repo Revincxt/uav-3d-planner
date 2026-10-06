@@ -1,4 +1,8 @@
 import "./dynamic.css";
+import "./workspace.css";
+import "./simulator-ui.css";
+import { FlightHud } from "./flight-hud";
+import { dynamicAvoidanceEvents, FlightAnnouncements, type AvoidanceEvent } from "./flight-announcements";
 
 import { buildDynamicComparisonRows, loadDynamicBundle } from "./dynamic-data";
 import type {
@@ -8,6 +12,13 @@ import type {
   DynamicScenario,
 } from "./dynamic-schema";
 import { DynamicViewer } from "./dynamic-viewer";
+import { mountFollowControls } from "./drone-follow";
+import { TaskArrivalNotice } from "./task-arrival-notice";
+import { PlaybackClock, mountPlaybackSpeedControls } from "./playback-clock";
+import { missionCaption, mountInspector, mountTabs, mountWorkspace } from "./workspace";
+import { dynamicRoutes, overviewDuration, waypointIndex, type OverviewRoute } from "./route-overview";
+import { playbackAction, showPlaybackButton, showPlaybackState } from "./playback-state";
+import { encounterView, mountEncounterControl, showChallenge } from "./encounter-view";
 
 const element = <T extends HTMLElement>(selector: string): T => {
   const value = document.querySelector<T>(selector);
@@ -15,118 +26,92 @@ const element = <T extends HTMLElement>(selector: string): T => {
   return value;
 };
 
-const METRIC_LABELS: Record<string, string> = {
-  completionTimeS: "Completion time",
-  executedPathLengthM: "Executed path length",
-  directDistanceM: "Direct start–goal distance",
-  pathExcessPct: "Path excess",
-  replans: "Replanning episodes",
-  failedReplans: "Failed replans",
-  holds: "Hold steps",
-  safetyGateActivations: "Safety-gate activations",
-  collisionCount: "Audited collisions",
-  totalPlanningWork: "Total planning work",
-  workUnit: "Planning-work unit",
-  totalChangedEdges: "Changed edges",
-  deadlineMisses: "Deadline misses",
-  minimumClearanceM: "Minimum clearance",
-};
+const shortPlanner = (label: string): string =>
+  label.replace("Repeated ", "").replace("3D D* Lite", "D* Lite");
 
-function readableMetric(key: string): string {
-  return (
-    METRIC_LABELS[key] ??
-    key
-      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-      .replace(/^./, (letter) => letter.toUpperCase())
-  );
-}
-
-function formatScalar(key: string, value: string | number | boolean | null): string {
-  if (value === null) return "—";
-  if (typeof value === "boolean") return value ? "yes" : "no";
-  if (typeof value === "string") return value;
-  const suffix = key.endsWith("Pct")
-    ? "%"
-    : key.endsWith("Ms")
-      ? " ms"
-      : key.endsWith("M")
-        ? " m"
-        : key.endsWith("S")
-          ? " s"
-          : "";
-  const digits = Number.isInteger(value) ? 0 : 2;
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: digits })}${suffix}`;
-}
-
-function appendCells(row: HTMLTableRowElement, values: string[]): void {
-  for (const value of values) {
-    const cell = document.createElement("td");
-    cell.textContent = value;
-    row.append(cell);
-  }
+function metric(label: string, value: string, title?: string): HTMLElement {
+  const card = document.createElement("div");
+  card.className = "metric-card";
+  const name = document.createElement("span");
+  name.textContent = label;
+  const number = document.createElement("strong");
+  number.textContent = value;
+  card.append(name, number);
+  if (title) card.title = title;
+  return card;
 }
 
 function renderOutcome(run: DynamicRun): void {
-  const body = element<HTMLTableSectionElement>("#outcome-metrics-body");
-  body.replaceChildren();
-  for (const [key, value] of Object.entries(run.metrics)) {
-    const row = document.createElement("tr");
-    const label = document.createElement("th");
-    label.scope = "row";
-    label.textContent = readableMetric(key);
-    const metric = document.createElement("td");
-    metric.textContent = formatScalar(key, value);
-    row.append(label, metric);
-    body.append(row);
-  }
-  element("#run-status").textContent =
-    run.status === "success"
-      ? "The recorded vehicle reached the declared goal."
-      : `${run.status}: ${run.failureReason ?? "no failure reason recorded"}`;
+  const values = run.metrics;
+  element("#outcome-metrics-body").replaceChildren(
+    metric("Completion", values.completionTimeS === null ? "—" : `${values.completionTimeS.toFixed(1)} s`),
+    metric("Path length", `${values.executedPathLengthM.toFixed(1)} m`),
+    metric("Replans", values.replans.toLocaleString()),
+    metric("Safety holds", values.holds.toLocaleString(), "Recorded steps spent holding position"),
+  );
+  const status = element("#run-status");
+  status.textContent = run.status === "success" ? "✓ Goal reached" : run.status === "no-path" ? "No path" : run.status === "timeout" ? "Time limit reached" : "Invalid run";
+  status.classList.toggle("is-failure", run.status !== "success");
+  status.title = run.failureReason ?? "Recorded run outcome";
 }
 
 function renderComparison(bundle: DynamicBundleV1, scenario: DynamicScenario): void {
-  const body = element<HTMLTableSectionElement>("#comparison-body");
+  const body = element("#comparison-body");
+  const select = element<HTMLSelectElement>("#planner-select");
   body.replaceChildren();
   for (const result of buildDynamicComparisonRows(bundle, scenario)) {
-    const row = document.createElement("tr");
-    const planner = document.createElement("th");
-    planner.scope = "row";
-    planner.textContent = result.plannerLabel;
-    row.append(planner);
-    appendCells(row, [
-      result.status,
-      result.completionTimeS === null ? "—" : result.completionTimeS.toFixed(1),
-      result.executedPathLengthM.toFixed(2),
-      result.replans.toLocaleString(),
-      result.holds.toLocaleString(),
-      result.safetyGateActivations.toLocaleString(),
-      `${result.totalPlanningWork.toLocaleString()} ${result.workUnit}`,
-    ]);
-    body.append(row);
+    const planner = bundle.planners.find((candidate) => candidate.label === result.plannerLabel);
+    if (!planner) continue;
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "planner-result";
+    card.dataset.planner = planner.id;
+    card.setAttribute("aria-label", `Replay ${result.plannerLabel}`);
+    const name = document.createElement("strong");
+    name.textContent = shortPlanner(result.plannerLabel);
+    const status = document.createElement("span");
+    status.className = "result-status";
+    status.classList.toggle("is-failure", result.status !== "success");
+    status.textContent = result.status === "success" ? "Reached goal" : result.status;
+    const details = document.createElement("span");
+    details.className = "result-details";
+    for (const [label, value] of [
+      ["Time", result.completionTimeS === null ? "—" : `${result.completionTimeS.toFixed(1)} s`],
+      ["Path", `${result.executedPathLengthM.toFixed(0)} m`],
+      ["Replans", result.replans.toLocaleString()],
+    ]) {
+      const item = document.createElement("span");
+      const number = document.createElement("b");
+      number.textContent = value!;
+      item.append(document.createTextNode(`${label} `), number);
+      details.append(item);
+    }
+    card.append(name, status, details);
+    card.addEventListener("click", () => {
+      select.value = planner.id;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    body.append(card);
   }
 }
 
+function highlightPlanner(plannerId: string): void {
+  document.querySelectorAll<HTMLButtonElement>("[data-planner]").forEach((button) => {
+    const active = button.dataset.planner === plannerId;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
 function renderFrameMetrics(frame: DynamicFrame, index: number, total: number): void {
-  const body = element<HTMLTableSectionElement>("#frame-metrics-body");
-  body.replaceChildren();
-  const row = document.createElement("tr");
-  appendCells(row, [
-    frame.timeS.toFixed(1),
-    frame.event?.label ?? "No discrete event",
-    frame.replanned
-      ? `${frame.replanReason ?? "replan"} · ${frame.plannerSuccess ? "path" : "no path"}`
-      : "No",
-    frame.planningTimeMs === null ? "Not timed" : `${frame.planningTimeMs.toFixed(2)} ms`,
-    frame.workUsed.toLocaleString(),
-    frame.changedEdges.toLocaleString(),
-    frame.activeTemporaryZoneIds.length.toLocaleString(),
-    frame.movingSpheres.length.toLocaleString(),
-  ]);
-  body.append(row);
-  element("#frame-summary").textContent =
-    `Frame ${index + 1} of ${total}; vehicle ENU ` +
-    `[${frame.vehicle.map((coordinate) => coordinate.toFixed(1)).join(", ")}] m.`;
+  element("#frame-metrics-body").replaceChildren(
+    metric("Active zones", String(frame.activeTemporaryZoneIds.length)),
+    metric("Moving obstacles", String(frame.movingSpheres.length)),
+    metric("Planning work", frame.workUsed.toLocaleString(), "Algorithm-specific work for this frame; work units differ between planners"),
+    metric("Changed edges", frame.changedEdges.toLocaleString()),
+  );
+  element("#frame-summary").textContent = `Frame ${index + 1} / ${total}`;
+  element("#vehicle-position").textContent = frame.vehicle.map((coordinate) => coordinate.toFixed(1)).join("  /  ");
 }
 
 async function start(): Promise<void> {
@@ -144,16 +129,19 @@ async function start(): Promise<void> {
     viewer = new DynamicViewer(viewerHost);
   } catch (error) {
     viewerHost.classList.add("viewer-error");
-    viewerHost.textContent = "WebGL is unavailable. The recorded state and outcome tables remain accessible.";
+    viewerHost.textContent = "3D preview unavailable. Replay telemetry remains available.";
+    document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => { button.disabled = true; });
     console.error(error);
   }
 
   let currentScenario: DynamicScenario;
   let currentRun: DynamicRun;
   let frameIndex = 0;
+  let currentTimeS = 0;
+  let lastMetricsFrame: DynamicFrame | null = null;
+  let routes: OverviewRoute[] = [];
   let animationFrame: number | null = null;
-  let playbackWallStart = 0;
-  let playbackTraceStart = 0;
+  const playbackClock = new PlaybackClock();
 
   for (const scenario of bundle.scenarios) {
     const option = document.createElement("option");
@@ -165,39 +153,57 @@ async function start(): Promise<void> {
   const announce = (message: string): void => {
     element("#live-region").textContent = message;
   };
+  const updateSceneCaption = (): void => {
+    element("#scene-caption").textContent = missionCaption(currentScenario, "city");
+  };
 
-  const renderFrame = (index: number, shouldAnnounce = false): void => {
-    frameIndex = Math.max(0, Math.min(index, currentRun.frames.length - 1));
+  const duration = (): number => overviewDuration(routes);
+  const taskNotice = new TaskArrivalNotice(viewerHost);
+  const flightHud = new FlightHud(element(".stage-viewport"), element(".playback-bar"));
+  const flightAnnouncements = new FlightAnnouncements(element(".stage-viewport"));
+  const avoidanceCache = new WeakMap<DynamicRun, AvoidanceEvent[]>();
+  let avoidanceEvents: AvoidanceEvent[] = [];
+  const renderTime = (timeS: number, shouldAnnounce = false, notify = false): void => {
+    const previousTimeS = currentTimeS;
+    currentTimeS = Math.max(0, Math.min(timeS, duration()));
+    frameIndex = waypointIndex(currentRun.frames, currentTimeS);
     const frame = currentRun.frames[frameIndex]!;
-    timeline.value = String(frameIndex);
-    timelineValue.value = `${frame.timeS.toFixed(1)} s`;
-    previous.disabled = frameIndex === 0;
-    next.disabled = frameIndex === currentRun.frames.length - 1;
-    viewer?.setFrame(frame);
-    renderFrameMetrics(frame, frameIndex, currentRun.frames.length);
-    if (shouldAnnounce) announce(`Showing ${frame.timeS.toFixed(1)} seconds`);
+    timeline.value = String(currentTimeS);
+    timelineValue.value = `${currentTimeS.toFixed(1)} s`;
+    previous.disabled = currentTimeS === 0;
+    next.disabled = currentTimeS === duration();
+    viewer?.setFrame(frame, currentTimeS, currentRun.frames.at(-1)!.timeS);
+    if (notify) taskNotice.advance(routes.find(route => route.id === viewer?.followedRouteId), previousTimeS, currentTimeS);
+    else taskNotice.reset();
+    const route = routes.find(route => route.id === currentScenario.id)!;
+    if (notify) flightAnnouncements.advance(route.id, routes.indexOf(route), avoidanceEvents, previousTimeS, currentTimeS);
+    else flightAnnouncements.reset();
+    flightHud.update(route, currentTimeS, routes.indexOf(route), !notify);
+    showPlaybackState(element("#playback-state"), "reactive", playbackAction(route.timedPath!, currentTimeS, route.mission, frame));
+    showChallenge(document.querySelector("#scene-challenge"), route.mission);
+    if (frame !== lastMetricsFrame) {
+      renderFrameMetrics(frame, frameIndex, currentRun.frames.length);
+      lastMetricsFrame = frame;
+    }
+    if (shouldAnnounce) announce(`All ${routes.length} missions at ${currentTimeS.toFixed(1)} seconds`);
   };
 
   const setPlaying = (playing: boolean): void => {
+    viewer?.setPlaying(playing);
+    if (!playing) flightAnnouncements.suspend();
     if (!playing && animationFrame !== null) {
       cancelAnimationFrame(animationFrame);
       animationFrame = null;
     }
-    playPause.textContent = playing ? "Pause" : "Play";
-    playPause.setAttribute("aria-pressed", String(playing));
+    showPlaybackButton(playPause, playing);
   };
+  mountEncounterControl(() => encounterView(routes.find(route => route.id === currentScenario.id)!, currentScenario.movingSpheres, currentScenario.temporaryNoFlyZones), view => {
+    setPlaying(false); renderTime(view.timeS); viewer?.observeEncounter(view.position);
+  });
 
   const playbackTick = (now: number): void => {
-    const targetTraceTime = playbackTraceStart + (now - playbackWallStart) / 1000;
-    let targetIndex = frameIndex;
-    while (
-      targetIndex + 1 < currentRun.frames.length &&
-      currentRun.frames[targetIndex + 1]!.timeS <= targetTraceTime
-    ) {
-      targetIndex += 1;
-    }
-    if (targetIndex !== frameIndex) renderFrame(targetIndex);
-    if (frameIndex >= currentRun.frames.length - 1) {
+    renderTime(playbackClock.sample(now), false, true);
+    if (currentTimeS >= duration()) {
       setPlaying(false);
       announce("Playback complete");
       return;
@@ -206,9 +212,8 @@ async function start(): Promise<void> {
   };
 
   const beginPlayback = (): void => {
-    if (frameIndex === currentRun.frames.length - 1) renderFrame(0);
-    playbackWallStart = performance.now();
-    playbackTraceStart = currentRun.frames[frameIndex]!.timeS;
+    if (currentTimeS >= duration() - 1e-8) renderTime(0);
+    playbackClock.start(currentTimeS);
     setPlaying(true);
     animationFrame = requestAnimationFrame(playbackTick);
   };
@@ -218,56 +223,64 @@ async function start(): Promise<void> {
     const run = currentScenario.runs.find((candidate) => candidate.plannerId === plannerId);
     if (!run) throw new Error(`Missing ${plannerId} run in ${currentScenario.id}`);
     currentRun = run;
-    timeline.max = String(run.frames.length - 1);
+    avoidanceEvents = avoidanceCache.get(run) ?? dynamicAvoidanceEvents(currentScenario, run);
+    avoidanceCache.set(run, avoidanceEvents);
+    routes = dynamicRoutes(bundle.scenarios, plannerId);
+    viewer?.setRoutes(routes, currentScenario.id);
+    timeline.max = String(duration());
     renderOutcome(run);
-    renderFrame(0);
+    renderTime(currentTimeS);
+    highlightPlanner(plannerId);
     const planner = bundle.planners.find((candidate) => candidate.id === plannerId);
     if (shouldAnnounce) announce(`${planner?.label ?? plannerId} trace loaded`);
   };
 
   const updateScenario = (): void => {
+    const resume = animationFrame !== null;
     setPlaying(false);
     const scenario = bundle.scenarios.find((candidate) => candidate.id === scenarioSelect.value);
     if (!scenario) throw new Error(`Unknown scenario: ${scenarioSelect.value}`);
     currentScenario = scenario;
     viewer?.setScenario(scenario);
+    viewer?.focusRoute(scenario.id);
     const previousPlanner = plannerSelect.value;
     plannerSelect.replaceChildren();
     for (const planner of bundle.planners) {
       const option = document.createElement("option");
       option.value = planner.id;
-      option.textContent = planner.label;
+      option.textContent = shortPlanner(planner.label);
       option.selected = planner.id === previousPlanner;
       plannerSelect.append(option);
     }
     if (!plannerSelect.value) plannerSelect.value = bundle.planners[0]!.id;
-    updateRun(plannerSelect.value, false);
     renderComparison(bundle, scenario);
-    element("#scene-caption").textContent =
-      `${scenario.description} ENU coordinates; distances in metres and trace time in seconds.`;
+    updateRun(plannerSelect.value, false);
+    element("#scene-title").textContent = "Manhattan";
+    updateSceneCaption();
     viewerHost.setAttribute(
       "aria-label",
-      `${scenario.label}: ${scenario.buildings.length} buildings, ` +
+      `${routes.length} tasks share one obstacle world and clock. Focus: ${scenario.label}: ${scenario.buildings.length} buildings, ` +
         `${scenario.staticNoFlyZones.length} static zones, ` +
         `${scenario.temporaryNoFlyZones.length} temporary zones, and ` +
         `${scenario.movingSpheres.length} moving obstacles.`,
     );
     announce(`${scenario.label} loaded`);
+    if (resume) beginPlayback();
   };
 
   scenarioSelect.addEventListener("change", updateScenario);
   plannerSelect.addEventListener("change", () => updateRun(plannerSelect.value));
   timeline.addEventListener("input", () => {
     setPlaying(false);
-    renderFrame(Number(timeline.value), true);
+    renderTime(Number(timeline.value), true);
   });
   previous.addEventListener("click", () => {
     setPlaying(false);
-    renderFrame(frameIndex - 1, true);
+    renderTime(currentTimeS - 2, true);
   });
   next.addEventListener("click", () => {
     setPlaying(false);
-    renderFrame(frameIndex + 1, true);
+    renderTime(currentTimeS + 2, true);
   });
   playPause.addEventListener("click", () => {
     if (animationFrame === null) beginPlayback();
@@ -276,58 +289,44 @@ async function start(): Promise<void> {
       announce("Playback paused");
     }
   });
+  mountPlaybackSpeedControls(playbackClock, () => currentTimeS, rate => announce(`Playback speed ${rate} times`));
   document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
       const view = button.dataset.view;
       if (view === "isometric" || view === "top" || view === "reset") viewer?.setView(view);
+      const activeView = view === "reset" ? "isometric" : view;
+      document.querySelectorAll<HTMLButtonElement>("[data-view]:not([data-view='reset'])").forEach((candidate) => {
+        candidate.setAttribute("aria-pressed", String(candidate.dataset.view === activeView));
+      });
     });
   });
-
-  const commitUrl = `https://github.com/Revincxt/uav-3d-planner/commit/${bundle.sourceCommit}`;
-  const provenance = element("#provenance");
-  const sourceLink = document.createElement("a");
-  sourceLink.href = commitUrl;
-  sourceLink.textContent = bundle.sourceCommit.slice(0, 12);
-  const generated = document.createElement("p");
-  generated.append(
-    document.createTextNode(`Generated ${bundle.generatedAt}; ${bundle.verificationStatus}; source commit `),
-    sourceLink,
-    document.createTextNode("."),
-  );
-  const method = document.createElement("p");
-  method.textContent =
-    "Frames are deterministic records produced by the Python simulator. Geometry and event streams are shared across planners within each scenario. Wall-clock planning time is not recorded in this deterministic demonstration. Work is an algorithm-specific diagnostic; expanded nodes and D* Lite queue pops are not equivalent units. The page interpolates no states, and these illustrative runs are not statistical evidence.";
-  const protocol = document.createElement("p");
-  protocol.textContent =
-    `Protocol ${bundle.protocol.id}: ${bundle.protocol.timeStepS} s simulation step, ` +
-    `${bundle.protocol.replanIntervalS} s replanning interval, ` +
-    `${bundle.protocol.cruiseSpeedMps} m/s cruise speed, ${bundle.protocol.maxTimeS} s horizon, ` +
-    `${bundle.protocol.resolutionM} m grid, and ${bundle.protocol.maxExpansions.toLocaleString()} maximum expansions.`;
-  const downloads = document.createElement("p");
-  downloads.append(document.createTextNode("Download: "));
-  const recordsLink = document.createElement("a");
-  recordsLink.href = `./${bundle.downloads.recordsCsv.path}`;
-  recordsLink.textContent = "run records (CSV)";
-  const manifestLink = document.createElement("a");
-  manifestLink.href = `./${bundle.downloads.scenarioManifest.path}`;
-  manifestLink.textContent = "scenario manifest (JSON)";
-  downloads.append(
-    recordsLink,
-    document.createTextNode(" and "),
-    manifestLink,
-    document.createTextNode("."),
-  );
-  provenance.replaceChildren(generated, method, protocol, downloads);
 
   scenarioSelect.value = bundle.scenarios[0]!.id;
   currentScenario = bundle.scenarios[0]!;
   currentRun = currentScenario.runs[0]!;
   updateScenario();
+  mountWorkspace({
+    scenarios: bundle.scenarios.map((scenario) => ({
+      ...scenario,
+      group: "Manhattan",
+      summary: scenario.mission ? `${scenario.mission.origin} → ${scenario.mission.destination}` : scenario.description,
+    })),
+    select: scenarioSelect,
+  });
+  mountInspector();
+  mountTabs();
+  mountFollowControls(viewer, scenarioSelect, () => { taskNotice.reset(); flightAnnouncements.reset(); });
   element("#load-state").remove();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) setPlaying(false);
+  });
   window.addEventListener(
     "pagehide",
     () => {
       setPlaying(false);
+      taskNotice.dispose();
+      flightAnnouncements.dispose();
+      flightHud.dispose();
       viewer?.dispose();
     },
     { once: true },

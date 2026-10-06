@@ -97,6 +97,38 @@ def test_relative_motion_detects_exact_tangency_and_splits_at_keyframes() -> Non
     )
 
 
+def test_long_patrol_uses_logarithmic_lookup_without_changing_interpolation() -> None:
+    class CountedFrames(tuple):
+        reads = 0
+
+        def __getitem__(self, index):
+            self.reads += 1
+            return super().__getitem__(index)
+
+    frames = CountedFrames((float(i), (float(i % 2), 10.0, 10.0)) for i in range(1025))
+    sphere = MovingSphere("long-patrol", 0.5, frames)
+    for clock in (0, 1, 511, 511.5, 1023.75, 1024, 2000):
+        frames.reads = 0
+        clamped = min(1024, max(0, clock))
+        index = min(int(clamped), 1023)
+        left, right = float(index % 2), float((index + 1) % 2)
+        expected = left + (right - left) * (clamped - index)
+        assert sphere.position_at(clock) == (expected, 10.0, 10.0)
+        assert frames.reads < 20
+
+
+def test_long_patrol_collision_slices_preserve_turn_and_exact_boundary_contacts() -> None:
+    frames = tuple((float(i), (10.0, 2.0 if i % 2 == 0 else 18.0, 10.0)) for i in range(1025))
+    full = empty_scenario(moving=(MovingSphere("patrol", 0.5, frames),))
+    short = empty_scenario(moving=(MovingSphere("patrol", 0.5, frames[510:514]),))
+    for start, end in ((510, 511), (510.5, 511.5), (511, 512), (511.5, 512.5)):
+        for y in (2.0, 10.0, 18.0):
+            a, b = (2.0, y, 10.0), (18.0, y, 10.0)
+            assert spacetime_segment_is_free(full, a, b, start, end) == (
+                spacetime_segment_is_free(short, a, b, start, end)
+            )
+
+
 def test_no_dynamic_obstacles_matches_static_collision_contract() -> None:
     scenario = empty_scenario()
     cases = (

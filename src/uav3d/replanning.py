@@ -6,9 +6,11 @@ import math
 from dataclasses import dataclass
 from itertools import pairwise
 
+from uav3d.collision import point_is_free, segment_is_free
 from uav3d.dynamic import DynamicScenario, dynamic_scenario_fingerprint, snapshot_scene
 from uav3d.dynamic_collision import spacetime_segment_is_free
 from uav3d.geometry import Point3, almost_equal, distance, lerp, polyline_length
+from uav3d.horizontal_curves import smooth_horizontal_curves
 from uav3d.planners import (
     AStar3D,
     AStarConfig,
@@ -18,6 +20,8 @@ from uav3d.planners import (
     LazyThetaStarConfig,
 )
 from uav3d.planners.base import Planner, PlanningResult
+from uav3d.scene import Scene
+from uav3d.smoothing import farthest_visible_shortcut, smooth_path
 
 REPLANNING_ALGORITHMS = (
     "repeated-astar-3d",
@@ -199,6 +203,44 @@ def _safe_traversals(scenario: DynamicScenario, traversals: tuple[_Traversal, ..
     )
 
 
+def _horizontal_escape(
+    scenario: DynamicScenario, position: Point3, time_s: float, duration: float,
+    cruise_speed: float,
+) -> tuple[Point3, ...]:
+    """Locally observed traffic can require movement instead of an unsafe hover.
+
+    A swept-volume snapshot can already contain the current position while the
+    actual aircraft is still approaching. In that case no static search can
+    escape the snapshot. Test bounded, level avoidance primitives against exact
+    relative motion, including a full safe hover at the new position. This uses
+    only the next two control steps, not the entire future mission schedule.
+    """
+    goal = scenario.static_scene.goal
+    heading = math.atan2(goal[1] - position[1], goal[0] - position[0])
+    candidates: list[tuple[float, Point3]] = []
+    for scale in (1.0, 0.5):
+        span = cruise_speed * duration * scale
+        for index in range(32):
+            angle = heading + index * math.tau / 32
+            endpoint = (position[0] + span * math.cos(angle),
+                        position[1] + span * math.sin(angle), position[2])
+            if not spacetime_segment_is_free(scenario, position, endpoint,
+                                              time_s, time_s + duration):
+                continue
+            if not spacetime_segment_is_free(scenario, endpoint, endpoint,
+                                              time_s + duration, time_s + duration * 2):
+                continue
+            separations = [distance(endpoint, aircraft.position_at(time_s + duration * 2))
+                           - aircraft.radius - scenario.static_scene.required_clearance
+                           for aircraft in scenario.moving_spheres]
+            progress = distance(position, goal) - distance(endpoint, goal)
+            clearance = min(separations, default=80.0)
+            candidates.append((progress + 2 * min(80, clearance), endpoint))
+    if not candidates:
+        return ()
+    return (position, max(candidates, key=lambda item: item[0])[1])
+
+
 def simulate_replanning(
     scenario: DynamicScenario,
     algorithm: str,
@@ -210,6 +252,16 @@ def simulate_replanning(
     resolution: float = 4.0,
     max_expansions: int = 120_000,
     reuse_search_state: bool = True,
+    shortcut_paths: bool = False,
+    preserve_altitude: bool = False,
+    start_time: float = 0.0,
+    planning_guard_s: float = 0.0,
+    smooth_turns: bool = False,
+    turn_scale_m: float = 60.0,
+    curve_sample_spacing_m: float = 2.0,
+    initial_heading: tuple[float, float] | None = None,
+    arrival_heading: tuple[float, float] | None = None,
+    allow_horizontal_escape: bool = False,
 ) -> DynamicRun:
     """Execute a deterministic online replanning run with an exact dynamic safety gate."""
 
@@ -218,6 +270,16 @@ def simulate_replanning(
         raise ValueError("simulation times, speed, and resolution must be finite and positive")
     if max_expansions <= 0:
         raise ValueError("max_expansions must be positive")
+    if not math.isfinite(start_time) or not 0 <= start_time < max_time:
+        raise ValueError("start_time must be finite and lie before max_time")
+    if not math.isfinite(planning_guard_s) or planning_guard_s < 0:
+        raise ValueError("planning_guard_s must be finite and non-negative")
+    if smooth_turns and not preserve_altitude:
+        raise ValueError("horizontal turn smoothing requires altitude preservation")
+    if not all(
+        math.isfinite(value) and value > 0 for value in (turn_scale_m, curve_sample_spacing_m)
+    ):
+        raise ValueError("turn scale and curve spacing must be finite and positive")
     if algorithm not in REPLANNING_ALGORITHMS:
         choices = ", ".join(REPLANNING_ALGORITHMS)
         raise ValueError(f"unknown replanning algorithm {algorithm!r}; choose one of: {choices}")
@@ -239,12 +301,28 @@ def simulate_replanning(
     # self-describing when callers explicitly disable incremental-state reuse.
     if algorithm == "dstar-lite-3d" and not reuse_search_state:
         parameters["reuse_search_state"] = 0
+    if shortcut_paths:
+        parameters["path_shortcut"] = 1
+    if preserve_altitude:
+        parameters["preserve_altitude"] = 1
+    if start_time:
+        parameters["start_time"] = start_time
+    if planning_guard_s:
+        parameters["planning_guard_s"] = planning_guard_s
+    if smooth_turns:
+        parameters.update(
+            horizontal_curve_degree=5,
+            turn_scale_m=turn_scale_m,
+            curve_sample_spacing_m=curve_sample_spacing_m,
+        )
+    if allow_horizontal_escape:
+        parameters["horizontal_escape"] = 1
     frames: list[DynamicFrame] = []
     executed: list[Point3] = [scenario.static_scene.start]
     position = scenario.static_scene.start
     current_path: tuple[Point3, ...] = ()
-    time_s = 0.0
-    next_replan = 0.0
+    time_s = start_time
+    next_replan = start_time
     replans = 0
     failed_replans = 0
     holds = 0
@@ -254,7 +332,43 @@ def simulate_replanning(
     total_changed_edges = 0
     failure_reason: str | None = None
 
+    def prepare_path(snapshot: Scene, path: tuple[Point3, ...]) -> tuple[Point3, ...]:
+        if smooth_turns:
+            if len(path) < 2:
+                return path
+            base = smooth_path(
+                snapshot,
+                path,
+                optimize_shortcuts=shortcut_paths,
+                preserve_altitude=True,
+                round_corners=False,
+            )
+            heading = initial_heading
+            for a, b in reversed(list(pairwise(executed))):
+                if math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-8:
+                    heading = (b[0] - a[0], b[1] - a[1])
+                    break
+            return smooth_horizontal_curves(
+                base.path,
+                base.altitude_progress,
+                lambda a, b, _u, _v: segment_is_free(snapshot, a, b),
+                turn_scale_m=turn_scale_m,
+                sample_spacing_m=curve_sample_spacing_m,
+                start_direction=heading,
+                end_direction=arrival_heading,
+            ).points
+        return (
+            tuple(farthest_visible_shortcut(snapshot, path, preserve_altitude=preserve_altitude))
+            if shortcut_paths
+            else path
+        )
+
     while time_s < max_time - 1e-12:
+        guard = (
+            snapshot_scene(scenario, time_s, start=position, lookahead_s=planning_guard_s)
+            if planning_guard_s
+            else None
+        )
         replanned = False
         replan_reason: str | None = None
         planner_success: bool | None = None
@@ -266,7 +380,8 @@ def simulate_replanning(
         if scheduled or missing_plan:
             replan_reason = "initial" if replans == 0 else ("scheduled" if scheduled else "no-plan")
             planner = _planner(algorithm, resolution, max_expansions, incremental)
-            result = planner.plan(snapshot_scene(scenario, time_s, start=position))
+            snapshot = guard or snapshot_scene(scenario, time_s, start=position)
+            result = planner.plan(snapshot)
             replans += 1
             replanned = True
             planner_success = result.success
@@ -276,7 +391,8 @@ def simulate_replanning(
             total_changed_edges += frame_changed_edges
             next_replan = time_s + replan_interval
             if result.success:
-                current_path = _trim_path(result.path, position)
+                path = prepare_path(snapshot, result.path)
+                current_path = _trim_path(path, position)
             else:
                 current_path = ()
                 failed_replans += 1
@@ -301,12 +417,20 @@ def simulate_replanning(
         traversals, remaining_path, movement_duration = _candidate_traversal(
             current_path, time_s, step_duration, cruise_speed
         )
-        safe = bool(traversals) and _safe_traversals(scenario, traversals)
+        safe = (
+            bool(traversals)
+            and _safe_traversals(scenario, traversals)
+            and (
+                guard is None
+                or all(segment_is_free(guard, segment.start, segment.end) for segment in traversals)
+            )
+        )
         if traversals and not safe:
             safety_activations += 1
             # Replan once; the exact dynamic gate still owns the final decision.
             planner = _planner(algorithm, resolution, max_expansions, incremental)
-            result = planner.plan(snapshot_scene(scenario, time_s, start=position))
+            snapshot = guard or snapshot_scene(scenario, time_s, start=position)
+            result = planner.plan(snapshot)
             replans += 1
             replanned = True
             replan_reason = "safety-gate"
@@ -318,16 +442,43 @@ def simulate_replanning(
             total_work += work
             total_changed_edges += changed
             if result.success:
-                current_path = _trim_path(result.path, position)
+                path = prepare_path(snapshot, result.path)
+                current_path = _trim_path(path, position)
                 traversals, remaining_path, movement_duration = _candidate_traversal(
                     current_path, time_s, step_duration, cruise_speed
                 )
-                safe = bool(traversals) and _safe_traversals(scenario, traversals)
+                safe = (
+                    bool(traversals)
+                    and _safe_traversals(scenario, traversals)
+                    and (
+                        guard is None
+                        or all(
+                            segment_is_free(guard, segment.start, segment.end)
+                            for segment in traversals
+                        )
+                    )
+                )
             else:
                 failed_replans += 1
                 current_path = ()
                 traversals = ()
                 safe = False
+
+        # Do not wait inside an approaching aircraft's swept volume until the
+        # hold itself becomes unsafe. Defaults of frozen studies are unchanged.
+        if not safe and allow_horizontal_escape and guard is not None and (
+            not point_is_free(guard, position) or not spacetime_segment_is_free(
+                scenario, position, position, time_s, time_s + step_duration)
+        ):
+            escape = _horizontal_escape(scenario, position, time_s, step_duration, cruise_speed)
+            if escape:
+                current_path = escape
+                traversals, remaining_path, movement_duration = _candidate_traversal(
+                    current_path, time_s, step_duration, cruise_speed)
+                safe = bool(traversals) and _safe_traversals(scenario, traversals)
+                next_replan = time_s + step_duration
+                replan_reason = "safety-gate"
+                safety_activations += 1
 
         if safe:
             frames.append(

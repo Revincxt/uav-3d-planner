@@ -95,7 +95,10 @@ def _canonical_number(value: float) -> str:
 
 
 def problem_fingerprint(scene: Scene) -> str:
-    """Hash planner semantics while excluding labels, metadata, and numeric spelling."""
+    """Hash planning semantics, including reserved hard-stop constraints when present.
+
+    Ordinary descriptive metadata remains excluded, preserving legacy fingerprints.
+    """
 
     canonical = {
         "fingerprint_schema": "uav3d-problem-v2",
@@ -130,6 +133,14 @@ def problem_fingerprint(scene: Scene) -> str:
             key=lambda item: (item["center"], item["radius"], item["z_min"], item["z_max"]),
         ),
     }
+    if scene.metadata.get("missionTaskPoints"):
+        canonical["ordered_service_stops"] = [
+            {
+                "position": [_canonical_number(value) for value in task["position"]],
+                "service_duration_s": _canonical_number(task["serviceDurationS"]),
+            }
+            for task in scene.metadata["missionTaskPoints"]
+        ]
     payload = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 

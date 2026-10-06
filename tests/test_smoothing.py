@@ -9,6 +9,7 @@ from uav3d.smoothing import (
     farthest_visible_shortcut,
     remove_duplicate_points,
     sample_bspline,
+    shortest_visible_shortcut,
     smooth_path,
 )
 from uav3d.validation import audit_path
@@ -57,3 +58,20 @@ def test_invalid_raw_path_is_not_smoothed() -> None:
     result = smooth_path(scene, [scene.start, scene.goal])
     assert result.path == ()
     assert result.method == "not-run"
+
+
+def test_shortest_visibility_route_avoids_farthest_index_detour() -> None:
+    scene = smoothing_scene()
+    raw = [scene.start, (6, 6, 5), (14, 6, 5), (18, 14, 5), (5, 18, 5), scene.goal]
+    greedy = farthest_visible_shortcut(scene, raw)
+    optimized = shortest_visible_shortcut(scene, raw)
+
+    assert path_is_free(scene, raw)
+    assert path_is_free(scene, optimized)
+    assert optimized == [scene.start, (6, 6, 5), (14, 6, 5), scene.goal]
+    assert polyline_length(optimized) < polyline_length(greedy) - 4.0
+    assert optimized == shortest_visible_shortcut(scene, raw)
+    result = smooth_path(scene, raw, optimize_shortcuts=True)
+    assert result.collision_free
+    assert audit_path(scene, result.path).valid
+    assert polyline_length(result.path) <= polyline_length(greedy) + 1e-9

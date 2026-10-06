@@ -1,114 +1,27 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Descriptive benchmark results for 3D A*, Lazy Theta*, and RRT* in static urban UAV scenes."
-    />
-    <title>Benchmark results — UAV 3D Planner Lab</title>
+    <meta name="description" content="Recorded UAV missions through the official Manhattan building map." />
+    <title>Manhattan Results — UAV 3D Planner</title>
   </head>
   <body>
-    <main class="results-page" id="benchmark-results">
-      <nav class="study-nav" aria-label="Study views">
-        <a href="./">Recorded paths</a>
-        <span aria-current="page">Benchmark results</span>
-        <a href="./dynamic.html">Dynamic replanning</a>
-        <a href="./predictive.html">Predictive planning</a>
-      </nav>
-
-      <header class="results-masthead">
-        <div>
-          <p class="eyebrow">Reproducible planning study</p>
-          <h1>Benchmark results</h1>
-          <p class="scope">
-            Sensitivity analyses and nominal-budget summaries for static buildings and fixed
-            no-fly zones.
-          </p>
-        </div>
-        <p class="evidence-label">Descriptive benchmark · scene-clustered intervals</p>
+    <main class="workspace workspace-results" id="mission-results">
+      <header class="app-header">
+        <a class="brand" href="./" aria-label="Planner home"><span class="brand-mark" aria-hidden="true"></span></a>
+        <nav class="study-nav" aria-label="Planning views"><a href="./">Static</a><a href="./dynamic.html">Dynamic</a><a href="./predictive.html">Predictive</a><a href="./results.html" aria-current="page">Results</a></nav>
+        <span class="header-meta"><span class="status-dot" aria-hidden="true"></span>NYC map · Simulated missions</span>
       </header>
-
-      <p id="load-state" class="load-state" role="status" aria-live="polite">
-        Loading recorded benchmark data…
-      </p>
-
-      <section class="study-scope" aria-labelledby="scope-heading">
-        <h2 id="scope-heading">Analysis scope</h2>
-        <p id="benchmark-meta"></p>
-      </section>
-
-      <section class="sensitivity" aria-labelledby="sensitivity-heading">
-        <header class="section-heading">
-          <h2 id="sensitivity-heading">Sensitivity analyses</h2>
-          <p>
-            Raw-path excess is relative to the straight-line lower bound and is conditional on a
-            successful, independently certified path.
-          </p>
-        </header>
-
-        <div class="chart-grid">
-          <figure>
-            <h3>Voxel resolution</h3>
-            <div id="resolution-chart" class="chart-host"></div>
-            <figcaption>
-              Graph planners only. Markers are medians, vertical bars are interquartile ranges,
-              and labels report successful runs over attempts. Missing estimates are not plotted.
-            </figcaption>
-          </figure>
-
-          <figure>
-            <h3>RRT* sample budget</h3>
-            <div id="rrt-budget-chart" class="chart-host"></div>
-            <figcaption>
-              The horizontal axis is logarithmic. Markers are medians, vertical bars are
-              interquartile ranges, and labels report successful runs over attempts.
-            </figcaption>
-          </figure>
-        </div>
-      </section>
-
-      <section class="summary" aria-labelledby="summary-heading">
-        <header class="section-heading">
-          <h2 id="summary-heading">Nominal-budget summary</h2>
-          <p>Exactly one row per planner; no winner or rank is inferred.</p>
-        </header>
-        <div class="table-wrap">
-          <table>
-            <caption id="summary-caption">
-              Dataset-level estimates at the declared nominal budget. Time includes all runs;
-              path and clearance metrics include successful runs only.
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Planner</th>
-                <th scope="col">Budget</th>
-                <th scope="col">Path runs (scenes)</th>
-                <th scope="col">Timing runs (scenes)</th>
-                <th scope="col">Success % [95% CI]</th>
-                <th scope="col">Time ms median [IQR]</th>
-                <th scope="col">Raw excess % median [IQR]</th>
-                <th scope="col">Smoothed excess % median [IQR]</th>
-                <th scope="col">Clearance m median [IQR]</th>
-              </tr>
-            </thead>
-            <tbody id="summary-body"></tbody>
-          </table>
-        </div>
-        <p class="downloads">
-          Download:
-          <a href="./benchmark-records.csv">run records (CSV)</a>,
-          <a href="./benchmark-summary.csv">summary (CSV)</a>,
-          <a href="./dataset-manifest.json">dataset manifest</a>, and
-          <a href="./timing-manifest.json">timing provenance</a>.
-        </p>
-      </section>
-
-      <details>
-        <summary>Method and provenance</summary>
-        <div id="provenance"></div>
-      </details>
+      <div class="workspace-body">
+        <section class="workspace-content" aria-label="Manhattan mission results">
+          <p id="load-state" class="load-state" role="status" aria-live="polite">Loading Manhattan mission records…</p>
+          <div class="demo-grid results-layout">
+            <section class="stage-card results-stage" aria-label="All study results"><section class="results-panel" aria-label="Overall algorithm comparisons"><div id="comparison-charts" class="results-overview"></div><p class="results-note" id="results-note"></p></section></section>
+          </div>
+        </section>
+      </div>
     </main>
     <script type="module" src="/src/results.ts"></script>
   </body>
