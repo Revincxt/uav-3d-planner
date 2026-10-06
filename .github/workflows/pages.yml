@@ -11,6 +11,7 @@ on:
       - "tests/**"
       - "pyproject.toml"
       - "scripts/validate_committed_data.py"
+      - "scripts/committed_inputs.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

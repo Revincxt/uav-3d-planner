@@ -10,6 +10,7 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
+from committed_inputs import assert_equivalent, input_record, load_inputs, restore_input
 from export_manhattan_static_dynamic import mission_scenes, shared_dynamic_scenarios
 
 from uav3d.benchmark import scene_fingerprint
@@ -71,6 +72,7 @@ def audit_current(public: Path) -> dict[str, int]:
     for bundle in (static, dynamic, predictive):
         audit_city(bundle, city)
         audit_downloads(bundle, public)
+    inputs = load_inputs(public, city)
     missions = mission_scenes(city)
     baselines = [
         next(run for run in scenario["results"] if run["plannerId"] == "astar-3d")["paths"]["raw"]
@@ -79,7 +81,10 @@ def audit_current(public: Path) -> dict[str, int]:
     dynamic_episodes = shared_dynamic_scenarios(missions, baselines)
     counts = {"static": 0, "dynamic": 0, "predictive": 0}
     run_ids: set[str] = set()
-    for index, (mission, scene) in enumerate(missions):
+    for index, (_mission, regenerated_scene) in enumerate(missions):
+        saved = inputs["static"][index]
+        assert_equivalent(input_record(regenerated_scene), saved)
+        scene = restore_input(saved, city, dynamic=False)
         exported = static["scenarios"][index]
         if exported["id"] != scene.scene_id or exported["fingerprint"] != scene_fingerprint(scene):
             raise ValueError("Static mission identity mismatch")
@@ -90,7 +95,7 @@ def audit_current(public: Path) -> dict[str, int]:
                 raise ValueError("Static mission failed")
             for layer in ("raw", "smoothed"):
                 path = run["paths"][layer]
-                audit_task_visits(path, mission["taskPoints"])
+                audit_task_visits(path, scene.metadata["missionTaskPoints"])
                 audit = audit_path(scene, tuple(tuple(point) for point in path))
                 if not audit.valid or not math.isclose(
                     audit.length_m, run["metrics"][layer + "LengthM"], abs_tol=0.001
@@ -99,7 +104,9 @@ def audit_current(public: Path) -> dict[str, int]:
                         f"Invalid static trajectory or metrics: {run['runId']}/{layer}"
                     )
             counts["static"] += 1
-        episode = dynamic_episodes[index]
+        saved = inputs["dynamic"][index]
+        assert_equivalent(input_record(dynamic_episodes[index]), saved)
+        episode = restore_input(saved, city, dynamic=True)
         recorded = dynamic["scenarios"][index]
         if recorded["id"] != episode.scenario_id or recorded[
             "fingerprint"
@@ -113,7 +120,7 @@ def audit_current(public: Path) -> dict[str, int]:
                 raise ValueError("Dynamic mission failed")
             audit_task_visits(
                 [f["vehicle"] for f in frames],
-                mission["taskPoints"],
+                scene.metadata["missionTaskPoints"],
                 times=[f["timeS"] for f in frames],
             )
             for left, right in pairwise(frames):
@@ -142,9 +149,12 @@ def audit_current(public: Path) -> dict[str, int]:
                         clock = end
             counts["dynamic"] += 1
     runtime = study_runtime()
-    for episode, recorded in zip(
-        build_manhattan_missions(city), predictive["scenarios"], strict=True
+    for index, (regenerated_episode, recorded) in enumerate(
+        zip(build_manhattan_missions(city), predictive["scenarios"], strict=True)
     ):
+        saved = inputs["predictive"][index]
+        assert_equivalent(input_record(regenerated_episode), saved)
+        episode = restore_input(saved, city, dynamic=True)
         if recorded["id"] != episode.scenario_id or recorded[
             "fingerprint"
         ] != dynamic_scenario_fingerprint(episode):

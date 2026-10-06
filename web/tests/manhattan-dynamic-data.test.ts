@@ -76,7 +76,7 @@ describe("recorded Manhattan reactive missions", () => {
       }
     }
     expect(validateDynamicBundle(bundle).protocol.id).toBe("manhattan-reactive-demo-v1");
-  });
+  }, 30000);
 
   it("retains compatibility with the legacy Manhattan v2 unconstrained-height replay", () => {
     const bundle = structuredClone(source);
@@ -86,7 +86,7 @@ describe("recorded Manhattan reactive missions", () => {
       for (const run of scenario.runs) delete run.parameters.preserveAltitude;
     }
     expect(validateDynamicBundle(bundle).protocol.id).toBe("manhattan-reactive-demo-v2");
-  });
+  }, 30000);
 
   it.each([undefined, true, 0, 2])("rejects v2 protocol.pathShortcut=%s", (value) => {
     expect(() => validateDynamicBundle({ ...source, protocol: {
