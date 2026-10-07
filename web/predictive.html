@@ -12,7 +12,7 @@
       <header class="app-header">
         <nav class="study-nav" aria-label="Planning views">
           <a href="./">Static</a><a href="./dynamic.html">Dynamic</a>
-          <span aria-current="page">Predictive</span><a href="./results.html">Results</a>
+          <a href="./predictive.html" aria-current="page">Predictive</a><a href="./results.html">Benchmark</a>
         </nav>
       </header>
       <div class="workspace-body">
@@ -23,14 +23,12 @@
           </header>
           <div class="demo-grid">
             <section class="stage-card" aria-label="Trajectory replay">
-              <div class="stage-toolbar">
-                <label class="planner-picker"><span class="sr-only">Planner</span><select id="planner-select"></select></label>
+              <div class="stage-toolbar" role="group" aria-label="Flight controls">
+                <label class="planner-control"><span class="sr-only">Planner</span><select id="planner-select" aria-label="Planner"></select></label>
                 <div class="follow-controls"><select id="follow-target" aria-label="Drone to follow"></select><button id="follow-toggle" type="button" aria-pressed="false" title="Close chase view centered on the selected UAV">Follow</button></div>
-                <div class="stage-controls">
-                  <div class="view-controls" aria-label="Camera projection">
-                    <button type="button" data-view="isometric" aria-pressed="true">3D</button>
-                    <button type="button" data-view="xy" aria-pressed="false">Top</button>
-                  </div>
+                <div class="view-controls camera-controls" role="group" aria-label="Camera projection">
+                  <button type="button" data-view="isometric" aria-pressed="true">3D</button>
+                  <button type="button" data-view="xy" aria-pressed="false">Top</button>
                 </div>
               </div>
               <div class="stage-viewport">

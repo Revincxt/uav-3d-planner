@@ -14,7 +14,7 @@
           <a href="./">Static</a>
           <a href="./dynamic.html" aria-current="page">Dynamic</a>
           <a href="./predictive.html">Predictive</a>
-          <a href="./results.html">Results</a>
+          <a href="./results.html">Benchmark</a>
         </nav>
       </header>
 
@@ -26,15 +26,13 @@
           <header class="content-heading"><div><h1 id="scene-title">Manhattan</h1><p id="scene-caption" hidden></p></div></header>
           <div class="demo-grid dynamic-demo-grid">
             <section class="stage-card dynamic-stage" aria-labelledby="scene-title">
-              <header class="stage-toolbar">
-                <div class="stage-controls">
-                  <label class="planner-control"><span class="sr-only">Planner</span><select id="planner-select" aria-label="Planner"></select></label>
-                  <div class="follow-controls"><select id="follow-target" aria-label="Drone to follow"></select><button id="follow-toggle" type="button" aria-pressed="false" title="Close chase view centered on the selected UAV">Follow</button></div>
-                  <div class="view-controls" aria-label="Camera view">
-                    <button type="button" data-view="isometric" aria-pressed="true">3D</button>
-                    <button type="button" data-view="top" aria-pressed="false">Top</button>
-                    <button type="button" data-view="reset" title="Reset camera" aria-label="Reset camera"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.2 7A6 6 0 1 1 4 12M4.2 7V3.7M4.2 7h3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
-                  </div>
+              <header class="stage-toolbar" role="group" aria-label="Flight controls">
+                <label class="planner-control"><span class="sr-only">Planner</span><select id="planner-select" aria-label="Planner"></select></label>
+                <div class="follow-controls"><select id="follow-target" aria-label="Drone to follow"></select><button id="follow-toggle" type="button" aria-pressed="false" title="Close chase view centered on the selected UAV">Follow</button></div>
+                <div class="view-controls camera-controls" role="group" aria-label="Camera view">
+                  <button type="button" data-view="isometric" aria-pressed="true">3D</button>
+                  <button type="button" data-view="top" aria-pressed="false">Top</button>
+                  <button type="button" data-view="reset" title="Reset camera" aria-label="Reset camera"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.2 7A6 6 0 1 1 4 12M4.2 7V3.7M4.2 7h3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
                 </div>
               </header>
               <div class="stage-viewport dynamic-viewport">

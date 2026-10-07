@@ -85,7 +85,6 @@ dd { margin: 0; }
 .stage-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid #dfe5ed; border-radius: 12px; background: #fff; box-shadow: 0 4px 18px rgba(32,42,55,.025); }
 .stage-toolbar { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-height: 49px; padding: 10px 13px; border-bottom: 1px solid var(--line); background: #fff; font-size: 10px; }
 .stage-toolbar > :last-child { margin-left: auto; }
-.stage-controls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .stage-toolbar .view-controls, .button-group { display: flex; align-items: center; gap: 3px; }
 .control-cluster { display: flex; align-items: center; gap: 7px; }
 .control-label { color: var(--muted); font-size: 9px; }
@@ -164,11 +163,8 @@ dd { margin: 0; }
 .follow-controls { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .follow-controls select { padding-left: 7px; max-width: 91px; }
 .follow-controls button { min-width: 65px; }
-.workspace-dynamic .stage-toolbar > .stage-controls { width: 100%; margin-left: 0; justify-content: flex-start; }
-.workspace-dynamic .stage-controls > .view-controls { margin-left: auto; }
 .workspace .stage-toolbar { flex-wrap: wrap; gap: 8px; }
 .workspace .stage-toolbar select { max-width: 220px; }
-.workspace .stage-toolbar .stage-controls { flex-wrap: wrap; }
 
 @media (max-width: 1250px) {
   .workspace-body { grid-template-columns: 212px minmax(0, 1fr); }
@@ -203,7 +199,6 @@ dd { margin: 0; }
   .inspector-toggle { flex: 0 0 60px; margin-left: 0; order: 3; }
   .workspace .demo-grid > .inspector-card { top: 60px; }
   .stage-toolbar { flex-wrap: wrap; gap: 7px; padding: 8px; }
-  .stage-controls { gap: 6px; }
   .playback-bar { gap: 7px; padding: 10px 8px; flex-wrap: wrap; }
   .playback-bar .speed-control { display: inline-flex; }
   .canvas-legend { gap: 6px 10px; font-size: 8px; }

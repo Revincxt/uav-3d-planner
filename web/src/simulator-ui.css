@@ -34,7 +34,7 @@ body { background: var(--page); font-size: var(--ui-size); }
 .workspace .brand-mark { width: 27px; height: 27px; background: #77bde80b; border-color: #77bde85c; border-radius: 5px; }
 .workspace .brand-mark::before, .workspace .brand-mark::after { background: var(--accent); width: 13px; left: 6px; top: 11px; }
 .workspace .study-nav { gap: 4px; }
-.workspace .study-nav a, .workspace .study-nav span { color: var(--muted); font-size: var(--ui-size); padding: 8px 12px; border: 1px solid transparent; border-radius: 5px; white-space: nowrap; }
+.workspace .study-nav a, .workspace .study-nav span { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; color: var(--muted); font-size: var(--ui-size); padding: 8px 12px; border: 1px solid transparent; border-radius: 5px; white-space: nowrap; }
 .workspace .study-nav [aria-current="page"] { color: #c1e6fb; background: var(--control-active); border-color: #77bde84c; }
 .workspace .study-nav a:hover { background: #ffffff0a; color: #fff; }
 .workspace .study-nav a[aria-current="page"]:hover { background: #77bde829; color: #c1e6fb; }
@@ -52,20 +52,19 @@ body { background: var(--page); font-size: var(--ui-size); }
 }
 .workspace:not(.workspace-results) .app-header {
   position: absolute; z-index: 5; top: var(--hud-gap); left: var(--hud-gap); right: var(--hud-gap);
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: 44px; gap: 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 44px; grid-template-areas: "routes navigation"; gap: 12px;
   height: 44px; min-height: 0; padding: 0; border: 0; background: none; pointer-events: none;
 }
 .workspace:not(.workspace-results) .study-nav,
 .workspace:not(.workspace-results) .inspector-toggle,
-.workspace:not(.workspace-results) .stage-toolbar > select,
-.workspace:not(.workspace-results) .stage-toolbar > label,
+.workspace:not(.workspace-results) .planner-control,
 .workspace:not(.workspace-results) .follow-controls,
 .workspace:not(.workspace-results) .view-controls {
   background: var(--hud-surface); border: 1px solid var(--hud-border); border-radius: 7px;
   box-shadow: var(--hud-shadow); backdrop-filter: blur(8px); pointer-events: auto;
 }
-.workspace:not(.workspace-results) .study-nav { position: static; justify-self: center; transform: none; height: 44px; padding: 3px; margin: 0; }
-.workspace:not(.workspace-results) .camera-controls { justify-self: end; padding: 3px; }
+.workspace:not(.workspace-results) .study-nav { position: static; grid-area: navigation; justify-self: end; transform: none; height: 44px; max-width: 100%; padding: 3px; margin: 0; }
+.workspace:not(.workspace-results) .camera-controls { grid-area: camera; padding: 2px; }
 .workspace .camera-controls button { height: 34px; min-height: 34px; font-size: var(--ui-size); padding: 6px 8px; }
 .workspace .camera-controls button:is([data-view="reset"], #observe-encounter) { width: 34px; min-width: 34px; padding: 7px; }
 .workspace .camera-controls svg { display: block; width: 18px; height: 18px; }
@@ -81,30 +80,28 @@ body { background: var(--page); font-size: var(--ui-size); }
   backdrop-filter: blur(12px);
 }
 .workspace:not(.workspace-results) .content-heading h1::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--success); }
-.workspace:not(.workspace-results) .inspector-toggle { position: absolute; top: -52px; right: 0; min-width: 80px; height: 40px; padding: 0 14px; color: var(--ink); margin: 0; font-size: var(--ui-size); }
+.workspace:not(.workspace-results) .inspector-toggle { grid-area: inspector; min-width: 88px; height: 40px; padding: 0 12px; color: var(--ink); margin: 0; font-size: var(--ui-size); }
 .workspace:not(.workspace-results) .inspector-toggle[aria-expanded="true"] { color: #c1e6fb; background: linear-gradient(var(--control-active), var(--control-active)), var(--hud-surface); border-color: var(--control-border); }
 .workspace:not(.workspace-results) .stage-toolbar {
   position: absolute; z-index: 5; top: 76px; left: var(--hud-gap); right: var(--hud-gap);
+  width: auto; display: flex; flex-wrap: nowrap;
   min-height: 0; padding: 0; border: 0; gap: 8px; background: none; pointer-events: none;
 }
-.workspace:not(.workspace-results) .stage-toolbar > select { min-width: 146px; height: 38px; }
+.workspace:not(.workspace-results) .stage-toolbar > * { margin: 0; flex-shrink: 0; }
+.workspace:not(.workspace-results) .stage-toolbar > .camera-controls { margin-left: auto; }
+.workspace:not(.workspace-results) .planner-control { grid-area: planner; display: flex; align-items: center; width: max-content; min-width: 0; height: 40px; padding: 2px; }
+.workspace:not(.workspace-results) .planner-control select { width: auto; height: 34px; border: 0; background: transparent; text-overflow: ellipsis; }
+.workspace-static .stage-toolbar .planner-control { width: 146px; height: 38px; padding: 0; }
+.workspace-static .stage-toolbar .planner-control select { width: 100%; height: 36px; }
 .workspace:not(.workspace-results) .stage-toolbar select { font-size: var(--ui-size); }
-.workspace:not(.workspace-results) .stage-toolbar > label { padding: 2px; }
-.workspace:not(.workspace-results) .stage-toolbar > label select { border: 0; background: transparent; }
-.workspace:not(.workspace-results) .follow-controls { padding: 2px; gap: 3px; }
-.workspace:not(.workspace-results) .stage-toolbar > .follow-controls { margin-left: 0; }
+.workspace:not(.workspace-results) .follow-controls { grid-area: follow; height: 40px; padding: 2px; gap: 3px; }
 .workspace:not(.workspace-results) .follow-controls select { border: 0; background: transparent; }
 .workspace:not(.workspace-results) .follow-controls button { min-width: 67px; background: #ffffff08; }
 .workspace .follow-controls button[aria-pressed="true"] { color: #c1e6fb; border-color: var(--control-border); background: var(--control-active); }
-.workspace:not(.workspace-results) .stage-controls { gap: 8px; pointer-events: none; }
-.workspace:not(.workspace-results) .view-controls { padding: 3px; gap: 2px; }
+.workspace:not(.workspace-results) .view-controls { height: 40px; padding: 2px; gap: 2px; }
 .workspace:not(.workspace-results) .view-controls button { border-color: transparent; padding: 6px 9px; background: none; }
 .workspace:not(.workspace-results) .view-controls button[aria-pressed="true"] { color: #c1e6fb; background: var(--control-active); border-color: var(--control-border); }
-.workspace-dynamic .stage-toolbar > .stage-controls { width: 100%; justify-content: flex-start; margin: 0; }
-.workspace-dynamic .planner-control { padding: 2px; border: 1px solid var(--hud-border); border-radius: 7px; background: var(--hud-surface); backdrop-filter: blur(8px); pointer-events: auto; }
-.workspace-dynamic .planner-control select { border: 0; background: none; }
-.workspace-dynamic .stage-controls > .view-controls:last-child { margin-left: auto; }
-.workspace:not(.workspace-results) .playback-state { top: 170px; left: var(--hud-gap); max-width: calc(100% - 36px); padding: 7px 10px; background: var(--hud-surface); color: var(--muted); font-size: var(--ui-size); border-color: var(--hud-border); backdrop-filter: blur(8px); }
+.workspace:not(.workspace-results) .playback-state { top: var(--hud-gap); left: 50%; transform: translateX(-50%); display: flex; align-items: center; width: max-content; min-height: 34px; max-width: calc(100% - 36px); padding: 7px 10px; white-space: nowrap; background: var(--hud-surface); color: var(--muted); font-size: var(--ui-size); border-color: var(--hud-border); backdrop-filter: blur(8px); }
 .workspace .playback-state[data-action="flying"] { color: var(--success); }
 .workspace .playback-state:is([data-action="waiting"], [data-action="replanning"]) { color: var(--warning); border-color: #e5b77c4c; }
 .workspace:not(.workspace-results) .scene-challenge,
@@ -113,7 +110,7 @@ body { background: var(--page); font-size: var(--ui-size); }
 .workspace:not(.workspace-results) .orientation-reference,
 .workspace:not(.workspace-results) .event-strip { display: none; }
 .workspace:not(.workspace-results) .app-header .route-legend {
-  position: static; margin: 0; max-width: none;
+  position: static; grid-area: routes; justify-self: start; margin: 0; max-width: 100%;
   display: flex; flex-wrap: nowrap; align-items: center; min-height: 44px; pointer-events: auto;
   gap: 2px; justify-content: flex-start; padding: 4px; border-radius: 7px; border: 1px solid var(--hud-border);
   background: var(--hud-surface); box-shadow: var(--hud-shadow); color: #c4d4d7; backdrop-filter: blur(12px);
@@ -243,7 +240,9 @@ body { background: var(--page); font-size: var(--ui-size); }
 .workspace .load-state { background: var(--hud-surface); border-color: var(--hud-border); color: var(--ink); font-size: var(--ui-size); }
 .workspace .viewer-witness-readout { top: 266px; left: var(--hud-gap); color: #f0cf9c; background: rgba(40, 39, 25, .72); border-color: #e7bf7d42; font-size: var(--ui-size); }
 .workspace .viewer-witness-readout :is(strong, small) { font-size: var(--ui-size); }
-.workspace-results .app-header { background: var(--glass-surface); border-color: var(--hud-border); backdrop-filter: blur(8px); }
+.workspace-results .app-header { padding-inline: var(--hud-gap); gap: 12px; background: var(--glass-surface); border-color: var(--hud-border); backdrop-filter: blur(8px); }
+.workspace-results .study-nav { margin-left: auto; height: 44px; padding: 3px; border: 1px solid var(--hud-border); border-radius: 7px; background: var(--hud-surface); }
+.workspace-results .header-meta { margin-left: 0; }
 .workspace-results .stage-card { background: var(--glass-panel); border-color: var(--hud-border); backdrop-filter: blur(8px); }
 
 /* Compact details keep the same type size; reflow cards rather than shrinking labels. */
@@ -278,30 +277,33 @@ body { background: var(--page); font-size: var(--ui-size); }
   .workspace .route-legend button { gap: 3px; padding: 4px 3px; }
   .workspace .route-legend i { width: 6px; }
   .workspace:not(.workspace-results) .study-nav { gap: 1px; padding: 3px; }
-  .workspace:not(.workspace-results) .study-nav a, .workspace:not(.workspace-results) .study-nav span { padding: 8px 6px; }
+  .workspace .study-nav a, .workspace .study-nav span { padding: 8px 8px; }
   .workspace:not(.workspace-results) .stage-toolbar select { max-width: 165px; }
+}
+/* Reserve a top-center status row when the three header groups cannot fit side by side. */
+@media (max-width: 900px) {
+  .workspace:not(.workspace-results) .playback-state { top: 4px; min-height: 24px; padding: 2px 10px; line-height: 18px; }
+  .workspace:not(.workspace-results) .app-header { top: 34px; height: 32px; grid-template-rows: 32px; }
+  .workspace:not(.workspace-results) .study-nav { height: 32px; padding: 1px; }
+  .workspace:not(.workspace-results) .study-nav a { min-height: 28px; padding: 4px 6px; }
+  .workspace:not(.workspace-results) .app-header .route-legend { min-height: 32px; padding: 2px; }
+  .workspace .route-legend button { min-height: 24px; padding-block: 3px; }
 }
 @media (max-width: 760px) {
   :root { --hud-gap: 12px; }
-  .workspace:not(.workspace-results) .app-header { display: flex; flex-direction: column; align-items: stretch; height: auto; gap: 8px; }
-  .workspace:not(.workspace-results) .app-header .route-legend { width: 100%; max-width: none; min-height: 38px; justify-content: space-between; gap: 1px; padding: 4px; }
-  .workspace .route-legend button { gap: 3px; min-height: 28px; padding: 3px; }
+  .workspace:not(.workspace-results) .app-header { grid-template-columns: minmax(0, 1fr); grid-template-rows: 32px 26px; grid-template-areas: "navigation" "routes"; height: auto; gap: 6px; }
+  .workspace:not(.workspace-results) .app-header .route-legend { width: 100%; max-width: none; min-height: 26px; justify-content: space-between; gap: 1px; padding: 2px; }
+  .workspace .route-legend button { gap: 3px; min-height: 20px; padding: 1px 3px; }
   .workspace .route-legend i { width: 5px; }
-  .workspace:not(.workspace-results) .study-nav { width: 100%; height: 40px; justify-content: center; gap: 1px; padding: 3px; }
-  .workspace:not(.workspace-results) .study-nav a, .workspace:not(.workspace-results) .study-nav span { padding: 6px; }
-  .workspace:not(.workspace-results) .camera-controls { position: absolute; top: 92px; right: 0; height: 40px; }
-  .workspace:not(.workspace-results) .inspector-toggle { top: -49px; height: 40px; }
-  .workspace:not(.workspace-results) .stage-toolbar { top: 104px; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 7px; }
-  .workspace:not(.workspace-results) .stage-toolbar > select { width: calc(100% - 172px); min-width: 0; max-width: none; height: 40px; }
-  .workspace:not(.workspace-results) .stage-toolbar > label { width: calc(100% - 172px); max-width: none; height: 40px; }
-  .workspace:not(.workspace-results) .stage-toolbar > label select { width: 100%; max-width: none; }
-  .workspace:not(.workspace-results) .stage-toolbar > .follow-controls { width: max-content; height: 40px; margin-left: 0; }
-  .workspace-dynamic .stage-toolbar > .stage-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }
-  .workspace-dynamic .planner-control { width: calc(100% - 172px); min-width: 0; height: 40px; }
-  .workspace:not(.workspace-results) .planner-control select { max-width: 100%; width: 100%; }
-  .workspace-dynamic .stage-controls > .follow-controls { width: max-content; height: 40px; margin-left: 0; }
-  .workspace:not(.workspace-results) .content-heading { top: 198px; }
-  .workspace:not(.workspace-results) .playback-state { top: 236px; }
+  .workspace:not(.workspace-results) .study-nav { width: max-content; height: 32px; gap: 1px; padding: 1px; }
+  .workspace .study-nav a, .workspace .study-nav span { padding: 6px; }
+  .workspace:not(.workspace-results) .study-nav a { padding: 4px 6px; }
+  .workspace:not(.workspace-results) .stage-toolbar { top: 104px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "planner camera" "follow inspector"; align-items: center; gap: 7px; }
+  .workspace:not(.workspace-results) .stage-toolbar .planner-control { width: 100%; height: 40px; }
+  .workspace:not(.workspace-results) .planner-control select { width: 100%; max-width: 100%; }
+  .workspace:not(.workspace-results) .follow-controls { justify-self: start; }
+  .workspace:not(.workspace-results) .inspector-toggle { justify-self: end; }
+  .workspace:not(.workspace-results) .content-heading { top: 206px; }
   .workspace .speed-control button { min-width: 31px; }
   .flight-hud { width: 366px; }
   .hud-telemetry { padding: 12px 13px; }
@@ -314,20 +316,21 @@ body { background: var(--page); font-size: var(--ui-size); }
   .flight-announcement { bottom: 239px; }
   .workspace .task-arrival-notice { bottom: 235px; padding: 9px 13px; }
   .workspace:not(.workspace-results) .map-attribution { bottom: 218px; right: 12px; }
-  .workspace:not(.workspace-results) .demo-grid > .inspector-card { top: 198px; bottom: 12px; right: 12px; width: calc(100% - 24px); }
+  .workspace:not(.workspace-results) .demo-grid > .inspector-card { top: 206px; bottom: 12px; right: 12px; width: calc(100% - 24px); }
   .workspace .viewer-witness-readout { top: 316px; }
 }
 @media (max-height: 550px) and (min-width: 761px) {
   :root { --hud-gap: 12px; }
   .workspace:not(.workspace-results) .app-header { height: 36px; grid-template-rows: 36px; }
   .workspace:not(.workspace-results) .study-nav { height: 36px; padding: 2px; }
-  .workspace:not(.workspace-results) .study-nav a, .workspace:not(.workspace-results) .study-nav span { padding: 5px 6px; }
+  .workspace:not(.workspace-results) .study-nav a, .workspace:not(.workspace-results) .study-nav span { min-height: 30px; padding: 5px 6px; }
   .workspace:not(.workspace-results) .camera-controls { padding: 2px; }
   .workspace .camera-controls button { height: 30px; min-height: 30px; padding-top: 5px; padding-bottom: 5px; }
   .workspace:not(.workspace-results) .stage-toolbar { top: 57px; padding: 0; gap: 8px; }
   .workspace:not(.workspace-results) .content-heading { top: 102px; }
-  .workspace:not(.workspace-results) .inspector-toggle { top: -45px; height: 38px; }
-  .workspace:not(.workspace-results) .playback-state { top: 139px; }
+  .workspace:not(.workspace-results) .stage-toolbar :is(.planner-control, .follow-controls, .view-controls, .inspector-toggle) { height: 38px; }
+  .workspace:not(.workspace-results) .stage-toolbar :is(button, select) { min-height: 30px; }
+  .workspace:not(.workspace-results) .planner-control select { height: 30px; }
   .workspace:not(.workspace-results) .app-header .route-legend { min-height: 36px; gap: 2px; padding: 3px; }
   .workspace .route-legend button { gap: 3px; padding: 3px; min-height: 28px; }
   .workspace .route-legend i { width: 6px; }
@@ -360,4 +363,12 @@ body { background: var(--page); font-size: var(--ui-size); }
   .workspace-dynamic .inspector-card .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .workspace-dynamic .inspector-card .comparison-heading { display: flex; padding: 4px 0; }
   .workspace-dynamic .inspector-card .planner-comparison { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-height: 550px) and (min-width: 761px) and (max-width: 900px) {
+  .workspace:not(.workspace-results) .playback-state { min-height: 20px; padding: 1px 10px; line-height: 16px; }
+  .workspace:not(.workspace-results) .app-header { top: 28px; height: 24px; grid-template-rows: 24px; }
+  .workspace:not(.workspace-results) .study-nav { height: 24px; padding: 0; }
+  .workspace:not(.workspace-results) .study-nav a { min-height: 22px; padding: 1px 6px; line-height: 18px; }
+  .workspace:not(.workspace-results) .app-header .route-legend { min-height: 24px; padding: 1px; }
+  .workspace .route-legend button { min-height: 20px; padding-block: 1px; }
 }

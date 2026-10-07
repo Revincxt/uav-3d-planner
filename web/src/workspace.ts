@@ -35,13 +35,6 @@ export function mountWorkspace({ scenarios, select }: WorkspaceOptions): void {
     legend.classList.add("route-legend");
     const header = document.querySelector(".app-header");
     header?.prepend(legend);
-    const camera = document.querySelector<HTMLElement>(".stage-toolbar .view-controls:last-child");
-    if (header && camera) {
-      const previous = camera.parentElement;
-      camera.classList.add("camera-controls");
-      header.append(camera);
-      if (previous?.classList.contains("stage-controls") && !previous.childElementCount) previous.remove();
-    }
     legend.setAttribute("aria-label", `${scenarios.length} tasks in shared airspace; click to observe or follow a task`);
     legend.title = "All tasks share the same obstacles and clock. Focus changes stops and follow target only; inter-mission avoidance is not jointly optimized.";
     scenarios.forEach((scenario, index) => {
@@ -91,12 +84,15 @@ export function missionCaption(scenario: LibraryScenario, scope: "city" | "missi
 
 export function mountInspector(): void {
   const panel = document.querySelector<HTMLElement>(".inspector-card");
-  const heading = document.querySelector(".content-heading");
-  if (!panel || !heading) return;
+  const toolbar = document.querySelector(".stage-toolbar");
+  if (!panel || !toolbar) return;
+  panel.id ||= "flight-inspector";
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.className = "inspector-toggle";
-  toggle.textContent = "Details";
+  toggle.textContent = "Inspector";
+  toggle.title = "Open inspector";
+  toggle.setAttribute("aria-controls", panel.id);
   toggle.setAttribute("aria-expanded", "false");
   const close = document.createElement("button");
   close.type = "button";
@@ -106,17 +102,22 @@ export function mountInspector(): void {
   const dismiss = (): void => {
     panel.classList.remove("inspector-open");
     toggle.setAttribute("aria-expanded", "false");
-    toggle.textContent = "Details";
+    toggle.title = "Open inspector";
   };
   close.addEventListener("click", () => { dismiss(); toggle.focus(); });
   panel.append(close);
   toggle.addEventListener("click", () => {
     const open = panel.classList.toggle("inspector-open");
     toggle.setAttribute("aria-expanded", String(open));
-    toggle.textContent = open ? "Close" : "Details";
+    toggle.title = open ? "Close inspector" : "Open inspector";
   });
-  heading.append(toggle);
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape") dismiss(); });
+  toolbar.append(toggle);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && panel.classList.contains("inspector-open")) {
+      dismiss();
+      toggle.focus();
+    }
+  });
 }
 
 export function mountTabs(): void {

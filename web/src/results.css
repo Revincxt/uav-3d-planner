@@ -75,7 +75,7 @@
   .comparison-series[data-groups="2"] .comparison-tick:first-child { visibility: hidden; }
 }
 @media (max-width: 760px) {
-  .workspace-results .app-header { gap: 10px; }
+  .workspace-results .app-header { gap: 8px; }
   .workspace-results .study-nav { gap: 2px; }
   .workspace-results .study-nav a { padding: 7px 6px; }
   .workspace-results .workspace-content { padding: 12px; }
@@ -85,6 +85,7 @@
   .comparison-chart { padding: 8px; }
 }
 @media (max-width: 430px) {
+  .workspace-results .brand { display: none; }
   .workspace-results .workspace-content { padding: 8px; }
   .results-panel { padding: 8px; }
   .results-overview { gap: 8px; }

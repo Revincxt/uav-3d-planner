@@ -23,7 +23,7 @@ A 3D UAV path-planning simulator built on real Manhattan building data, featurin
 - **Static**: Compare A*, Lazy Theta*, and RRT* routes around fixed obstacles.
 - **Dynamic**: Replay reactive obstacle avoidance and local replanning around shared moving obstacles and temporary no-fly zones.
 - **Predictive**: Use known traffic schedules for 4D space-time planning, avoiding future conflicts and restricted time windows.
-- **Results**: Compare three aggregate metrics per study using bar charts.
+- **Benchmark**: Compare three aggregate metrics per study using bar charts.
 
 Explore a 3.6 × 3.8 km city model with 8 missions per study and 6–8 mandatory waypoints per route. Includes smooth trajectories, variable-speed playback, close-range drone following, and mission details.
 
