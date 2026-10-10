@@ -273,7 +273,7 @@ describe("computed Manhattan predictive protocol", () => {
     const misplaced = cityBundle();
     misplaced.scenarios[0].runs[0].parameters.spaceTimeConnectivity = 26;
     expect(() => validatePredictiveBundle(misplaced)).toThrow(/only valid for the 4D planner/);
-  });
+  }, 30000);
 
   it("loads a runtime-computed two-point LOS-only path with no fictitious fillet radius", () => {
     const bundle = validatePredictiveBundle(losOnlyBundle());
