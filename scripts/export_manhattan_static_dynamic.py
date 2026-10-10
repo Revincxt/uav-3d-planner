@@ -34,6 +34,7 @@ from uav3d.dynamic_study import (
     dynamic_record_rows,
     dynamic_run_id,
 )
+from uav3d.flight_cost import mission_altitude_levels, with_turn_clearance
 from uav3d.geometry import Point3, distance, polyline_length
 from uav3d.horizontal_curves import smooth_horizontal_curves
 from uav3d.manhattan_challenges import select_encounter, static_reference
@@ -68,6 +69,8 @@ PROTOCOL = {
     "turnScaleM": 60,
     "curveSampleSpacingM": 2,
     "horizontalEscape": 1,
+    "verticalCostScale": 5,
+    "maxClimbRateMps": 3,
 }
 STATIC_PLANNERS = ("astar-3d", "lazy-theta-star", "rrt-star")
 # Destination names designate simulated neighborhood roof targets, not helipads.
@@ -303,13 +306,26 @@ def mission_scenes(city: Any) -> list[tuple[dict[str, Any], Scene]]:
 
 
 def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
+    levels = mission_altitude_levels(scene, 50)
     if algorithm == "astar-3d":
         planner = AStar3D(
-            AStarConfig(resolution=50, max_expansions=20_000, max_wall_time_ms=120_000)
+            AStarConfig(
+                resolution=50,
+                max_expansions=20_000,
+                max_wall_time_ms=120_000,
+                vertical_cost_scale=5,
+                altitude_levels=levels,
+            )
         )
     elif algorithm == "lazy-theta-star":
         planner = LazyThetaStar(
-            LazyThetaStarConfig(resolution=50, max_expansions=20_000, max_wall_time_ms=120_000)
+            LazyThetaStarConfig(
+                resolution=50,
+                max_expansions=20_000,
+                max_wall_time_ms=120_000,
+                vertical_cost_scale=5,
+                altitude_levels=levels,
+            )
         )
     else:
         planner = RRTStar(
@@ -324,6 +340,7 @@ def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
                 global_goal_connection=True,
                 informed_sampling=True,
                 max_wall_time_ms=120_000,
+                vertical_cost_scale=5,
             )
         )
     started = time.perf_counter()
@@ -331,7 +348,7 @@ def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
     targets = [scene.start, *(tuple(task["position"]) for task in tasks), scene.goal]
     plans, smoothings = [], []
     for index, (start, goal) in enumerate(pairwise(targets)):
-        leg = replace(scene, start=start, goal=goal)
+        leg = with_turn_clearance(replace(scene, start=start, goal=goal))
         planned_leg = planner.plan(leg, seed + index)
         if not planned_leg.success:
             raise RuntimeError(
@@ -380,6 +397,7 @@ def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
         protected=protected,
         turn_scale_m=60,
         sample_spacing_m=2,
+        round_reversals=True,
     )
     smooth_path_points = curves.points
     progress = list(curves.parameters)
@@ -663,6 +681,9 @@ def dynamic_record(city: Any, mission: dict[str, Any], scenario: DynamicScenario
             turn_scale_m=PROTOCOL["turnScaleM"],
             curve_sample_spacing_m=PROTOCOL["curveSampleSpacingM"],
             allow_horizontal_escape=True,
+            vertical_cost_scale=PROTOCOL["verticalCostScale"],
+            altitude_levels=mission_altitude_levels(scenario.static_scene, PROTOCOL["resolutionM"]),
+            max_climb_rate=PROTOCOL["maxClimbRateMps"],
         )
         if not run.metrics.success or run.metrics.collision_count:
             raise RuntimeError(f"{scenario.scenario_id}/{algorithm}: {run.metrics.failure_reason}")
@@ -698,6 +719,12 @@ def dynamic_record(city: Any, mission: dict[str, Any], scenario: DynamicScenario
                 "parameters": parameters,
                 "metrics": _export_metrics(run),
                 "frames": frames,
+                "executionTimedPath": [
+                    {"time": p.time_s, "position": list(p.position), "action": p.action}
+                    for p in run.execution_timed_path.waypoints
+                ]
+                if run.execution_timed_path is not None
+                else None,
             }
         )
     record = _export_scenario(scenario, [])

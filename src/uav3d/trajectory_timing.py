@@ -346,6 +346,7 @@ def retime_timed_path(
         )
 
     last_iteration = 0
+    serialization_retries = 0
     for iteration in range(1, max_iterations + 1):
         last_iteration = iteration
         changed = _relax_acceleration_constraints(
@@ -377,7 +378,21 @@ def retime_timed_path(
                 candidate.duration_s,
             )
         if not changed:
-            break
+            if serialization_decimal_places is not None and serialization_retries < 6:
+                # Very short curved chords amplify both cumulative-clock
+                # cancellation and decimal coordinate rounding in the acceleration
+                # diagnostic. Even the unrounded serialized-clock path can fail
+                # although the solver's local durations satisfy its targets.
+                # Repeating an unchanged sweep cannot fix either source of error.
+                # Dilate movement only, then re-audit the unchanged declared
+                # limits AND the actual serialized copy. Never relax a limit,
+                # move a height knot, discard a segment, or extend a true wait.
+                serialization_retries += 1
+                for i, waypoint in enumerate(path.waypoints[1:]):
+                    if waypoint.action == "move":
+                        durations[i] *= 1.001
+            else:
+                break
 
     return TrajectoryTimingResult(
         "time-parameterization-did-not-converge",

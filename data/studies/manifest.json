@@ -4,23 +4,23 @@
     {
       "name": "demo-data.json",
       "archive": "demo-data.json.gz",
-      "bytes": 35925183,
-      "archiveBytes": 12060570,
-      "sha256": "sha256:b3474cb7737431c19c1cb3631e536ecd508b65db5f732a6dee6b8c742404d9d4"
+      "bytes": 36568693,
+      "archiveBytes": 12335110,
+      "sha256": "sha256:5d32fa55473067815521d97dc4aa3ea5006c5ec0f7cdc12a3ada99b8ac973675"
     },
     {
       "name": "dynamic-data.json",
       "archive": "dynamic-data.json.gz",
-      "bytes": 126514300,
-      "archiveBytes": 39181154,
-      "sha256": "sha256:22d0923406ef4fe53182c09fa89b0cebbec69d6cc2f74daa4830adf18cd512a3"
+      "bytes": 213029283,
+      "archiveBytes": 78255421,
+      "sha256": "sha256:71168288adbfe3c6e07590baec787ee75fd05e2d53af07dc6682983bc74f1bd8"
     },
     {
       "name": "predictive-data.json",
       "archive": "predictive-data.json.gz",
-      "bytes": 46942821,
-      "archiveBytes": 15299225,
-      "sha256": "sha256:6aca7aea261686da6937f7e4253b198fadbc6f130e888c80b3607dc8a4e3f90d"
+      "bytes": 54241849,
+      "archiveBytes": 17520695,
+      "sha256": "sha256:60146b04fa134f3425e172ade5a0d6376c468ec2f7153451d5a8e3fa2053a202"
     }
   ]
 }

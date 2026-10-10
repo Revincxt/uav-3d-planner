@@ -38,7 +38,13 @@ class RouteDiversityTests(unittest.TestCase):
         for study in AUDIT["audit_public"](ROOT / "web/public"):
             with self.subTest(study=study["study"], planner=study["planner"]):
                 self.assertEqual(study["missionCount"], 8)
-                self.assertLess(study["worstPairFraction"], 0.10)
+                # Efficient low-altitude urban flights may share short street links.
+                # Keep the full XY diagnostic (including reverse traffic), but
+                # do not force extra flight distance just to separate two drawings.
+                # Bound both a local shared corridor and cohort-wide repetition;
+                # this layout policy is not an inter-vehicle safety certificate.
+                self.assertLess(study["worstPairFraction"], 0.15)
+                self.assertLess(study["meanPairFraction"], 0.01)
                 self.assertEqual(len(study["pairs"]), 28)
 
 

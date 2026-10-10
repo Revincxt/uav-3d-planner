@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/favicon.ico?v=flight-mark-1" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg?v=flight-mark-1" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Recorded UAV missions through the official Manhattan building map." />
@@ -9,19 +10,12 @@
   </head>
   <body>
     <main class="workspace workspace-results" id="mission-results">
+      <div id="benchmark-map" class="benchmark-map" aria-label="Manhattan simulation map"></div>
       <header class="app-header">
-        <a class="brand" href="./" aria-label="Planner home"><span class="brand-mark" aria-hidden="true"></span></a>
-        <span class="header-meta"><span class="status-dot" aria-hidden="true"></span>NYC map · Simulated missions</span>
         <nav class="study-nav" aria-label="Planning views"><a href="./">Static</a><a href="./dynamic.html">Dynamic</a><a href="./predictive.html">Predictive</a><a href="./results.html" aria-current="page">Benchmark</a></nav>
       </header>
-      <div class="workspace-body">
-        <section class="workspace-content" aria-label="Manhattan mission results">
-          <p id="load-state" class="load-state" role="status" aria-live="polite">Loading Manhattan mission records…</p>
-          <div class="demo-grid results-layout">
-            <section class="stage-card results-stage" aria-label="All study results"><section class="results-panel" aria-label="Overall algorithm comparisons"><div id="comparison-charts" class="results-overview"></div><p class="results-note" id="results-note"></p></section></section>
-          </div>
-        </section>
-      </div>
+      <div id="benchmark-host" class="benchmark-host" aria-label="Manhattan mission results"></div>
+      <div class="map-attribution">Imagery: USDA · <a href="https://www.usgs.gov/the-national-map-data-delivery" target="_blank" rel="noopener noreferrer">USGS The National Map</a></div>
     </main>
     <script type="module" src="/src/results.ts"></script>
   </body>

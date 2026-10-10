@@ -35,6 +35,18 @@ describe("faithful temporal route presentation", () => {
     geometry.dispose(); line.dispose(); halo.dispose();
   });
 
+  it("updates local plan times without injecting duplicate shader declarations", () => {
+    const geometry = new LineGeometry(); geometry.setPositions([0, 0, 0, 100, 0, 0]);
+    const material = new LineMaterial();
+    const first = revealReplayWindow(geometry, [0, 10], material);
+    const shader = material.vertexShader;
+    const second = revealReplayWindow(geometry, [20, 30], material);
+    expect(second.start).toBe(first.start); expect(second.end).toBe(first.end);
+    expect(material.vertexShader).toBe(shader);
+    expect(geometry.getAttribute("instanceTimeStart").getX(0)).toBe(20);
+    geometry.dispose(); material.dispose();
+  });
+
   it.each(["fixed", "reactive", "predictive"] as const)("keeps %s geometry retained across playback and rewind", kind => {
     const route: OverviewRoute = { id: "one", label: "One", points: [[0, 0, 10], [100, 0, 10], [100, 100, 10]],
       timedPath: [{ timeS: 0, position: [0, 0, 10] }, { timeS: 10, position: [100, 0, 10] }, { timeS: 20, position: [100, 100, 10] }],
@@ -44,8 +56,8 @@ describe("faithful temporal route presentation", () => {
     const upload = vi.spyOn(line.geometry, "setPositions");
     for (const t of [5, 10, 15, 20, 0]) overview.setTime(t);
     expect(upload).not.toHaveBeenCalled();
-    expect(Boolean(line.material.uniforms.replayTime)).toBe(kind !== "fixed");
-    expect(Boolean(overview.group.getObjectByName("overview-plan-one"))).toBe(kind === "predictive");
+    expect(Boolean(line.material.uniforms.replayTime)).toBe(true);
+    expect(Boolean(overview.group.getObjectByName("overview-plan-one"))).toBe(true);
     expect(overview.vehicle(route.id)!.position.toArray().map(v => v === 0 ? 0 : v)).toEqual([0, 10, 0]);
     overview.dispose();
   });
@@ -63,9 +75,9 @@ describe("faithful temporal route presentation", () => {
     if (pending) expect(pending.visible).toBe(true);
     overview.setTime(4); expect(clock.value).toBe(4);
     const position = overview.vehicle(route.id)!.position.clone();
-    overview.setPlaying(false); expect(clock.value).toBe(10);
+    overview.setPlaying(false); expect(clock.value).toBe(4);
     expect(overview.vehicle(route.id)!.position.equals(position)).toBe(true);
-    if (pending) expect(pending.visible).toBe(false);
+    if (pending) expect(pending.visible).toBe(true);
     overview.setPlaying(true); expect(clock.value).toBe(4);
     overview.setTime(10); if (pending) expect(pending.visible).toBe(false);
     expect(upload).not.toHaveBeenCalled(); overview.dispose();

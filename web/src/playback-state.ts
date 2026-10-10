@@ -1,6 +1,7 @@
 import type { CityMission } from "./city-schema";
 import type { DynamicFrame } from "./dynamic-schema";
 import { timedPosition, waypointIndex, type RouteWaypoint } from "./route-overview";
+import { phaseLabel, type FlightPhase } from "./trajectory-semantics";
 
 export type PlaybackKind = "fixed" | "reactive" | "predictive";
 export type PlaybackAction = "Ready" | "Flying" | "Service" | "Waiting" | "Replanning" | "Arrived";
@@ -30,16 +31,18 @@ export function playbackAction(
   return "Flying";
 }
 
-export function showPlaybackState(host: HTMLElement, kind: PlaybackKind, action: PlaybackAction, counterpart = false): void {
+export function showPlaybackState(host: HTMLElement, kind: PlaybackKind, action: PlaybackAction, counterpart = false, phase?: FlightPhase): void {
   const name = kind === "fixed" ? "Fixed route" : kind === "predictive" ? "Space-time" : counterpart ? "Reactive baseline" : "Live replanning";
-  if (host.textContent === `${name} · ${action}` && host.dataset.kind === kind) return;
-  host.textContent = `${name} · ${action}`;
+  const label = phase && action !== "Replanning" && action !== "Service" ? phaseLabel(phase) : action;
+  if (host.textContent === `${name} · ${label}` && host.dataset.kind === kind) return;
+  host.textContent = `${name} · ${label}`;
   host.dataset.kind = kind;
-  host.dataset.action = action.toLowerCase();
+  host.dataset.action = phase?.kind === "waiting" && action !== "Service" ? "waiting" : action.toLowerCase();
   host.ownerDocument.documentElement.dataset.playbackKind = kind;
   host.title = kind === "fixed"
     ? "Illustrative fly-through playback at 15 m/s; not a timed flight feasibility certificate."
     : kind === "predictive"
-      ? "Dashed: the preplanned final route. Solid: the portion already flown."
-      : "Solid: the portion already flown. Dashed: the current recorded local plan, when available.";
+      ? "Dashed: the scheduled future route. Solid: already flown. Amber pause marker: explicit hold with countdown."
+      : counterpart ? "Colored dashed: remaining recorded route, not advance knowledge of the reactive planner. Solid: already flown."
+      : "Solid: already flown. Dashed: the current recorded local plan, updated at each replan.";
 }

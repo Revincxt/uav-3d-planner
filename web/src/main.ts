@@ -6,6 +6,9 @@ import type { DemoBundle, DemoScenario, PlannerId } from "./schema";
 import { missionCaption, mountInspector, mountWorkspace } from "./workspace";
 import "./workspace.css";
 import "./simulator-ui.css";
+import { mountBenchmark } from "./benchmark-panel";
+import { mountPageLifecycle } from "./page-lifecycle";
+import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
 import { overviewDuration, staticRoutes } from "./route-overview";
 import { mountFollowControls } from "./drone-follow";
@@ -13,6 +16,7 @@ import { TaskArrivalNotice } from "./task-arrival-notice";
 import { PlaybackClock, mountPlaybackSpeedControls } from "./playback-clock";
 import { playbackAction, showPlaybackButton, showPlaybackState } from "./playback-state";
 import { encounterView, mountEncounterControl, showChallenge } from "./encounter-view";
+import { flightPhase, RouteStatusStrip } from "./trajectory-semantics";
 
 const element = <T extends HTMLElement>(selector: string): T => {
   const value = document.querySelector<T>(selector);
@@ -153,6 +157,8 @@ async function start(): Promise<void> {
 
   const taskNotice = new TaskArrivalNotice(viewerElement);
   const flightHud = new FlightHud(element(".stage-viewport"), element(".playback-bar"));
+  const routeInteraction = new RouteInteraction(viewerElement, viewer, select, () => routes);
+  const routeStates = new RouteStatusStrip();
   const renderTime = (timeS: number, notify = false): void => {
     const previousTimeS = currentTimeS;
     const duration = overviewDuration(routes);
@@ -166,7 +172,9 @@ async function start(): Promise<void> {
     else taskNotice.reset();
     const route = routes.find(route => route.id === select.value)!;
     flightHud.update(route, currentTimeS, routes.indexOf(route), !notify);
-    showPlaybackState(element("#playback-state"), "fixed", playbackAction(route.timedPath!, currentTimeS, route.mission));
+    routeInteraction.update(currentTimeS, !notify);
+    routeStates.update(routes, currentTimeS, !notify);
+    showPlaybackState(element("#playback-state"), "fixed", playbackAction(route.timedPath!, currentTimeS, route.mission), false, flightPhase(route, currentTimeS));
     showChallenge(document.querySelector("#scene-challenge"), route.mission);
   };
   const setPlaying = (playing: boolean): void => {
@@ -211,6 +219,7 @@ async function start(): Promise<void> {
   const renderResults = (): void => {
     renderPlannerResults(bundle, selectedScenario(), visible, (plannerId, checked) => {
       if (!checked) return;
+      const resume = animationFrame !== null;
       selectedPlanner = plannerId;
       plannerSelect.value = plannerId;
       visible.clear();
@@ -218,6 +227,7 @@ async function start(): Promise<void> {
       viewer?.setPlannerVisibility(visible);
       refreshRoutes();
       renderResults();
+      if (resume) beginPlayback();
       element("#live-region").textContent = `All ${routes.length} routes use ${bundle.planners.find((planner) => planner.id === plannerId)?.label ?? plannerId}`;
     });
     updateComparisonCaption();
@@ -247,11 +257,13 @@ async function start(): Promise<void> {
 
   select.addEventListener("change", update);
   plannerSelect.addEventListener("change", () => {
+    const resume = animationFrame !== null;
     selectedPlanner = plannerSelect.value as PlannerId;
     visible.clear(); visible.add(selectedPlanner);
     viewer?.setPlannerVisibility(visible);
     refreshRoutes();
     renderResults();
+    if (resume) beginPlayback();
   });
   document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -267,9 +279,12 @@ async function start(): Promise<void> {
   element("#previous-frame").addEventListener("click", () => { setPlaying(false); renderTime(currentTimeS - 2); });
   element("#next-frame").addEventListener("click", () => { setPlaying(false); renderTime(currentTimeS + 2); });
   mountPlaybackSpeedControls(playbackClock, () => currentTimeS);
-  window.addEventListener("pagehide", () => { setPlaying(false); taskNotice.dispose(); flightHud.dispose(); viewer?.dispose(); }, { once: true });
+  mountPageLifecycle({ pause: () => setPlaying(false), restore: () => renderTime(currentTimeS),
+    dispose: () => { routeInteraction.dispose(); taskNotice.dispose(); flightHud.dispose(); viewer?.dispose(); } });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) setPlaying(false); });
   update();
-  mountFollowControls(viewer, select, () => taskNotice.reset());
+  mountFollowControls(viewer, select, enabled => { taskNotice.reset(); routeInteraction.followChanged(enabled); });
+  mountBenchmark({ isPlaying: () => animationFrame !== null, pause: () => setPlaying(false), resume: beginPlayback });
 }
 
 start().catch((error: unknown) => {

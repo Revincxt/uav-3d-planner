@@ -301,9 +301,17 @@ class ManhattanPredictiveEvidenceTests(unittest.TestCase):
         # later formatting revision. Scope, hash chain and archived source bytes
         # remain checked; semantic source edits must still fail.
         provenance = bundle.get("computationSourceProvenance", bundle["sourceProvenance"])
+        expected_sources = [entry["path"] for entry in source_provenance()["files"]]
+        if "refinement" in bundle:
+            self.assertEqual(
+                bundle["refinement"]["anchorAlignment"],
+                "continuously-certified-slow-connector",
+            )
+            self.assertIs(bundle["refinement"]["reactiveRawTracesRecomputed"], True)
+            expected_sources.append("scripts/refine_predictive_demo.py")
         self.assertEqual(
-            [entry["path"] for entry in provenance["files"]],
-            [entry["path"] for entry in source_provenance()["files"]],
+            sorted(entry["path"] for entry in provenance["files"]),
+            sorted(expected_sources),
         )
         digest = hashlib.sha256(
             json.dumps(provenance["files"], sort_keys=True, separators=(",", ":")).encode()

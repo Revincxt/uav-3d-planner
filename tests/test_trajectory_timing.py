@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from itertools import pairwise
 
 import pytest
 
+import uav3d.trajectory_timing as timing_module
 from uav3d.kinematics import (
     DiscreteExecutionEnvelope,
     qualify_timed_path_execution,
@@ -151,6 +153,64 @@ def test_time_parameterization_is_deterministic_and_never_shortens_a_segment() -
         candidate + 1e-12 >= source
         for source, candidate in zip(original_durations, candidate_durations, strict=True)
     )
+
+
+def test_converged_solver_retries_decimal_guard_without_relaxing_limits_or_waits(
+    monkeypatch,
+) -> None:
+    path = TimedPath(
+        (
+            TimedWaypoint(0, (0, 0, 20), "start"),
+            TimedWaypoint(1, (0, 0, 20), "wait"),
+            TimedWaypoint(3, (1, 0, 20), "move"),
+            TimedWaypoint(5, (2, 0, 20), "move"),
+        )
+    )
+    original = timing_module._qualified_after_decimal_serialization
+
+    def guard(candidate, envelope, decimal):
+        return candidate.duration_s > 5.001 and original(candidate, envelope, decimal)
+
+    monkeypatch.setattr(timing_module, "_qualified_after_decimal_serialization", guard)
+    result = retime_timed_path(path, serialization_decimal_places=11)
+    assert result.status == "qualified" and result.timed_path is not None
+    assert result.timed_path.positions == path.positions
+    assert result.timed_path.wait_time_s == 1
+    assert result.timed_path.duration_s == pytest.approx(5.004)
+    assert qualify_timed_path_execution(result.timed_path).qualified
+    assert original(result.timed_path, DiscreteExecutionEnvelope(), 11)
+
+
+def test_unrecoverable_decimal_guard_still_fails_closed(monkeypatch) -> None:
+    monkeypatch.setattr(timing_module, "_qualified_after_decimal_serialization", lambda *_: False)
+    result = retime_timed_path(_path(((0, 0, 20), (1, 0, 20)), 2), serialization_decimal_places=11)
+    assert result.status == "time-parameterization-did-not-converge"
+    assert result.timed_path is None
+    assert result.iterations < 128
+
+
+def test_converged_local_durations_retry_cumulative_clock_roundoff(monkeypatch) -> None:
+    """Checking the rebuilt absolute clock can expose error absent from local durations."""
+    path = _path(((0, 0, 20), (1, 0, 20), (2, 0, 20)), 2)
+    qualify = timing_module.qualify_timed_path_execution
+
+    def absolute_clock_check(candidate, envelope):
+        result = qualify(candidate, envelope)
+        if candidate.duration_s <= 4.001:
+            return replace(
+                result,
+                qualified=False,
+                boundary_aware_max_discrete_acceleration_proxy_mps2=4.000003,
+                violations=("acceleration-proxy-limit-exceeded",),
+            )
+        return result
+
+    monkeypatch.setattr(timing_module, "qualify_timed_path_execution", absolute_clock_check)
+    result = retime_timed_path(path, serialization_decimal_places=11)
+    assert result.status == "qualified" and result.timed_path is not None
+    assert result.timed_path.positions == path.positions
+    assert result.timed_path.duration_s == pytest.approx(4.004)
+    assert qualify(result.timed_path).qualified
 
 
 @pytest.mark.parametrize(

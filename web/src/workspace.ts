@@ -22,6 +22,7 @@ interface WorkspaceOptions {
 export function mountWorkspace({ scenarios, select }: WorkspaceOptions): void {
   if (!scenarios.length) return;
   const focus = (id: string): void => {
+    if (select.value === id) return;
     select.value = id;
     select.dispatchEvent(new Event("change", { bubbles: true }));
   };
@@ -94,6 +95,7 @@ export function mountInspector(): void {
   toggle.title = "Open inspector";
   toggle.setAttribute("aria-controls", panel.id);
   toggle.setAttribute("aria-expanded", "false");
+  panel.inert = true;
   const close = document.createElement("button");
   close.type = "button";
   close.className = "inspector-close";
@@ -101,6 +103,7 @@ export function mountInspector(): void {
   close.setAttribute("aria-label", "Close inspector");
   const dismiss = (): void => {
     panel.classList.remove("inspector-open");
+    panel.inert = true;
     toggle.setAttribute("aria-expanded", "false");
     toggle.title = "Open inspector";
   };
@@ -108,6 +111,7 @@ export function mountInspector(): void {
   panel.append(close);
   toggle.addEventListener("click", () => {
     const open = panel.classList.toggle("inspector-open");
+    panel.inert = !open;
     toggle.setAttribute("aria-expanded", String(open));
     toggle.title = open ? "Close inspector" : "Open inspector";
   });

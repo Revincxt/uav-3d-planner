@@ -1,3 +1,4 @@
+import { uiSymbol, type UISymbol } from "./ui-symbol";
 export type StudyKind = "static" | "dynamic" | "predictive";
 export type SummaryMetric = "routeM" | "planningTimeMs" | "arrivalTimeS" | "waitTimeS" | "work";
 export type ComparisonScale = "linear" | "log1p";
@@ -16,15 +17,15 @@ export interface ComparisonMetric {
   entries: ComparisonDatum[];
 }
 const plannerStyles: Record<string, { color: string; shortLabel: string; code: string }> = {
-  "astar-3d": { color: "#8ebee5", shortLabel: "3D A*", code: "A*" },
-  "repeated-astar-3d": { color: "#8ebee5", shortLabel: "3D A*", code: "A*" },
-  "lazy-theta-star": { color: "#9bd0bf", shortLabel: "Lazy Theta*", code: "Θ*" },
-  "repeated-lazy-theta-star": { color: "#9bd0bf", shortLabel: "Lazy Theta*", code: "Θ*" },
-  "rrt-star": { color: "#d8bd91", shortLabel: "RRT*", code: "RRT*" },
-  "dstar-lite-3d": { color: "#c1b2df", shortLabel: "D* Lite", code: "D*" },
-  "dstar-lite-reset-3d": { color: "#c1b2df", shortLabel: "D* Lite · reset", code: "D*R" },
-  "dstar-lite-reuse-3d": { color: "#9bd0bf", shortLabel: "D* Lite · reuse", code: "D*U" },
-  "space-time-astar-4d": { color: "#d8bd91", shortLabel: "4D A*", code: "4D" },
+  "astar-3d": { color: "#68c8ed", shortLabel: "3D A*", code: "A*" },
+  "repeated-astar-3d": { color: "#68c8ed", shortLabel: "3D A*", code: "A*" },
+  "lazy-theta-star": { color: "#6cdab5", shortLabel: "Lazy Theta*", code: "Θ*" },
+  "repeated-lazy-theta-star": { color: "#6cdab5", shortLabel: "Lazy Theta*", code: "Θ*" },
+  "rrt-star": { color: "#efba78", shortLabel: "RRT*", code: "RRT*" },
+  "dstar-lite-3d": { color: "#b7a1ef", shortLabel: "D* Lite", code: "D*" },
+  "dstar-lite-reset-3d": { color: "#b7a1ef", shortLabel: "D* Lite · reset", code: "D*R" },
+  "dstar-lite-reuse-3d": { color: "#6cdab5", shortLabel: "D* Lite · reuse", code: "D*U" },
+  "space-time-astar-4d": { color: "#efba78", shortLabel: "4D A*", code: "4D" },
 };
 export const plannerStyle = (id: string, label: string) => plannerStyles[id] ?? { color: "#a6bbc9", shortLabel: label, code: label };
 const workUnits: Record<string, string> = {
@@ -87,7 +88,8 @@ export function renderMetricChart(metric: ComparisonMetric): HTMLElement {
   const groups = comparisonGroups(metric), caption = node("figcaption", "comparison-caption");
   const title = node("span", "comparison-title"); title.title = metric.label;
   title.append(node("span", "comparison-full-title", metric.label), node("span", "comparison-short-title", metric.shortLabel));
-  caption.append(title);
+  const icons: Record<SummaryMetric, UISymbol> = { routeM: "route", planningTimeMs: "clock", arrivalTimeS: "clock", waitTimeS: "wait", work: "search" };
+  title.prepend(uiSymbol(icons[metric.key])); caption.append(title);
   caption.append(node("span", "comparison-unit", groups.length === 1 ? `${groups[0]!.unit}${groups[0]!.scale === "log1p" ? " · log" : ""}` : ""));
   figure.append(caption);
   const body = node("div", "comparison-series"); body.dataset.groups = String(groups.length);

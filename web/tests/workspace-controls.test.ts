@@ -105,11 +105,13 @@ describe("Inspector control", () => {
     expect(f.toggle.attributes.get("aria-controls")).toBe("existing-panel");
     f.toggle.events.get("click")!();
     expect(f.panel.classList.contains("inspector-open")).toBe(true);
+    expect((f.panel as typeof f.panel & { inert: boolean }).inert).toBe(false);
     expect(f.toggle.attributes.get("aria-expanded")).toBe("true");
     expect(f.toggle.title).toBe("Close inspector");
     expect(f.toggle.textContent).toBe("Inspector");
     f.toggle.events.get("click")!();
     expect(f.panel.classList.contains("inspector-open")).toBe(false);
+    expect((f.panel as typeof f.panel & { inert: boolean }).inert).toBe(true);
     expect(f.toggle.attributes.get("aria-expanded")).toBe("false");
     expect(f.toggle.title).toBe("Open inspector");
   });

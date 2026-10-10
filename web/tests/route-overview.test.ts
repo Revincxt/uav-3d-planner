@@ -281,6 +281,19 @@ describe("real eight-route records", () => {
   });
 });
 
+describe("exact reactive clock", () => {
+  it("uses native climb-constrained timing instead of redistributing time by distance", () => {
+    const executionTimedPath: NonNullable<DynamicRun["executionTimedPath"]> = [
+      { timeS: 0, position: [0, 0, 0], action: "start" },
+      { timeS: 10, position: [0, 0, 30], action: "move" },
+      { timeS: 12, position: [30, 0, 30], action: "move" },
+    ];
+    expect(reactiveTrace({ frames: [], executionTimedPath })).toBe(executionTimedPath);
+    expect(timedPosition(executionTimedPath, 5)).toEqual([0, 0, 15]);
+    expect(timedPosition(executionTimedPath, 11)).toEqual([15, 0, 30]);
+  });
+});
+
 describe("retained source city", () => {
   it("shares exact city geometry across missions but rebuilds when source or bounds change", () => {
     const host = new THREE.Group(), cache = new RetainedCity();

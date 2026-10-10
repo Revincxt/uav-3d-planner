@@ -1,6 +1,9 @@
 import "./dynamic.css";
 import "./workspace.css";
 import "./simulator-ui.css";
+import { mountBenchmark } from "./benchmark-panel";
+import { mountPageLifecycle } from "./page-lifecycle";
+import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
 import { dynamicAvoidanceEvents, FlightAnnouncements, type AvoidanceEvent } from "./flight-announcements";
 
@@ -19,6 +22,7 @@ import { missionCaption, mountInspector, mountTabs, mountWorkspace } from "./wor
 import { dynamicRoutes, overviewDuration, waypointIndex, type OverviewRoute } from "./route-overview";
 import { playbackAction, showPlaybackButton, showPlaybackState } from "./playback-state";
 import { encounterView, mountEncounterControl, showChallenge } from "./encounter-view";
+import { flightPhase, RouteStatusStrip } from "./trajectory-semantics";
 
 const element = <T extends HTMLElement>(selector: string): T => {
   const value = document.querySelector<T>(selector);
@@ -160,6 +164,8 @@ async function start(): Promise<void> {
   const duration = (): number => overviewDuration(routes);
   const taskNotice = new TaskArrivalNotice(viewerHost);
   const flightHud = new FlightHud(element(".stage-viewport"), element(".playback-bar"));
+  const routeInteraction = new RouteInteraction(viewerHost, viewer, scenarioSelect, () => routes);
+  const routeStates = new RouteStatusStrip();
   const flightAnnouncements = new FlightAnnouncements(element(".stage-viewport"));
   const avoidanceCache = new WeakMap<DynamicRun, AvoidanceEvent[]>();
   let avoidanceEvents: AvoidanceEvent[] = [];
@@ -179,7 +185,9 @@ async function start(): Promise<void> {
     if (notify) flightAnnouncements.advance(route.id, routes.indexOf(route), avoidanceEvents, previousTimeS, currentTimeS);
     else flightAnnouncements.reset();
     flightHud.update(route, currentTimeS, routes.indexOf(route), !notify);
-    showPlaybackState(element("#playback-state"), "reactive", playbackAction(route.timedPath!, currentTimeS, route.mission, frame));
+    routeInteraction.update(currentTimeS, !notify);
+    routeStates.update(routes, currentTimeS, !notify);
+    showPlaybackState(element("#playback-state"), "reactive", playbackAction(route.timedPath!, currentTimeS, route.mission, frame), false, flightPhase(route, currentTimeS));
     showChallenge(document.querySelector("#scene-challenge"), route.mission);
     if (frame !== lastMetricsFrame) {
       renderFrameMetrics(frame, frameIndex, currentRun.frames.length);
@@ -219,6 +227,7 @@ async function start(): Promise<void> {
   };
 
   const updateRun = (plannerId: string, shouldAnnounce = true): void => {
+    const resume = animationFrame !== null;
     setPlaying(false);
     const run = currentScenario.runs.find((candidate) => candidate.plannerId === plannerId);
     if (!run) throw new Error(`Missing ${plannerId} run in ${currentScenario.id}`);
@@ -233,6 +242,7 @@ async function start(): Promise<void> {
     highlightPlanner(plannerId);
     const planner = bundle.planners.find((candidate) => candidate.id === plannerId);
     if (shouldAnnounce) announce(`${planner?.label ?? plannerId} trace loaded`);
+    if (resume) beginPlayback();
   };
 
   const updateScenario = (): void => {
@@ -315,22 +325,20 @@ async function start(): Promise<void> {
   });
   mountInspector();
   mountTabs();
-  mountFollowControls(viewer, scenarioSelect, () => { taskNotice.reset(); flightAnnouncements.reset(); });
+  routeStates.update(routes, currentTimeS, true);
+  mountFollowControls(viewer, scenarioSelect, enabled => { taskNotice.reset(); flightAnnouncements.reset(); routeInteraction.followChanged(enabled); });
   element("#load-state").remove();
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) setPlaying(false);
   });
-  window.addEventListener(
-    "pagehide",
-    () => {
-      setPlaying(false);
+  mountBenchmark({ isPlaying: () => animationFrame !== null, pause: () => setPlaying(false), resume: beginPlayback });
+  mountPageLifecycle({ pause: () => setPlaying(false), restore: () => renderTime(currentTimeS), dispose: () => {
+      routeInteraction.dispose();
       taskNotice.dispose();
       flightAnnouncements.dispose();
       flightHud.dispose();
       viewer?.dispose();
-    },
-    { once: true },
-  );
+  } });
 }
 
 start().catch((error: unknown) => {

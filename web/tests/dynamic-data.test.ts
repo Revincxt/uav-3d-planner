@@ -209,6 +209,27 @@ describe("dynamic bundle v1", () => {
     expect(() => validateDynamicBundle(value)).toThrow(/path lengths disagree/);
   });
 
+  it("validates and retains an exact variable-speed execution clock", () => {
+    const value = fixture() as unknown as { scenarios: { runs: Record<string, unknown>[] }[] };
+    const recorded = value.scenarios[0]!.runs[0]!;
+    recorded.parameters = { resolutionM: 4, maxExpansions: 120_000, cruiseSpeedMps: 8, maxClimbRateMps: 3 };
+    recorded.executionTimedPath = [
+      { time: 0, position: start, action: "start" },
+      { time: 3.5, position: midpoint, action: "move" },
+      { time: 8, position: goal, action: "move" },
+    ];
+    const parsed = validateDynamicBundle(value).scenarios[0]!.runs[0]!.executionTimedPath!;
+    expect(parsed.map(p => p.timeS)).toEqual([0, 3.5, 8]);
+    (recorded.executionTimedPath as { time: number }[])[1]!.time = 0.1;
+    expect(() => validateDynamicBundle(value)).toThrow(/motion contract/);
+  });
+
+  it("refuses to fabricate timing when a climb-constrained trace is missing", () => {
+    const value = fixture();
+    value.scenarios[0]!.runs[0]!.parameters.maxClimbRateMps = 3;
+    expect(() => validateDynamicBundle(value)).toThrow(/exact climb-constrained/);
+  });
+
   it("rejects placeholder provenance and duplicate planner runs", () => {
     const placeholder = fixture();
     placeholder.sourceCommit = "worktree-v0.3";

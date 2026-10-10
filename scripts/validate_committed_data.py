@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import math
+from bisect import bisect_right
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,7 @@ from uav3d.manhattan_predictive import (
     build_manhattan_missions,
     study_runtime,
 )
+from uav3d.predictive import TimedPath, TimedWaypoint
 from uav3d.validation import audit_path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -127,7 +129,51 @@ def audit_current(public: Path) -> dict[str, int]:
                 scene.metadata["missionTaskPoints"],
                 times=[f["timeS"] for f in frames],
             )
-            for left, right in pairwise(frames):
+            knots = run.get("executionTimedPath")
+            if knots:
+                trace = TimedPath(
+                    tuple(
+                        TimedWaypoint(p["time"], tuple(p["position"]), p["action"]) for p in knots
+                    )
+                )
+                if not trace.is_safe(episode) or not math.isclose(
+                    trace.arrival_time_s, frames[-1]["timeS"], abs_tol=1e-8
+                ):
+                    raise ValueError(f"Invalid exact reactive execution clock: {run['runId']}")
+                audit_task_visits(
+                    trace.positions,
+                    scene.metadata["missionTaskPoints"],
+                    times=[p.time_s for p in trace.waypoints],
+                )
+                for a, b in pairwise(trace.waypoints):
+                    dt = b.time_s - a.time_s
+                    if math.dist(a.position, b.position) > run["parameters"][
+                        "cruiseSpeedMps"
+                    ] * dt + 1e-6 or (
+                        abs(b.position[2] - a.position[2])
+                        > run["parameters"]["maxClimbRateMps"] * dt + 1e-6
+                    ):
+                        raise ValueError("Reactive execution violates speed or climb rate")
+                clocks = [p.time_s for p in trace.waypoints]
+                for frame in frames:
+                    i = max(0, bisect_right(clocks, frame["timeS"]) - 1)
+                    a = trace.waypoints[i]
+                    b = trace.waypoints[min(i + 1, len(trace.waypoints) - 1)]
+                    fraction = (frame["timeS"] - a.time_s) / (b.time_s - a.time_s) if b != a else 0
+                    position = tuple(
+                        x + (y - x) * fraction for x, y in zip(a.position, b.position, strict=True)
+                    )
+                    if math.dist(position, frame["vehicle"]) > 1e-6:
+                        raise ValueError("Reactive execution clock disagrees with telemetry")
+                if not math.isclose(
+                    sum(math.dist(a.position, b.position) for a, b in pairwise(trace.waypoints)),
+                    run["metrics"]["executedPathLengthM"],
+                    abs_tol=0.001,
+                ):
+                    raise ValueError("Reactive execution clock changed geometry or metrics")
+            elif "maxClimbRateMps" in run["parameters"]:
+                raise ValueError("Climb-constrained reactive flight lacks its exact clock")
+            for left, right in pairwise(() if knots else frames):
                 # Telemetry frames may bracket multiple corners. Audit the actual execution
                 # prefix, not the straight chord between the two frame positions.
                 points = right["executedPath"][len(left["executedPath"]) - 1 :]

@@ -750,6 +750,7 @@ def smooth_predictive_timed_path(
     preserve_altitude: bool = False,
     curve_method: Literal["fillet", "bspline"] = "fillet",
     schedule_dynamic_waits: bool = False,
+    round_reversals: bool = False,
 ) -> PredictiveSmoothingResult:
     """Round movement blocks and return only an exactly audited dense linear trajectory.
 
@@ -837,7 +838,11 @@ def smooth_predictive_timed_path(
         try:
             if curve_method == "bspline":
                 candidate, rounded_corners, applied_radius = smooth_timed_horizontal_curves(
-                    scenario, geometry_input, candidate_radius, sample_spacing_m
+                    scenario,
+                    geometry_input,
+                    candidate_radius,
+                    sample_spacing_m,
+                    round_reversals=round_reversals,
                 )
             elif preserve_altitude:
                 candidate, rounded_corners, applied_radius = _build_horizontal_candidate(

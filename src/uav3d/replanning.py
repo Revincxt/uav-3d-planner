@@ -9,6 +9,7 @@ from itertools import pairwise
 from uav3d.collision import point_is_free, segment_is_free
 from uav3d.dynamic import DynamicScenario, dynamic_scenario_fingerprint, snapshot_scene
 from uav3d.dynamic_collision import spacetime_segment_is_free
+from uav3d.flight_cost import segment_flight_time, validate_vertical_scale, with_turn_clearance
 from uav3d.geometry import Point3, almost_equal, distance, lerp, polyline_length
 from uav3d.horizontal_curves import smooth_horizontal_curves
 from uav3d.planners import (
@@ -20,6 +21,7 @@ from uav3d.planners import (
     LazyThetaStarConfig,
 )
 from uav3d.planners.base import Planner, PlanningResult
+from uav3d.predictive import TimedPath, TimedWaypoint
 from uav3d.scene import Scene
 from uav3d.smoothing import farthest_visible_shortcut, smooth_path
 
@@ -98,6 +100,7 @@ class DynamicRun:
     parameters: dict[str, float | int]
     frames: tuple[DynamicFrame, ...]
     metrics: DynamicMetrics
+    execution_timed_path: TimedPath | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -124,17 +127,39 @@ def list_replanning_algorithms() -> tuple[str, ...]:
 
 
 def _planner(
-    algorithm: str, resolution: float, max_expansions: int, incremental: DStarLite3D | None
+    algorithm: str,
+    resolution: float,
+    max_expansions: int,
+    incremental: DStarLite3D | None,
+    vertical_cost_scale: float = 1.0,
+    altitude_levels: tuple[float, ...] = (),
 ) -> Planner:
     if algorithm == "repeated-astar-3d":
-        return AStar3D(AStarConfig(resolution=resolution, max_expansions=max_expansions))
+        return AStar3D(
+            AStarConfig(
+                resolution=resolution,
+                max_expansions=max_expansions,
+                vertical_cost_scale=vertical_cost_scale,
+                altitude_levels=altitude_levels,
+            )
+        )
     if algorithm == "repeated-lazy-theta-star":
         return LazyThetaStar(
-            LazyThetaStarConfig(resolution=resolution, max_expansions=max_expansions)
+            LazyThetaStarConfig(
+                resolution=resolution,
+                max_expansions=max_expansions,
+                vertical_cost_scale=vertical_cost_scale,
+                altitude_levels=altitude_levels,
+            )
         )
     if algorithm == "dstar-lite-3d":
         return incremental or DStarLite3D(
-            DStarLiteConfig(resolution=resolution, max_queue_pops=max_expansions)
+            DStarLiteConfig(
+                resolution=resolution,
+                max_queue_pops=max_expansions,
+                vertical_cost_scale=vertical_cost_scale,
+                altitude_levels=altitude_levels,
+            )
         )
     choices = ", ".join(REPLANNING_ALGORITHMS)
     raise ValueError(f"unknown replanning algorithm {algorithm!r}; choose one of: {choices}")
@@ -153,6 +178,7 @@ def _candidate_traversal(
     start_time: float,
     duration: float,
     cruise_speed: float,
+    max_climb_rate: float | None = None,
 ) -> tuple[tuple[_Traversal, ...], tuple[Point3, ...], float]:
     """Advance along a polyline without replacing bends by an unsafe chord."""
 
@@ -168,10 +194,17 @@ def _candidate_traversal(
         if segment_length <= 1e-12:
             current = target
             continue
-        traveled = min(segment_length, remaining_budget)
+        full_duration = segment_flight_time(current, target, cruise_speed, max_climb_rate)
+        traveled = (
+            min(segment_length, remaining_budget)
+            if max_climb_rate is None
+            else segment_length * min(1.0, (duration - elapsed) / full_duration)
+        )
         fraction = traveled / segment_length
         endpoint = target if fraction >= 1.0 - 1e-12 else lerp(current, target, fraction)
-        segment_duration = traveled / cruise_speed
+        segment_duration = (
+            traveled / cruise_speed if max_climb_rate is None else full_duration * fraction
+        )
         traversals.append(
             _Traversal(
                 current,
@@ -185,7 +218,7 @@ def _candidate_traversal(
         if fraction < 1.0 - 1e-12:
             return (tuple(traversals), (endpoint, *path[index + 1 :]), elapsed)
         current = target
-        if remaining_budget <= 1e-12:
+        if remaining_budget <= 1e-12 or elapsed >= duration - 1e-12:
             return (tuple(traversals), (current, *path[index + 2 :]), elapsed)
     return (tuple(traversals), (current,), elapsed)
 
@@ -209,6 +242,7 @@ def _horizontal_escape(
     time_s: float,
     duration: float,
     cruise_speed: float,
+    start_heading: tuple[float, float] | None = None,
 ) -> tuple[Point3, ...]:
     """Locally observed traffic can require movement instead of an unsafe hover.
 
@@ -220,7 +254,7 @@ def _horizontal_escape(
     """
     goal = scenario.static_scene.goal
     heading = math.atan2(goal[1] - position[1], goal[0] - position[0])
-    candidates: list[tuple[float, Point3]] = []
+    candidates: list[tuple[float, tuple[Point3, ...]]] = []
     for scale in (1.0, 0.5):
         span = cruise_speed * duration * scale
         for index in range(32):
@@ -230,26 +264,40 @@ def _horizontal_escape(
                 position[1] + span * math.sin(angle),
                 position[2],
             )
-            if not spacetime_segment_is_free(
-                scenario, position, endpoint, time_s, time_s + duration
-            ):
+            path: tuple[Point3, ...] = (position, endpoint)
+            if start_heading is not None:
+                # Geometry proposal only. The exact, arc-length flight clock
+                # and every executed chord are certified immediately below.
+                path = smooth_horizontal_curves(
+                    path,
+                    (0.0, 1.0),
+                    lambda *_: True,
+                    start_direction=start_heading,
+                    turn_scale_m=60,
+                    sample_spacing_m=1,
+                    round_reversals=True,
+                ).points
+            speed = min(cruise_speed, polyline_length(path) / duration)
+            traversals, _, _ = _candidate_traversal(path, time_s, duration, speed)
+            if not traversals or not _safe_traversals(scenario, traversals):
                 continue
+            reached = traversals[-1].end
             if not spacetime_segment_is_free(
-                scenario, endpoint, endpoint, time_s + duration, time_s + duration * 2
+                scenario, reached, reached, time_s + duration, time_s + duration * 2
             ):
                 continue
             separations = [
-                distance(endpoint, aircraft.position_at(time_s + duration * 2))
+                distance(reached, aircraft.position_at(time_s + duration * 2))
                 - aircraft.radius
                 - scenario.static_scene.required_clearance
                 for aircraft in scenario.moving_spheres
             ]
-            progress = distance(position, goal) - distance(endpoint, goal)
+            progress = distance(position, goal) - distance(reached, goal)
             clearance = min(separations, default=80.0)
-            candidates.append((progress + 2 * min(80, clearance), endpoint))
+            candidates.append((progress + 2 * min(80, clearance), path))
     if not candidates:
         return ()
-    return (position, max(candidates, key=lambda item: item[0])[1])
+    return max(candidates, key=lambda item: item[0])[1]
 
 
 def simulate_replanning(
@@ -273,10 +321,16 @@ def simulate_replanning(
     initial_heading: tuple[float, float] | None = None,
     arrival_heading: tuple[float, float] | None = None,
     allow_horizontal_escape: bool = False,
+    vertical_cost_scale: float = 1.0,
+    altitude_levels: tuple[float, ...] = (),
+    max_climb_rate: float | None = None,
 ) -> DynamicRun:
     """Execute a deterministic online replanning run with an exact dynamic safety gate."""
 
     numeric = (time_step, replan_interval, cruise_speed, max_time, resolution)
+    validate_vertical_scale(vertical_cost_scale)
+    if max_climb_rate is not None and (not math.isfinite(max_climb_rate) or max_climb_rate <= 0):
+        raise ValueError("max_climb_rate must be finite and positive")
     if not all(math.isfinite(value) and value > 0 for value in numeric):
         raise ValueError("simulation times, speed, and resolution must be finite and positive")
     if max_expansions <= 0:
@@ -296,7 +350,14 @@ def simulate_replanning(
         raise ValueError(f"unknown replanning algorithm {algorithm!r}; choose one of: {choices}")
 
     incremental = (
-        DStarLite3D(DStarLiteConfig(resolution=resolution, max_queue_pops=max_expansions))
+        DStarLite3D(
+            DStarLiteConfig(
+                resolution=resolution,
+                max_queue_pops=max_expansions,
+                vertical_cost_scale=vertical_cost_scale,
+                altitude_levels=altitude_levels,
+            )
+        )
         if algorithm == "dstar-lite-3d" and reuse_search_state
         else None
     )
@@ -328,6 +389,11 @@ def simulate_replanning(
         )
     if allow_horizontal_escape:
         parameters["horizontal_escape"] = 1
+    if vertical_cost_scale != 1:
+        parameters["vertical_cost_scale"] = vertical_cost_scale
+    if max_climb_rate is not None:
+        parameters["max_climb_rate"] = max_climb_rate
+    exact_trace = [TimedWaypoint(start_time, scenario.static_scene.start, "start")]
     frames: list[DynamicFrame] = []
     executed: list[Point3] = [scenario.static_scene.start]
     position = scenario.static_scene.start
@@ -367,6 +433,7 @@ def simulate_replanning(
                 sample_spacing_m=curve_sample_spacing_m,
                 start_direction=heading,
                 end_direction=arrival_heading,
+                round_reversals=vertical_cost_scale > 1,
             ).points
         return (
             tuple(farthest_visible_shortcut(snapshot, path, preserve_altitude=preserve_altitude))
@@ -390,8 +457,17 @@ def simulate_replanning(
         missing_plan = len(current_path) < 2
         if scheduled or missing_plan:
             replan_reason = "initial" if replans == 0 else ("scheduled" if scheduled else "no-plan")
-            planner = _planner(algorithm, resolution, max_expansions, incremental)
+            planner = _planner(
+                algorithm,
+                resolution,
+                max_expansions,
+                incremental,
+                vertical_cost_scale,
+                altitude_levels,
+            )
             snapshot = guard or snapshot_scene(scenario, time_s, start=position)
+            if vertical_cost_scale > 1:
+                snapshot = with_turn_clearance(snapshot)
             result = planner.plan(snapshot)
             replans += 1
             replanned = True
@@ -426,7 +502,7 @@ def simulate_replanning(
 
         step_duration = min(time_step, max_time - time_s)
         traversals, remaining_path, movement_duration = _candidate_traversal(
-            current_path, time_s, step_duration, cruise_speed
+            current_path, time_s, step_duration, cruise_speed, max_climb_rate
         )
         safe = (
             bool(traversals)
@@ -439,8 +515,17 @@ def simulate_replanning(
         if traversals and not safe:
             safety_activations += 1
             # Replan once; the exact dynamic gate still owns the final decision.
-            planner = _planner(algorithm, resolution, max_expansions, incremental)
+            planner = _planner(
+                algorithm,
+                resolution,
+                max_expansions,
+                incremental,
+                vertical_cost_scale,
+                altitude_levels,
+            )
             snapshot = guard or snapshot_scene(scenario, time_s, start=position)
+            if vertical_cost_scale > 1:
+                snapshot = with_turn_clearance(snapshot)
             result = planner.plan(snapshot)
             replans += 1
             replanned = True
@@ -456,7 +541,7 @@ def simulate_replanning(
                 path = prepare_path(snapshot, result.path)
                 current_path = _trim_path(path, position)
                 traversals, remaining_path, movement_duration = _candidate_traversal(
-                    current_path, time_s, step_duration, cruise_speed
+                    current_path, time_s, step_duration, cruise_speed, max_climb_rate
                 )
                 safe = (
                     bool(traversals)
@@ -488,11 +573,28 @@ def simulate_replanning(
                 )
             )
         ):
-            escape = _horizontal_escape(scenario, position, time_s, step_duration, cruise_speed)
+            heading = initial_heading
+            if vertical_cost_scale > 1:
+                for a, b in reversed(list(pairwise(executed))):
+                    if math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-8:
+                        heading = (b[0] - a[0], b[1] - a[1])
+                        break
+            escape = _horizontal_escape(
+                scenario,
+                position,
+                time_s,
+                step_duration,
+                cruise_speed,
+                start_heading=heading if vertical_cost_scale > 1 else None,
+            )
             if escape:
                 current_path = escape
                 traversals, remaining_path, movement_duration = _candidate_traversal(
-                    current_path, time_s, step_duration, cruise_speed
+                    current_path,
+                    time_s,
+                    step_duration,
+                    min(cruise_speed, polyline_length(current_path) / step_duration),
+                    max_climb_rate,
                 )
                 safe = bool(traversals) and _safe_traversals(scenario, traversals)
                 next_replan = time_s + step_duration
@@ -525,6 +627,8 @@ def simulate_replanning(
                     collision_count += 1
                 position = traversal.end
                 executed.append(position)
+                if max_climb_rate is not None:
+                    exact_trace.append(TimedWaypoint(traversal.end_time, position, "move"))
             current_path = remaining_path
             if almost_equal(position, scenario.static_scene.goal, 1e-8):
                 time_s += movement_duration
@@ -560,6 +664,8 @@ def simulate_replanning(
             break
         holds += 1
         time_s += step_duration
+        if max_climb_rate is not None:
+            exact_trace.append(TimedWaypoint(time_s, position, "wait"))
         if time_s >= max_time - 1e-12:
             frames.append(DynamicFrame(time_s, position, "timeout", current_path))
             break
@@ -593,6 +699,7 @@ def simulate_replanning(
         parameters,
         tuple(frames),
         metrics,
+        TimedPath(tuple(exact_trace)) if max_climb_rate is not None else None,
     )
 
 

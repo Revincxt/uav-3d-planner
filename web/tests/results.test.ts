@@ -10,7 +10,8 @@ describe("observed Manhattan mission results", () => {
     const { readFileSync } = await import(filesystemModule);
     const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
     expect(read("results.html")).not.toMatch(/Mission studies|case-count|sidebar-heading/);
-    expect(read("results.html")).toContain('id="comparison-charts"');
+    expect(read("src/benchmark-panel.ts")).toContain('charts.id = "comparison-charts"');
+    expect(read("results.html")).toContain('id="benchmark-map"');
     for (const path of ["src/results.ts", "src/results.css", "src/simulator-ui.css"]) {
       expect(read(path)).not.toMatch(/mission-outcomes|mission-outcome|outcome-values|outcome-name|median-heading|summary-completion/);
     }
@@ -32,7 +33,7 @@ describe("observed Manhattan mission results", () => {
     const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
     expect(read("results.html")).not.toMatch(/case-sidebar|case-library|scenario-select|analysis-title/);
     expect(read("src/results.ts")).not.toMatch(/mountWorkspace|select\.value|select\.addEventListener/);
-    expect(read("src/results.ts")).toContain("analyses.map(renderStudy)");
+    expect(read("src/benchmark-panel.ts")).toContain("analyses.map(renderStudy)");
     expect(read("src/results.css")).toContain("grid-template-rows: repeat(3, minmax(0, 1fr))");
   });
   it("keeps zero waits and excludes missing values without inventing zero observations", () => {

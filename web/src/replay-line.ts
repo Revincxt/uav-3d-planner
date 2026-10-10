@@ -6,6 +6,9 @@ import type { LineMaterial } from "three/addons/lines/LineMaterial.js";
 export function revealReplayWindow(geometry: LineGeometry, times: readonly number[], material: LineMaterial): { start: { value: number }; end: { value: number } } {
   geometry.setAttribute("instanceTimeStart", new THREE.InstancedBufferAttribute(new Float32Array(times.slice(0, -1)), 1));
   geometry.setAttribute("instanceTimeEnd", new THREE.InstancedBufferAttribute(new Float32Array(times.slice(1)), 1));
+  // A reactive plan replaces its positions/times, not the compiled shader program.
+  if (material.uniforms.windowStart && material.uniforms.windowEnd)
+    return { start: material.uniforms.windowStart, end: material.uniforms.windowEnd };
   const start = { value: 0 }, end = { value: 0 };
   material.uniforms.windowStart = start; material.uniforms.windowEnd = end;
   material.vertexShader = `uniform float windowStart;

@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from bisect import bisect_left, bisect_right
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import pairwise
 
 from uav3d.geometry import Point3, distance, lerp
@@ -33,6 +33,12 @@ class _Span:
     end: float
     controls: tuple[Point3, ...]
     steps: int
+    samples: tuple[float, ...] = ()
+
+    def sample_parameters(self) -> tuple[float, ...]:
+        return self.samples or tuple(
+            self.start + (self.end - self.start) * i / self.steps for i in range(self.steps + 1)
+        )
 
     def xy(self, parameter: float) -> tuple[float, float]:
         u = max(0.0, min(1.0, (parameter - self.start) / (self.end - self.start)))
@@ -98,6 +104,27 @@ def _parameters(original: Sequence[float], extra: Sequence[float]) -> list[float
     return sorted(values)
 
 
+def _heading_samples(span: _Span) -> tuple[float, ...]:
+    """Refine only undersampled bends instead of multiplying every straight span."""
+    samples = list(span.sample_parameters())
+    for _ in range(12):
+        points = [span.xy(u) for u in samples]
+        split: set[int] = set()
+        for i in range(1, len(points) - 1):
+            a, b, c = points[i - 1 : i + 2]
+            incoming, outgoing = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+            lengths = math.hypot(*incoming) * math.hypot(*outgoing)
+            if lengths > 1e-18 and (
+                incoming[0] * outgoing[0] + incoming[1] * outgoing[1]
+                < lengths * math.cos(math.radians(3))
+            ):
+                split.update((i - 1, i))
+        if not split or len(samples) > 4096:
+            break
+        samples = sorted(set(samples) | {(samples[i] + samples[i + 1]) / 2 for i in split})
+    return tuple(samples)
+
+
 def smooth_horizontal_curves(
     points: Sequence[Point3],
     parameters: Sequence[float],
@@ -108,6 +135,7 @@ def smooth_horizontal_curves(
     sample_spacing_m: float = 2.0,
     start_direction: tuple[float, float] | None = None,
     end_direction: tuple[float, float] | None = None,
+    round_reversals: bool = False,
 ) -> HorizontalCurveResult:
     """Shrink only a blocked corner; keep safe curves elsewhere and every height knot.
 
@@ -162,14 +190,23 @@ def smooth_horizontal_curves(
     scales: list[float] = []
     corners = 0
 
+    def make_span(
+        a: Point3,
+        b: Point3,
+        start: float,
+        end: float,
+        initial_velocity: tuple[float, float],
+        final_velocity: tuple[float, float],
+        spacing: float,
+        angle: float,
+    ) -> _Span:
+        span = _span(a, b, start, end, initial_velocity, final_velocity, spacing, angle)
+        return replace(span, samples=_heading_samples(span)) if round_reversals else span
+
     def accept(candidate: list[_Span]) -> bool:
         samples = _parameters(
             parameters,
-            [
-                span.start + (span.end - span.start) * i / span.steps
-                for span in candidate
-                for i in range(span.steps + 1)
-            ],
+            [u for span in candidate for u in span.sample_parameters()],
         )
         samples = [u for u in samples if candidate[0].start <= u <= candidate[-1].end]
         lifted = []
@@ -191,29 +228,78 @@ def smooth_horizontal_curves(
             continue
         cosine = (incoming[0] * outgoing[0] + incoming[1] * outgoing[1]) / (length_a * length_b)
         angle = math.acos(max(-1.0, min(1.0, cosine)))
-        if angle < math.radians(0.2) or angle > math.radians(175):
+        if angle < math.radians(0.001 if round_reversals else 0.2) or (
+            angle > math.radians(175) and not round_reversals
+        ):
             continue
         tangent = math.tan(angle / 2)
         trim = min(turn_scale_m * tangent, length_a * 0.45, length_b * 0.45)
         v0 = cast_xy(tuple(value / (parameters[middle] - parameters[left]) for value in incoming))
         v1 = cast_xy(tuple(value / (parameters[right] - parameters[middle]) for value in outgoing))
         vm = ((v0[0] + v1[0]) / 2, (v0[1] + v1[1]) / 2)
-        for factor in (1.0, 0.75, 0.5, 0.25, 0.125, 0.0625, 0.03125):
+        factors: tuple[float, ...] = (1.0, 0.75, 0.5, 0.25, 0.125, 0.0625, 0.03125)
+        if round_reversals:
+            factors += (0.015625, 0.0078125, 0.00390625, 0.001953125)
+        for factor in factors:
             extent = trim * factor
-            if extent < 0.1:
+            if extent < (0.0001 if round_reversals else 0.1):
                 break
             entry = parameters[middle] - (parameters[middle] - parameters[left]) * extent / length_a
             exit_ = (
                 parameters[middle] + (parameters[right] - parameters[middle]) * extent / length_b
             )
             e, x = reference(entry), reference(exit_)
-            if parameters[middle] in protected:
+            if round_reversals and angle > math.radians(175):
+                # A collinear 180-degree spline has a zero-velocity cusp. Use
+                # two spans with a nonzero lateral tangent, testing both sides.
+                speed = (math.hypot(*v0) + math.hypot(*v1)) / 2
+                accepted = False
+                for side in (1, -1):
+                    lateral = (-incoming[1] / length_a * side, incoming[0] / length_a * side)
+                    pivot = (
+                        c
+                        if parameters[middle] in protected
+                        else (
+                            c[0] + lateral[0] * extent * 0.5,
+                            c[1] + lateral[1] * extent * 0.5,
+                            c[2],
+                        )
+                    )
+                    tangent_velocity = (lateral[0] * speed, lateral[1] * speed)
+                    candidate = [
+                        make_span(
+                            e,
+                            pivot,
+                            entry,
+                            parameters[middle],
+                            v0,
+                            tangent_velocity,
+                            sample_spacing_m,
+                            angle,
+                        ),
+                        make_span(
+                            pivot,
+                            x,
+                            parameters[middle],
+                            exit_,
+                            tangent_velocity,
+                            v1,
+                            sample_spacing_m,
+                            angle,
+                        ),
+                    ]
+                    if accept(candidate):
+                        accepted = True
+                        break
+                if not accepted:
+                    continue
+            elif parameters[middle] in protected:
                 candidate = [
-                    _span(e, c, entry, parameters[middle], v0, vm, sample_spacing_m, angle),
-                    _span(c, x, parameters[middle], exit_, vm, v1, sample_spacing_m, angle),
+                    make_span(e, c, entry, parameters[middle], v0, vm, sample_spacing_m, angle),
+                    make_span(c, x, parameters[middle], exit_, vm, v1, sample_spacing_m, angle),
                 ]
             else:
-                candidate = [_span(e, x, entry, exit_, v0, v1, sample_spacing_m, angle)]
+                candidate = [make_span(e, x, entry, exit_, v0, v1, sample_spacing_m, angle)]
             if accept(candidate):
                 patches.extend(candidate)
                 scales.append(extent / tangent)
@@ -238,9 +324,14 @@ def smooth_horizontal_curves(
                 min(1.0, sum(a * b for a, b in zip(velocity, desired, strict=True)) / speed**2),
             )
         )
-        if angle < math.radians(0.2) or angle > math.radians(175):
+        if angle < math.radians(0.001 if round_reversals else 0.2) or (
+            angle > math.radians(175) and not round_reversals
+        ):
             continue
-        for factor in (1.0, 0.5, 0.25, 0.125, 0.0625):
+        factors = (1.0, 0.5, 0.25, 0.125, 0.0625)
+        if round_reversals:
+            factors += (0.03125, 0.015625, 0.0078125)
+        for factor in factors:
             fraction = min(turn_scale_m / length, 0.45) * factor
             u = (
                 parameters[left]
@@ -253,7 +344,7 @@ def smooth_horizontal_curves(
                 else parameters[right]
             )
             candidate = [
-                _span(
+                make_span(
                     reference(u),
                     reference(v),
                     u,
@@ -264,6 +355,45 @@ def smooth_horizontal_curves(
                     angle,
                 )
             ]
+            if round_reversals and angle > math.radians(175):
+                accepted = False
+                midpoint_parameter = (u + v) / 2
+                midpoint = reference(midpoint_parameter)
+                for side in (1, -1):
+                    lateral = (-vector[1] / length * side, vector[0] / length * side)
+                    pivot = (
+                        midpoint[0] + lateral[0] * length * fraction * 0.5,
+                        midpoint[1] + lateral[1] * length * fraction * 0.5,
+                        midpoint[2],
+                    )
+                    tangent_velocity = (lateral[0] * speed, lateral[1] * speed)
+                    candidate = [
+                        make_span(
+                            reference(u),
+                            pivot,
+                            u,
+                            midpoint_parameter,
+                            desired if beginning else velocity,
+                            tangent_velocity,
+                            sample_spacing_m,
+                            angle,
+                        ),
+                        make_span(
+                            pivot,
+                            reference(v),
+                            midpoint_parameter,
+                            v,
+                            tangent_velocity,
+                            velocity if beginning else desired,
+                            sample_spacing_m,
+                            angle,
+                        ),
+                    ]
+                    if accept(candidate):
+                        accepted = True
+                        break
+                if not accepted:
+                    continue
             if accept(candidate):
                 patches.extend(candidate)
                 break
@@ -272,11 +402,7 @@ def smooth_horizontal_curves(
     starts = [span.start for span in patches]
     output_parameters = _parameters(
         parameters,
-        [
-            span.start + (span.end - span.start) * i / span.steps
-            for span in patches
-            for i in range(span.steps + 1)
-        ],
+        [u for span in patches for u in span.sample_parameters()],
     )
     output = []
     for u in output_parameters:

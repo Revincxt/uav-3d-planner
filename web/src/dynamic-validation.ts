@@ -189,6 +189,11 @@ function protocol(value: unknown): DynamicProtocol {
       fail("protocol.horizontalEscape must declare the Manhattan level avoidance controller");
     parsed.horizontalEscape = 1;
   }
+  if (item.verticalCostScale !== undefined) {
+    parsed.verticalCostScale = positive(item.verticalCostScale, "protocol.verticalCostScale");
+    if (parsed.verticalCostScale < 1) fail("vertical cost scale must be at least one");
+    parsed.maxClimbRateMps = positive(item.maxClimbRateMps, "protocol.maxClimbRateMps");
+  }
   if (MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(parsed.id)) {
     if (item.pathShortcut !== 1) fail("protocol.pathShortcut must be 1 for Manhattan v2/v3");
     parsed.pathShortcut = 1;
@@ -362,6 +367,7 @@ function frame(
     "bounds" | "start" | "goal" | "temporaryNoFlyZones" | "movingSpheres" | "mission"
   >,
   escapeSpanM = 0,
+  curvedEscape = false,
 ): DynamicFrame {
   const item = record(value, label);
   const timeS = nonNegative(item.timeS, `${label}.timeS`);
@@ -375,9 +381,10 @@ function frame(
   if (!samePoint(executedPath.at(-1)!, vehicle)) {
     fail(`${label}.executedPath must end at the vehicle position`);
   }
-  const localEscape = escapeSpanM > 0 && plannedPath.length === 2 && item.replanReason === "safety-gate" &&
-    Math.abs(plannedPath[0]![2] - plannedPath[1]![2]) <= 1e-5 &&
-    Math.hypot(...plannedPath[1]!.map((v, i) => v - plannedPath[0]![i]!)) <= escapeSpanM + 1e-5;
+  const localEscape = escapeSpanM > 0 && plannedPath.length >= 2 && item.replanReason === "safety-gate" &&
+    plannedPath.every(p => Math.abs(p[2] - plannedPath[0]![2]) <= 1e-5) &&
+    (curvedEscape ? polylineLength(plannedPath) <= escapeSpanM * 2 + 1e-5 :
+      plannedPath.length === 2 && polylineLength(plannedPath) <= escapeSpanM + 1e-5);
   if (
     plannedPath.length > 0 &&
     (!samePoint(plannedPath[0]!, vehicle) || (!localEscape && ![scenario.goal, ...(scenario.mission?.taskPoints?.map(task => task.position) ?? [])].some(target => samePoint(plannedPath.at(-1)!, target))))
@@ -527,7 +534,8 @@ function run(value: unknown, label: string, scenario: DynamicScenario, escapeSpa
 
   const parsedFrames = array(item.frames, `${label}.frames`).map((entry, index) =>
     frame(entry, `${label}.frames[${index}]`, scenario,
-      parameters.horizontalEscape === 1 ? escapeSpanM : 0),
+      parameters.horizontalEscape === 1 ? escapeSpanM : 0,
+      parameters.verticalCostScale !== undefined && Array.isArray(item.executionTimedPath)),
   );
   if (parsedFrames.length === 0 || parsedFrames[0]!.timeS !== 0) {
     fail(`${label}.frames must be non-empty and start at time 0`);
@@ -608,6 +616,43 @@ function run(value: unknown, label: string, scenario: DynamicScenario, escapeSpa
   }
 
   if (item.status === "success") auditMissionTaskVisits(parsedFrames.map(entry => entry.vehicle), scenario.mission, parsedFrames.map(entry => entry.timeS));
+  let executionTimedPath: DynamicRun["executionTimedPath"];
+  if (item.executionTimedPath !== undefined && item.executionTimedPath !== null) {
+    executionTimedPath = array(item.executionTimedPath, `${label}.executionTimedPath`).map((entry, i) => {
+      const knot = record(entry, `${label}.executionTimedPath[${i}]`);
+      if (!["start", "move", "wait"].includes(String(knot.action))) fail("Unsupported execution action");
+      return { timeS: finite(knot.time, "execution time"), position: vec3(knot.position, "execution position"),
+        action: knot.action as "start" | "move" | "wait" };
+    });
+    const knots = executionTimedPath;
+    if (!knots.length || knots[0]!.timeS !== 0 || knots[0]!.action !== "start" ||
+        !samePoint(knots[0]!.position, scenario.start) ||
+        !samePoint(knots.at(-1)!.position, lastFrame.vehicle) ||
+        !sameNumber(knots.at(-1)!.timeS, lastFrame.timeS) ||
+        !sameNumber(polylineLength(knots.map(k => k.position)), executedLength)) {
+      fail(`${label}.executionTimedPath disagrees with execution frames`);
+    }
+    for (let i = 1; i < knots.length; i++) {
+      const a = knots[i - 1]!, b = knots[i]!, dt = b.timeS - a.timeS;
+      const distance = Math.hypot(...b.position.map((v, axis) => v - a.position[axis]!));
+      if (dt <= 0 || b.action === "start" || (b.action === "wait") !== (distance <= 1e-9) ||
+          distance > (parameters.cruiseSpeedMps ?? Infinity) * dt + 1e-6 ||
+          Math.abs(b.position[2] - a.position[2]) > (parameters.maxClimbRateMps ?? Infinity) * dt + 1e-6) {
+        fail(`${label}.executionTimedPath violates its motion contract`);
+      }
+    }
+    let cursor = 0;
+    for (const frame of parsedFrames) {
+      while (cursor + 1 < knots.length && knots[cursor + 1]!.timeS <= frame.timeS) cursor++;
+      const a = knots[cursor]!, b = knots[cursor + 1];
+      const fraction = b ? (frame.timeS - a.timeS) / (b.timeS - a.timeS) : 0;
+      const position = a.position.map((v, axis) => v + ((b?.position[axis] ?? v) - v) * fraction) as Vec3;
+      if (!samePoint(position, frame.vehicle)) fail(`${label}.execution clock disagrees with telemetry`);
+    }
+    auditMissionTaskVisits(knots.map(k => k.position), scenario.mission, knots.map(k => k.timeS));
+  } else if (parameters.maxClimbRateMps !== undefined) {
+    fail(`${label} requires the exact climb-constrained execution clock`);
+  }
   return {
     runId: runId as `sha256:${string}`,
     plannerId,
@@ -616,6 +661,7 @@ function run(value: unknown, label: string, scenario: DynamicScenario, escapeSpa
     parameters,
     metrics: parsedMetrics,
     frames: parsedFrames,
+    ...(executionTimedPath ? { executionTimedPath } : {}),
   };
 }
 
@@ -809,6 +855,11 @@ function parseDynamicBundle(value: unknown): DynamicBundleV1 {
     fail("parameters.horizontalEscape must match the declared avoidance protocol");
   if (parsedProtocol.horizontalEscape !== 1 && scenarios.some(s => s.runs.some(r => r.parameters.horizontalEscape !== undefined)))
     fail("parameters.horizontalEscape requires an explicit protocol declaration");
+  if (parsedProtocol.verticalCostScale !== undefined && scenarios.some(s => s.runs.some(r =>
+      r.parameters.verticalCostScale !== parsedProtocol.verticalCostScale ||
+      r.parameters.maxClimbRateMps !== parsedProtocol.maxClimbRateMps || !r.executionTimedPath))) {
+    fail("flight-aware parameters and exact execution clocks must match the protocol");
+  }
   const downloadsItem = record(item.downloads, "downloads");
   if (
     Object.keys(downloadsItem).length !== 2 ||

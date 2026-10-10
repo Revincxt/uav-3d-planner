@@ -9,7 +9,8 @@ import time
 from dataclasses import dataclass
 
 from uav3d.collision import point_is_free, segment_is_free
-from uav3d.geometry import distance
+from uav3d.flight_cost import flight_distance, validate_vertical_scale
+from uav3d.geometry import Point3
 from uav3d.planners.base import BudgetUsage, PlanningBudget, PlanningResult, Scalar
 from uav3d.planners.grid import GridIndex, VoxelGrid, attach_exact_endpoints
 from uav3d.scene import Scene
@@ -20,8 +21,11 @@ class AStarConfig:
     resolution: float = 4.0
     max_expansions: int = 120_000
     max_wall_time_ms: float | None = None
+    vertical_cost_scale: float = 1.0
+    altitude_levels: tuple[float, ...] = ()
 
     def __post_init__(self) -> None:
+        validate_vertical_scale(self.vertical_cost_scale)
         if self.resolution <= 0:
             raise ValueError("resolution must be positive")
         if self.max_expansions <= 0:
@@ -45,6 +49,12 @@ class AStar3D:
             "max_wall_time_ms": self.config.max_wall_time_ms,
             "connectivity": 26,
         }
+        if self.config.vertical_cost_scale != 1:
+            parameters["vertical_cost_scale"] = self.config.vertical_cost_scale
+            parameters["objective"] = "cruise-equivalent-distance"
+        if self.config.altitude_levels:
+            parameters["altitude_layer_policy"] = "required-anchor-heights-plus-escape-layers"
+            parameters["altitude_layers"] = repr(self.config.altitude_levels)
         budget = PlanningBudget(
             "expanded-nodes", self.config.max_expansions, self.config.max_wall_time_ms
         )
@@ -72,7 +82,7 @@ class AStar3D:
                 budget_usage=BudgetUsage(0, elapsed, "goal-reached"),
             )
 
-        grid = VoxelGrid(scene, self.config.resolution)
+        grid = VoxelGrid(scene, self.config.resolution, self.config.altitude_levels)
         starts = grid.anchor_indices(scene.start)
         goals = set(grid.anchor_indices(scene.goal))
         if self._wall_time_exhausted(started):
@@ -85,9 +95,9 @@ class AStar3D:
         g_score: dict[GridIndex, float] = {}
         parents: dict[GridIndex, GridIndex] = {}
         for start in starts:
-            start_cost = distance(scene.start, grid.point(start))
+            start_cost = self._cost(scene.start, grid.point(start))
             g_score[start] = start_cost
-            start_h = distance(grid.point(start), scene.goal)
+            start_h = self._cost(grid.point(start), scene.goal)
             heapq.heappush(queue, (start_cost + start_h, start_h, next(counter), start))
         closed: set[GridIndex] = set()
         generated = len(starts)
@@ -161,12 +171,12 @@ class AStar3D:
             for neighbor in grid.neighbors(current):
                 if neighbor in closed:
                     continue
-                candidate = g_score[current] + distance(current_point, grid.point(neighbor))
+                candidate = g_score[current] + self._cost(current_point, grid.point(neighbor))
                 if candidate + 1e-12 >= g_score.get(neighbor, math.inf):
                     continue
                 parents[neighbor] = current
                 g_score[neighbor] = candidate
-                heuristic = distance(grid.point(neighbor), scene.goal)
+                heuristic = self._cost(grid.point(neighbor), scene.goal)
                 heapq.heappush(
                     queue,
                     (candidate + heuristic, heuristic, next(counter), neighbor),
@@ -187,6 +197,9 @@ class AStar3D:
             search_started,
             budget,
         )
+
+    def _cost(self, a: Point3, b: Point3) -> float:
+        return flight_distance(a, b, self.config.vertical_cost_scale)
 
     def _wall_time_exhausted(self, started: float) -> bool:
         limit = self.config.max_wall_time_ms

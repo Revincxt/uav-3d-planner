@@ -9,7 +9,8 @@ import time
 from dataclasses import dataclass
 
 from uav3d.collision import point_is_free, segment_is_free
-from uav3d.geometry import distance
+from uav3d.flight_cost import flight_distance, validate_vertical_scale
+from uav3d.geometry import Point3
 from uav3d.planners.base import BudgetUsage, PlanningBudget, PlanningResult, Scalar
 from uav3d.planners.grid import GridIndex, VoxelGrid, attach_exact_endpoints
 from uav3d.scene import Scene
@@ -20,8 +21,11 @@ class LazyThetaStarConfig:
     resolution: float = 4.0
     max_expansions: int = 120_000
     max_wall_time_ms: float | None = None
+    vertical_cost_scale: float = 1.0
+    altitude_levels: tuple[float, ...] = ()
 
     def __post_init__(self) -> None:
+        validate_vertical_scale(self.vertical_cost_scale)
         if self.resolution <= 0:
             raise ValueError("resolution must be positive")
         if self.max_expansions <= 0:
@@ -45,6 +49,12 @@ class LazyThetaStar:
             "max_wall_time_ms": self.config.max_wall_time_ms,
             "connectivity": 26,
         }
+        if self.config.vertical_cost_scale != 1:
+            parameters["vertical_cost_scale"] = self.config.vertical_cost_scale
+            parameters["objective"] = "cruise-equivalent-distance"
+        if self.config.altitude_levels:
+            parameters["altitude_layer_policy"] = "required-anchor-heights-plus-escape-layers"
+            parameters["altitude_layers"] = repr(self.config.altitude_levels)
         budget = PlanningBudget(
             "expanded-nodes", self.config.max_expansions, self.config.max_wall_time_ms
         )
@@ -72,7 +82,7 @@ class LazyThetaStar:
                 budget_usage=BudgetUsage(0, elapsed, "goal-reached"),
             )
 
-        grid = VoxelGrid(scene, self.config.resolution)
+        grid = VoxelGrid(scene, self.config.resolution, self.config.altitude_levels)
         starts = set(grid.anchor_indices(scene.start))
         goals = set(grid.anchor_indices(scene.goal))
         if self._wall_time_exhausted(started):
@@ -82,12 +92,12 @@ class LazyThetaStar:
 
         parents: dict[GridIndex, GridIndex] = {start: start for start in starts}
         g_score: dict[GridIndex, float] = {
-            start: distance(scene.start, grid.point(start)) for start in starts
+            start: self._cost(scene.start, grid.point(start)) for start in starts
         }
         queue: list[tuple[float, float, int, GridIndex]] = []
         counter = itertools.count()
         for start in sorted(starts):
-            heuristic = distance(grid.point(start), scene.goal)
+            heuristic = self._cost(grid.point(start), scene.goal)
             heapq.heappush(
                 queue,
                 (g_score[start] + heuristic, heuristic, next(counter), start),
@@ -169,12 +179,12 @@ class LazyThetaStar:
             for neighbor in grid.neighbors(current):
                 if neighbor in closed:
                     continue
-                candidate = g_score[assumed_parent] + distance(parent_point, grid.point(neighbor))
+                candidate = g_score[assumed_parent] + self._cost(parent_point, grid.point(neighbor))
                 if candidate + 1e-12 >= g_score.get(neighbor, math.inf):
                     continue
                 g_score[neighbor] = candidate
                 parents[neighbor] = assumed_parent
-                neighbor_h = distance(grid.point(neighbor), scene.goal)
+                neighbor_h = self._cost(grid.point(neighbor), scene.goal)
                 heapq.heappush(
                     queue,
                     (candidate + neighbor_h, neighbor_h, next(counter), neighbor),
@@ -195,6 +205,9 @@ class LazyThetaStar:
             search_started,
             budget,
         )
+
+    def _cost(self, a: Point3, b: Point3) -> float:
+        return flight_distance(a, b, self.config.vertical_cost_scale)
 
     def _wall_time_exhausted(self, started: float) -> bool:
         limit = self.config.max_wall_time_ms
@@ -219,7 +232,7 @@ class LazyThetaStar:
         for neighbor in grid.neighbors(current):
             if neighbor not in closed:
                 continue
-            candidate = g_score[neighbor] + distance(grid.point(neighbor), grid.point(current))
+            candidate = g_score[neighbor] + self._cost(grid.point(neighbor), grid.point(current))
             if candidate < best_cost:
                 best_parent = neighbor
                 best_cost = candidate

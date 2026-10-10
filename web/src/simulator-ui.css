@@ -17,6 +17,12 @@
   --hud-gap: 18px;
 }
 body { background: var(--page); font-size: var(--ui-size); }
+.workspace .study-nav a { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
+.workspace .study-nav a[aria-expanded="true"] { color: #c1e6fb; border-color: var(--control-border); background: var(--control-active); }
+@media (prefers-reduced-motion: no-preference) {
+  .workspace .inspector-card.inspector-open { animation: inspector-enter 160ms ease-out; }
+  @keyframes inspector-enter { from { transform: translateX(12px); } to { transform: none; } }
+}
 .workspace input { font-size: var(--ui-size); }
 .workspace button, .workspace select {
   min-height: 34px; border-color: var(--hud-border); border-radius: 6px;
@@ -118,6 +124,10 @@ body { background: var(--page); font-size: var(--ui-size); }
 .workspace .route-legend button { padding: 5px 6px; min-height: 30px; background: none; border-color: transparent; color: #c7d7e2; font: 500 var(--ui-size)/1.3 var(--ui-mono); }
 .workspace .route-legend button[aria-pressed="true"] { color: #fff; background: #ffffff08; border-color: transparent; box-shadow: inset 0 -2px 0 var(--route-color); }
 .workspace .route-legend i { width: 12px; }
+.workspace .route-legend button[data-flight-phase="waiting"] { color: #f5c581; border-color: #edb75d66; background: #e8b75c1a; }
+.workspace .route-legend button[data-flight-phase="waiting"] i { border-color: #f5bb60; border-style: dotted; }
+.workspace .route-legend button[data-flight-phase="arrived"] i { border-top-style: double; border-top-color: #97c4ae; }
+.workspace .route-legend button[data-flight-phase="arrived"] { color: #a0b8ad; }
 .workspace .task-arrival-notice { bottom: 248px; background: rgba(20, 43, 37, .72); color: #c2edd9; border-color: #80cda859; font-size: var(--ui-size); backdrop-filter: blur(8px); }
 .flight-announcement {
   position: absolute; z-index: 6; left: 50%; bottom: 244px; transform: translateX(-50%);
@@ -161,6 +171,11 @@ body { background: var(--page); font-size: var(--ui-size); }
 .hud-telemetry { padding: 12px 16px 14px; }
 .hud-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; font-size: var(--ui-size); color: var(--muted); }
 .hud-frame { color: var(--faint); font: var(--ui-size)/1.4 var(--ui-mono); letter-spacing: .05em; }
+.hud-route-key { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; font-size: var(--ui-size); pointer-events: auto; }
+.hud-route-key > span { display: inline-flex; align-items: center; gap: 5px; }
+.hud-route-key > span::before { content: ""; width: 14px; height: 0; border-top: 3px solid var(--hud-route); }
+.hud-route-key > .hud-key-plan::before { border-top-width: 2px; border-top-style: dashed; }
+.flight-hud[data-plan-meaning="fixed"] .hud-key-plan::before { border-top-style: solid; }
 .hud-aircraft { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-size: var(--ui-size); font-weight: 600; white-space: nowrap; }
 .hud-aircraft::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--hud-route); box-shadow: 0 0 0 3px #ffffff08; }
 .hud-flight { display: grid; grid-template-columns: 68px minmax(0, 1fr); align-items: center; gap: 16px; }
@@ -281,7 +296,7 @@ body { background: var(--page); font-size: var(--ui-size); }
   .workspace:not(.workspace-results) .stage-toolbar select { max-width: 165px; }
 }
 /* Reserve a top-center status row when the three header groups cannot fit side by side. */
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .workspace:not(.workspace-results) .playback-state { top: 4px; min-height: 24px; padding: 2px 10px; line-height: 18px; }
   .workspace:not(.workspace-results) .app-header { top: 34px; height: 32px; grid-template-rows: 32px; }
   .workspace:not(.workspace-results) .study-nav { height: 32px; padding: 1px; }
@@ -321,6 +336,8 @@ body { background: var(--page); font-size: var(--ui-size); }
 }
 @media (max-height: 550px) and (min-width: 761px) {
   :root { --hud-gap: 12px; }
+  .workspace-results .study-nav { height: 36px; padding: 2px; }
+  .workspace-results .study-nav a { min-height: 30px; padding: 5px 6px; }
   .workspace:not(.workspace-results) .app-header { height: 36px; grid-template-rows: 36px; }
   .workspace:not(.workspace-results) .study-nav { height: 36px; padding: 2px; }
   .workspace:not(.workspace-results) .study-nav a, .workspace:not(.workspace-results) .study-nav span { min-height: 30px; padding: 5px 6px; }
@@ -364,7 +381,7 @@ body { background: var(--page); font-size: var(--ui-size); }
   .workspace-dynamic .inspector-card .comparison-heading { display: flex; padding: 4px 0; }
   .workspace-dynamic .inspector-card .planner-comparison { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (max-height: 550px) and (min-width: 761px) and (max-width: 900px) {
+@media (max-height: 550px) and (min-width: 761px) and (max-width: 1100px) {
   .workspace:not(.workspace-results) .playback-state { min-height: 20px; padding: 1px 10px; line-height: 16px; }
   .workspace:not(.workspace-results) .app-header { top: 28px; height: 24px; grid-template-rows: 24px; }
   .workspace:not(.workspace-results) .study-nav { height: 24px; padding: 0; }

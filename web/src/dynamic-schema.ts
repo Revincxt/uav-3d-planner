@@ -25,6 +25,8 @@ export interface DynamicProtocol {
   turnScaleM?: number;
   curveSampleSpacingM?: number;
   horizontalEscape?: 1;
+  verticalCostScale?: number;
+  maxClimbRateMps?: number;
 }
 
 export interface ArtifactReference {
@@ -131,6 +133,7 @@ export interface DynamicRun {
   parameters: Record<string, number>;
   metrics: DynamicRunMetrics;
   frames: DynamicFrame[];
+  executionTimedPath?: { timeS: number; position: Vec3; action: "start" | "move" | "wait" }[];
 }
 
 export interface DynamicScenario {

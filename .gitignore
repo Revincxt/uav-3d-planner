@@ -4,6 +4,7 @@
 .pytest_cache/
 .ruff_cache/
 .venv/
+.pnpm-store/
 __pycache__/
 *.egg-info/
 *.py[cod]

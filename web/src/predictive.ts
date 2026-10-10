@@ -1,6 +1,9 @@
 import "./predictive.css";
 import "./workspace.css";
 import "./simulator-ui.css";
+import { mountBenchmark } from "./benchmark-panel";
+import { mountPageLifecycle } from "./page-lifecycle";
+import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
 import { predictiveAvoidanceEvents, FlightAnnouncements, type AvoidanceEvent } from "./flight-announcements";
 
@@ -11,6 +14,7 @@ import { PlaybackClock, mountPlaybackSpeedControls } from "./playback-clock";
 import { overviewDuration, predictiveRoutes, timedPosition, waypointIndex } from "./route-overview";
 import { finalFlight, type FinalFlight } from "./final-flight";
 import { playbackAction, showPlaybackButton, showPlaybackState } from "./playback-state";
+import { flightPhase, RouteStatusStrip } from "./trajectory-semantics";
 import { encounterView, mountEncounterControl, showChallenge } from "./encounter-view";
 
 import { loadPredictiveBundle } from "./predictive-data";
@@ -608,6 +612,8 @@ async function start(): Promise<void> {
 
   const taskNotice = new TaskArrivalNotice(viewerHost);
   const flightHud = new FlightHud(element(".stage-viewport"), element(".playback-bar"));
+  const routeInteraction = new RouteInteraction(viewerHost, viewer, scenarioSelect, () => routes);
+  const routeStates = new RouteStatusStrip();
   const flightAnnouncements = new FlightAnnouncements(element(".stage-viewport"));
   const avoidanceCache = new WeakMap<PredictiveRun, AvoidanceEvent[]>();
   let avoidanceEvents = predictiveAvoidanceEvents(currentRun);
@@ -627,6 +633,8 @@ async function start(): Promise<void> {
     if (notify) flightAnnouncements.advance(focusedRoute.id, routes.indexOf(focusedRoute), avoidanceEvents, previousTimeS, currentTimeS);
     else flightAnnouncements.reset();
     flightHud.update(focusedRoute, currentTimeS, routes.indexOf(focusedRoute), !notify);
+    routeInteraction.update(currentTimeS, !notify);
+    routeStates.update(routes, currentTimeS, !notify);
     const nowMs = performance.now();
     if (notify && nowMs - lastReadoutMs < 100 && currentTimeS < total) return;
     lastReadoutMs = nowMs;
@@ -647,7 +655,7 @@ async function start(): Promise<void> {
     timelineValue.value = `${currentTimeS.toFixed(2)} s`;
     element("#viewer-time-value").textContent = `${currentTimeS.toFixed(2)} s`;
     showPlaybackState(element("#playback-state"), currentRun.predictive ? "predictive" : "reactive",
-      playbackAction(path, currentTimeS, currentScenario.mission), !currentRun.predictive);
+      playbackAction(path, currentTimeS, currentScenario.mission), !currentRun.predictive, flightPhase(focusedRoute, currentTimeS));
     showChallenge(document.querySelector("#scene-challenge"), currentScenario.mission);
     witnessReadout.hidden = !witnessIsVisible;
     if (witnessIsVisible && evidence !== null) {
@@ -766,6 +774,7 @@ async function start(): Promise<void> {
   };
 
   const updateRun = (plannerId: string, shouldAnnounce = true): void => {
+    const resume = animationFrame !== null;
     setPlaying(false);
     const run = currentScenario.runs.find((candidate) => candidate.plannerId === plannerId);
     if (!run) throw new Error(`Missing ${plannerId} run in ${currentScenario.id}`);
@@ -790,6 +799,7 @@ async function start(): Promise<void> {
     updateUrl(true);
     const planner = bundle.planners.find((candidate) => candidate.id === plannerId);
     if (shouldAnnounce) announce(`${planner?.label ?? plannerId} trace loaded`);
+    if (resume) beginPlayback();
   };
 
   const updateScenario = (scenarioId: string, shouldAnnounce = true): void => {
@@ -941,7 +951,8 @@ async function start(): Promise<void> {
     })),
   });
   element("#load-state").remove();
-  mountFollowControls(viewer, scenarioSelect, () => { taskNotice.reset(); flightAnnouncements.reset(); });
+  routeStates.update(routes, currentTimeS, true);
+  mountFollowControls(viewer, scenarioSelect, enabled => { taskNotice.reset(); flightAnnouncements.reset(); routeInteraction.followChanged(enabled); });
 
   altitudeResizeObserver = new ResizeObserver(() => {
     renderEventAxis(currentFlight, duration(), currentTimeS);
@@ -958,18 +969,15 @@ async function start(): Promise<void> {
   reducedMotion.addEventListener("change", () => {
     if (reducedMotion.matches) setPlaying(false);
   });
-  window.addEventListener(
-    "pagehide",
-    () => {
-      setPlaying(false);
+  mountBenchmark({ isPlaying: () => animationFrame !== null, pause: () => setPlaying(false), resume: beginPlayback });
+  mountPageLifecycle({ pause: () => setPlaying(false), restore: () => renderTime(currentTimeS), dispose: () => {
+      routeInteraction.dispose();
       altitudeResizeObserver?.disconnect();
       taskNotice.dispose();
       flightAnnouncements.dispose();
       flightHud.dispose();
       viewer?.dispose();
-    },
-    { once: true },
-  );
+  } });
 }
 
 start().catch((error: unknown) => {

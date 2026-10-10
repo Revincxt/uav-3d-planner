@@ -17,6 +17,8 @@ import { createEndpointMarker, sceneLineStyle } from "./scene-style";
 import { addMissionTaskMarkers, avoidDroneMarkerOverlap, orientMissionTaskGates, sizeMissionTaskMarkers } from "./mission-tasks";
 import { updateMapSurround } from "./map-surround";
 import { configureMapNavigation, FrameRenderer, mapFramingPadding, positionTopOverview, positionWesternOverview } from "./map-navigation";
+import { MapCameraMotion } from "./map-camera-motion";
+import type { RoutePick } from "./route-picking";
 import type { DemoScenario, PlannerId, Vec3 } from "./schema";
 
 type PathMode = "raw" | "smoothed";
@@ -40,6 +42,7 @@ export class SceneViewer {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.OrthographicCamera();
   private readonly controls: OrbitControls;
+  private motion?: MapCameraMotion;
   private readonly frames = new FrameRenderer(() => this.drawFrame());
   private readonly content = new THREE.Group();
   private readonly paths = new THREE.Group();
@@ -77,8 +80,10 @@ export class SceneViewer {
     this.scene.add(this.sun, this.sun.target);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     configureMapNavigation(this.controls);
+    this.motion = new MapCameraMotion(this.camera, this.controls, () => this.frames.request());
+    this.controls.addEventListener("start", () => this.motion?.cancel());
     this.controls.addEventListener("change", () => this.frames.request());
-    this.resizeObserver = new ResizeObserver(() => this.resize());
+    this.resizeObserver = new ResizeObserver(() => { this.motion?.cancel(); this.resize(); });
     this.resizeObserver.observe(container);
   }
 
@@ -127,6 +132,13 @@ export class SceneViewer {
   }
 
   focusRoute(id: string): void { this.overview?.setFocus(id); this.render(); }
+  setRouteSelection(id: string | null): void { this.overview?.setSelection(id); this.render(); }
+  pickRouteAt(clientX: number, clientY: number, radius = 7): RoutePick | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const camera = this.follow?.routeId ? this.follow.camera : this.camera;
+    return this.overview?.pick(camera, clientX - rect.left, clientY - rect.top, rect.width, rect.height,
+      point => this.cityLayer?.blocksSight(camera, point) ?? false, radius) ?? null;
+  }
   setPlaying(playing: boolean): void { this.overview?.setPlaying(playing); this.render(); }
   get followedRouteId(): string | null { return this.follow?.routeId ?? null; }
 
@@ -137,6 +149,7 @@ export class SceneViewer {
   }
 
   setFollowRoute(id: string | null): void {
+    this.motion?.cancel();
     if (id === null) { this.follow?.stop(); this.resize(); return; }
     const drone = this.overview?.vehicle(id);
     if (!drone) return;
@@ -168,8 +181,8 @@ export class SceneViewer {
 
   observeEncounter(position: Vec3): void {
     this.follow?.stop();
-    this.observationBounds = positionEncounterCamera(this.camera, this.controls, position);
-    this.resize();
+    const move = (): void => { this.observationBounds = positionEncounterCamera(this.camera, this.controls, position); this.resize(); };
+    if (this.motion) this.motion.transition(move); else move();
   }
 
   setView(preset: ViewPreset): void {
@@ -177,6 +190,7 @@ export class SceneViewer {
     this.observationBounds = undefined;
     this.follow?.stop();
     this.viewPreset = preset === "reset" ? "isometric" : preset;
+    const move = (): void => {
     const bounds = this.sceneBounds();
     const center = bounds.getCenter(new THREE.Vector3());
     const size = bounds.getSize(new THREE.Vector3());
@@ -190,9 +204,12 @@ export class SceneViewer {
     this.controls.target.copy(center);
     this.controls.update();
     this.resize();
+    };
+    if (this.motion) this.motion.transition(move); else move();
   }
 
   dispose(): void {
+    this.motion?.cancel();
     this.follow?.stop();
     this.frames.cancel();
     this.resizeObserver.disconnect();
@@ -331,6 +348,7 @@ export class SceneViewer {
   private render(): void { this.frames.request(); }
 
   private drawFrame(): void {
+    if (this.motion?.step()) this.frames.request();
     const drone = this.follow?.routeId ? this.overview?.vehicle(this.follow.routeId) : undefined;
     if (drone && this.follow?.update(drone.position, this.overview!.heading(this.follow.routeId!, this.playbackTimeS), this.playbackTimeS)) this.frames.request();
     const camera = drone ? this.follow!.camera : this.camera;

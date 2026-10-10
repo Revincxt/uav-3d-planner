@@ -10,6 +10,7 @@ from itertools import pairwise
 from typing import TYPE_CHECKING
 
 from uav3d.collision import point_is_free
+from uav3d.flight_cost import segment_flight_time
 from uav3d.geometry import Point3, almost_equal, distance
 from uav3d.planners.grid import GridIndex, VoxelGrid
 from uav3d.predictive import (
@@ -64,8 +65,16 @@ class SpaceTimeAStarConfig:
     time_horizon: float = 60.0
     max_expansions: int = 120_000
     connectivity: int = 6
+    max_climb_rate: float | None = None
+    altitude_levels: tuple[float, ...] = ()
 
     def __post_init__(self) -> None:
+        if self.max_climb_rate is not None and (
+            not math.isfinite(self.max_climb_rate) or self.max_climb_rate <= 0
+        ):
+            raise ValueError("max_climb_rate must be finite and positive")
+        if self.connectivity != 26 and (self.max_climb_rate is not None or self.altitude_levels):
+            raise ValueError("flight-aware motion requires 26-connected variable-speed search")
         numeric = (self.resolution, self.time_step, self.cruise_speed, self.time_horizon)
         if not all(math.isfinite(value) and value > 0 for value in numeric):
             raise ValueError("space-time resolution, clock, speed, and horizon must be positive")
@@ -138,7 +147,7 @@ class SpaceTimeAStar3D:
         direct = self._earliest_direct_path(scenario, start_time, horizon_time)
         if direct is not None and math.isclose(
             direct.arrival_time_s,
-            start_time + distance(scene.start, scene.goal) / self.config.cruise_speed,
+            start_time + self._travel_time(scene.start, scene.goal),
             rel_tol=0.0,
             abs_tol=1e-9,
         ):
@@ -146,7 +155,7 @@ class SpaceTimeAStar3D:
             # speed, so this case is globally earliest without expanding a voxel-time state.
             return self._success(scenario, direct, 0, 1, parameters)
 
-        grid = VoxelGrid(scene, self.config.resolution)
+        grid = VoxelGrid(scene, self.config.resolution, self.config.altitude_levels)
         start_anchors = grid.anchor_indices(scene.start)
         goal_anchors = set(grid.anchor_indices(scene.goal))
         if not start_anchors or not goal_anchors:
@@ -293,6 +302,11 @@ class SpaceTimeAStar3D:
                     "secondary_objective": "path-length-at-equal-arrival",
                 }
             )
+        if self.config.max_climb_rate is not None:
+            parameters["max_climb_rate"] = self.config.max_climb_rate
+            parameters["movement_timing"] = "ceil-flight-time-over-time-step"
+        if self.config.altitude_levels:
+            parameters["altitude_layer_policy"] = "required-anchor-heights-plus-escape-layers"
         return parameters
 
     @staticmethod
@@ -306,7 +320,12 @@ class SpaceTimeAStar3D:
         return start_time + step * self.config.time_step
 
     def _heuristic(self, point: Point3, goal: Point3) -> float:
-        return distance(point, goal) / self.config.cruise_speed
+        return self._travel_time(point, goal)
+
+    def _travel_time(self, point: Point3, goal: Point3) -> float:
+        return segment_flight_time(
+            point, goal, self.config.cruise_speed, self.config.max_climb_rate
+        )
 
     def _earliest_direct_path(
         self,
@@ -315,7 +334,7 @@ class SpaceTimeAStar3D:
         horizon_time: float,
     ) -> TimedPath | None:
         scene = scenario.static_scene
-        travel_time = distance(scene.start, scene.goal) / self.config.cruise_speed
+        travel_time = self._travel_time(scene.start, scene.goal)
         for wait_step in range(self.config.horizon_steps + 1):
             departure = self._time(start_time, wait_step)
             arrival = departure + travel_time
@@ -361,7 +380,7 @@ class SpaceTimeAStar3D:
             if connector_length <= 1e-12:
                 candidates.append(((anchor, 0), (TimedWaypoint(start_time, start, "start"),)))
                 continue
-            travel_time = connector_length / self.config.cruise_speed
+            travel_time = self._travel_time(start, point)
             for wait_step in range(self.config.horizon_steps + 1):
                 departure = self._time(start_time, wait_step)
                 arrival = departure + travel_time
@@ -462,9 +481,7 @@ class SpaceTimeAStar3D:
                 max(
                     1,
                     math.ceil(
-                        distance(point, neighbor_point)
-                        / (self.config.cruise_speed * self.config.time_step)
-                        - 1e-12
+                        self._travel_time(point, neighbor_point) / self.config.time_step - 1e-12
                     ),
                 )
                 if self.config.connectivity == 26
@@ -499,7 +516,7 @@ class SpaceTimeAStar3D:
         point = grid.point(index)
         goal = scenario.static_scene.goal
         departure = self._time(start_time, step)
-        travel_time = distance(point, goal) / self.config.cruise_speed
+        travel_time = self._travel_time(point, goal)
         arrival = departure + travel_time
         if arrival > horizon_time + 1e-9:
             return None
@@ -565,6 +582,12 @@ class SpaceTimeAStar3D:
             raise AssertionError("predictive planner produced an unsafe timed path")
         for previous, current in pairwise(path.waypoints):
             if current.action == "move":
+                if self.config.max_climb_rate is not None and (
+                    abs(current.position[2] - previous.position[2])
+                    / (current.time_s - previous.time_s)
+                    > self.config.max_climb_rate * (1 + 1e-9)
+                ):
+                    raise AssertionError("predictive moving actions must respect climb rate")
                 observed = distance(previous.position, current.position) / (
                     current.time_s - previous.time_s
                 )

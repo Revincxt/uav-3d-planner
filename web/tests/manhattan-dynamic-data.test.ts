@@ -17,6 +17,8 @@ describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
     expect(bundle.protocol.smoothTurns).toBe(1);
     expect(bundle.protocol.turnScaleM).toBe(60);
     expect(bundle.protocol.curveSampleSpacingM).toBe(2);
+    expect(bundle.protocol.verticalCostScale).toBe(5);
+    expect(bundle.protocol.maxClimbRateMps).toBe(3);
     expect(bundle.sourceCommit).toMatch(/^local-snapshot:sha256:[0-9a-f]{64}$/);
     expect(bundle.scenarios).toHaveLength(8);
     for (const scenario of bundle.scenarios) {
@@ -36,6 +38,8 @@ describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
         expect(run.parameters.smoothTurns).toBe(1);
         expect(run.parameters.turnScaleM).toBe(bundle.protocol.turnScaleM);
         expect(run.parameters.curveSampleSpacingM).toBe(bundle.protocol.curveSampleSpacingM);
+        expect(run.parameters.verticalCostScale).toBe(5);
+        expect(run.executionTimedPath?.at(-1)?.timeS).toBeCloseTo(run.frames.at(-1)!.timeS, 8);
       }
     }
   });

@@ -345,6 +345,8 @@ def _movement_targets(source: DynamicFrame, destination: Point3) -> tuple[Point3
 
 
 def _reactive_timed_path(run: DynamicRun) -> TimedPath:
+    if run.execution_timed_path is not None:
+        return run.execution_timed_path
     if not run.frames:
         raise ValueError("a reactive run requires at least one frame")
     first = run.frames[0]

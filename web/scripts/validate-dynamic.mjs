@@ -151,6 +151,10 @@ const actualProtocol = [protocol.timeStepS, protocol.replanIntervalS, protocol.c
 if (!expectedProtocol || actualProtocol.some((value, index) => value !== expectedProtocol[index])) {
   fail("protocol does not match the declared deterministic replay configuration");
 }
+if (protocol.verticalCostScale !== undefined) {
+  if (positive(protocol.verticalCostScale, "verticalCostScale") < 1) fail("verticalCostScale must be at least one");
+  positive(protocol.maxClimbRateMps, "maxClimbRateMps");
+}
 if (shortcutProtocols.has(protocol.id) && protocol.pathShortcut !== 1) {
   fail("protocol.pathShortcut must be 1 for Manhattan v2/v3");
 }
@@ -394,6 +398,10 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
     const parameters = object(run.parameters, `${runLabel}.parameters`);
     if (Object.keys(parameters).length === 0) fail(`${runLabel}.parameters cannot be empty`);
     for (const [key, value] of Object.entries(parameters)) finite(value, `${runLabel}.parameters.${key}`);
+    if (protocol.verticalCostScale !== undefined &&
+        (parameters.verticalCostScale !== protocol.verticalCostScale || parameters.maxClimbRateMps !== protocol.maxClimbRateMps || !Array.isArray(run.executionTimedPath))) {
+      fail(`${runLabel} flight-aware parameters and exact clock must match the protocol`);
+    }
     if (shortcutProtocols.has(protocol.id) && parameters.pathShortcut !== 1) {
       fail(`${runLabel}.parameters.pathShortcut must be 1 for Manhattan v2/v3`);
     }
@@ -468,10 +476,12 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
       });
       const planned = parsePath(frame.path, `${frameLabel}.path`);
       const executed = parsePath(frame.executedPath, `${frameLabel}.executedPath`);
+      const curvedEscape = parameters.verticalCostScale !== undefined && Array.isArray(run.executionTimedPath);
       const localEscape = protocol.horizontalEscape === 1 && parameters.horizontalEscape === 1 &&
-        planned.length === 2 && frame.replanReason === "safety-gate" &&
-        Math.abs(planned[0][2] - planned[1][2]) <= 1e-5 &&
-        Math.hypot(...planned[1].map((v, i) => v - planned[0][i])) <= protocol.cruiseSpeedMps * protocol.timeStepS + 1e-5;
+        planned.length >= 2 && frame.replanReason === "safety-gate" &&
+        planned.every(p => Math.abs(p[2] - planned[0][2]) <= 1e-5) &&
+        (curvedEscape ? length(planned) <= protocol.cruiseSpeedMps * protocol.timeStepS * 2 + 1e-5 :
+          planned.length === 2 && length(planned) <= protocol.cruiseSpeedMps * protocol.timeStepS + 1e-5);
       if (
         planned.length > 0 &&
         (!samePoint(planned[0], vehicle) || (!localEscape && ![goal, ...(scene.mission?.taskPoints ?? []).map(task => task.position)].some(target => samePoint(planned.at(-1), target))))
@@ -560,6 +570,22 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
     }
     const directFromGeometry = Math.hypot(...goal.map((coordinate, index) => coordinate - start[index]));
     const executedFromGeometry = length(lastFrame.executedPath);
+    if (run.executionTimedPath != null) {
+      const knots = array(run.executionTimedPath, `${runLabel}.executionTimedPath`).map((p, i) => ({
+        time: nonNegative(p.time, `executionTimedPath[${i}].time`),
+        position: vector(p.position, 3, `executionTimedPath[${i}].position`), action: p.action,
+      }));
+      if (!knots.length || knots[0].time !== 0 || knots[0].action !== "start" ||
+          !samePoint(knots[0].position, start) || !samePoint(knots.at(-1).position, lastFrame.vehicle) ||
+          !sameNumber(knots.at(-1).time, lastFrame.timeS) || !sameNumber(length(knots.map(p => p.position)), executedFromGeometry)) fail("Exact execution clock disagrees with telemetry");
+      for (let i = 1; i < knots.length; i++) {
+        const a = knots[i - 1], b = knots[i], dt = b.time - a.time;
+        const span = Math.hypot(...b.position.map((v, axis) => v - a.position[axis]));
+        if (dt <= 0 || !["move", "wait"].includes(b.action) || (b.action === "wait") !== (span <= 1e-9) ||
+            span > parameters.cruiseSpeedMps * dt + 1e-6 ||
+            Math.abs(b.position[2] - a.position[2]) > parameters.maxClimbRateMps * dt + 1e-6) fail("Invalid climb-constrained execution segment");
+      }
+    } else if (parameters.maxClimbRateMps !== undefined) fail("Missing exact execution clock");
     if (
       !sameNumber(directDistance, directFromGeometry) ||
       !sameNumber(executedLength, executedFromGeometry) ||

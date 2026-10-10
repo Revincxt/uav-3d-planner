@@ -9,7 +9,8 @@ import time
 from dataclasses import dataclass
 
 from uav3d.collision import point_is_free, segment_is_free
-from uav3d.geometry import Point3, distance, dot, subtract
+from uav3d.flight_cost import flight_distance, validate_vertical_scale
+from uav3d.geometry import Point3, dot, subtract
 from uav3d.planners.base import BudgetUsage, PlanningBudget, PlanningResult, Scalar
 from uav3d.planners.grid import GridIndex, VoxelGrid, attach_exact_endpoints
 from uav3d.scene import Scene
@@ -22,8 +23,11 @@ Edge = tuple[GridIndex, GridIndex]
 class DStarLiteConfig:
     resolution: float = 4.0
     max_queue_pops: int = 120_000
+    vertical_cost_scale: float = 1.0
+    altitude_levels: tuple[float, ...] = ()
 
     def __post_init__(self) -> None:
+        validate_vertical_scale(self.vertical_cost_scale)
         if not math.isfinite(self.resolution) or self.resolution <= 0:
             raise ValueError("resolution must be finite and positive")
         if self.max_queue_pops <= 0:
@@ -119,6 +123,12 @@ class DStarLite3D:
             "incremental": True,
             "anchor_policy": "goal-aware-start-multi-goal-v1",
         }
+        if self.config.vertical_cost_scale != 1:
+            parameters["vertical_cost_scale"] = self.config.vertical_cost_scale
+            parameters["objective"] = "cruise-equivalent-distance"
+        if self.config.altitude_levels:
+            parameters["altitude_layer_policy"] = "required-anchor-heights-plus-escape-layers"
+            parameters["altitude_layers"] = repr(self.config.altitude_levels)
         if not point_is_free(scene, scene.start) or not point_is_free(scene, scene.goal):
             self._queue_pops_last = 0
             self._changed_edges_last = 0
@@ -239,7 +249,7 @@ class DStarLite3D:
         """Return every visible goal anchor and its exact-endpoint connector cost."""
 
         return {
-            anchor: distance(grid.point(anchor), scene.goal)
+            anchor: self._cost(grid.point(anchor), scene.goal)
             for anchor in grid.anchor_indices(scene.goal)
         }
 
@@ -262,9 +272,9 @@ class DStarLite3D:
         mission_axis = subtract(scene.goal, scene.start)
         connector = subtract(anchor_point, scene.start)
         backwards = dot(connector, mission_axis) < -1e-12
-        connector_cost = distance(scene.start, anchor_point)
+        connector_cost = self._cost(scene.start, anchor_point)
         goal_lower_bound = min(
-            distance(anchor_point, grid.point(goal_anchor)) + terminal_cost
+            self._cost(anchor_point, grid.point(goal_anchor)) + terminal_cost
             for goal_anchor, terminal_cost in goal_terminal_costs.items()
         )
         return (backwards, connector_cost + goal_lower_bound, connector_cost, anchor)
@@ -297,7 +307,7 @@ class DStarLite3D:
 
     def _initialize(self, scene: Scene) -> bool:
         self.reset()
-        self._grid = VoxelGrid(scene, self.config.resolution)
+        self._grid = VoxelGrid(scene, self.config.resolution, self.config.altitude_levels)
         self._scene = scene
         self._goal_point = scene.goal
         self._goal_terminal_costs = self._visible_goal_terminal_costs(scene, self._grid)
@@ -319,7 +329,7 @@ class DStarLite3D:
         assert self._grid is not None
         assert self._scene is not None
         assert self._start is not None
-        new_grid = VoxelGrid(scene, self.config.resolution)
+        new_grid = VoxelGrid(scene, self.config.resolution, self.config.altitude_levels)
         new_goal_terminal_costs = self._visible_goal_terminal_costs(scene, new_grid)
         new_start = self._select_start_anchor(
             scene,
@@ -353,7 +363,10 @@ class DStarLite3D:
 
     def _heuristic(self, left: GridIndex, right: GridIndex) -> float:
         assert self._grid is not None
-        return distance(self._grid.point(left), self._grid.point(right))
+        return self._cost(self._grid.point(left), self._grid.point(right))
+
+    def _cost(self, a: Point3, b: Point3) -> float:
+        return flight_distance(a, b, self.config.vertical_cost_scale)
 
     def _value(self, values: dict[GridIndex, float], vertex: GridIndex) -> float:
         return values.get(vertex, math.inf)
@@ -414,7 +427,7 @@ class DStarLite3D:
         right_point = self._grid.point(right)
         if not segment_is_free(self._scene, left_point, right_point):
             return math.inf
-        return distance(left_point, right_point)
+        return self._cost(left_point, right_point)
 
     def _edge_cost(self, left: GridIndex, right: GridIndex) -> float:
         edge = self._edge(left, right)

@@ -6,9 +6,11 @@ import math
 import random
 import time
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import cast
 
 from uav3d.collision import point_is_free, segment_is_free
+from uav3d.flight_cost import flight_distance, validate_vertical_scale
 from uav3d.geometry import Point3, add, distance, scale, subtract
 from uav3d.planners.base import (
     BudgetUsage,
@@ -36,8 +38,10 @@ class RRTStarConfig:
     informed_sampling: bool = False
     informed_uniform_ratio: float = 0.05
     informed_refresh_interval: int = 64
+    vertical_cost_scale: float = 1.0
 
     def __post_init__(self) -> None:
+        validate_vertical_scale(self.vertical_cost_scale)
         for name, integer_value in (
             ("max_samples", self.max_samples),
             ("informed_refresh_interval", self.informed_refresh_interval),
@@ -103,6 +107,9 @@ class RRTStar:
             "max_wall_time_ms": self.config.max_wall_time_ms,
             "quality_checkpoints": tuple(sorted(self.config.quality_checkpoints)),
         }
+        if self.config.vertical_cost_scale != 1:
+            parameters["vertical_cost_scale"] = self.config.vertical_cost_scale
+            parameters["objective"] = "cruise-equivalent-distance"
         if (
             self.config.direct_path_check
             or self.config.global_goal_connection
@@ -176,11 +183,11 @@ class RRTStar:
             if rng.random() < self.config.goal_bias:
                 sample = scene.goal
             elif self.config.informed_sampling and incumbent is not None:
-                best_length = costs[incumbent] + distance(nodes[incumbent], scene.goal)
+                best_length = costs[incumbent] + self._cost(nodes[incumbent], scene.goal)
                 sample = self._sample_informed(scene, rng, best_length)
             else:
                 sample = self._sample(scene, rng)
-            nearest = min(range(len(nodes)), key=lambda index: distance(nodes[index], sample))
+            nearest = min(range(len(nodes)), key=lambda index: self._cost(nodes[index], sample))
             candidate = self._steer(nodes[nearest], sample)
             candidate_moves = distance(nodes[nearest], candidate) > 1e-9
             candidate_is_safe = candidate_moves and point_is_free(scene, candidate)
@@ -196,9 +203,9 @@ class RRTStar:
                     scene, nodes, candidate, nearest, near_radius
                 )
                 parent = nearest
-                candidate_cost = costs[nearest] + distance(nodes[nearest], candidate)
+                candidate_cost = costs[nearest] + self._cost(nodes[nearest], candidate)
                 for index in near:
-                    alternative = costs[index] + distance(nodes[index], candidate)
+                    alternative = costs[index] + self._cost(nodes[index], candidate)
                     if alternative + 1e-12 < candidate_cost and self._candidate_edge_is_free(
                         scene, nodes, candidate, index, edge_visibility
                     ):
@@ -214,7 +221,7 @@ class RRTStar:
                 for index in near:
                     if index == parent or index == 0:
                         continue
-                    rewired_cost = candidate_cost + distance(candidate, nodes[index])
+                    rewired_cost = candidate_cost + self._cost(candidate, nodes[index])
                     if rewired_cost + 1e-12 < costs[index]:
                         if self._is_ancestor(index, new_index, parents):
                             continue
@@ -228,9 +235,9 @@ class RRTStar:
                         self._propagate_cost_delta(index, old_cost - rewired_cost, parents, costs)
 
                 if self.config.informed_sampling:
-                    candidate_goal_length = costs[new_index] + distance(candidate, scene.goal)
+                    candidate_goal_length = costs[new_index] + self._cost(candidate, scene.goal)
                     incumbent_length = (
-                        costs[incumbent] + distance(nodes[incumbent], scene.goal)
+                        costs[incumbent] + self._cost(nodes[incumbent], scene.goal)
                         if incumbent is not None
                         else math.inf
                     )
@@ -252,7 +259,9 @@ class RRTStar:
                 incumbent = self._best_goal_parent(scene, nodes, costs, goal_visibility, started)
             if iteration in checkpoint_set:
                 trace.append(
-                    self._quality_point(scene, nodes, costs, iteration, started, goal_visibility)
+                    self._quality_point(
+                        scene, nodes, costs, iteration, started, goal_visibility, parents
+                    )
                 )
             if self._wall_time_exhausted(started):
                 terminated_by = "wall-time-budget-exhausted"
@@ -324,7 +333,9 @@ class RRTStar:
         # Do not query LOS for every nearby vertex in a dense informed region.
         # Parent/rewire costs are checked first, in the historical index order.
         # An edge unable to improve either cost cannot change the resulting tree.
-        near = {index for index, point in enumerate(nodes) if distance(point, candidate) <= radius}
+        near = {
+            index for index, point in enumerate(nodes) if self._cost(point, candidate) <= radius
+        }
         near.add(nearest)
         return sorted(near), {nearest: True}  # the steering edge was already certified
 
@@ -353,7 +364,7 @@ class RRTStar:
         for index, point in enumerate(nodes):
             goal_distance = distance(point, scene.goal)
             if self.config.global_goal_connection or goal_distance <= self.config.goal_tolerance:
-                candidates.append((costs[index] + goal_distance, index))
+                candidates.append((costs[index] + self._cost(point, scene.goal), index))
         incumbent = min(
             (candidate for candidate in candidates if visible.get(candidate[1]) is True),
             default=None,
@@ -383,6 +394,7 @@ class RRTStar:
         iteration: int,
         started: float,
         visibility: dict[int, bool] | None = None,
+        parents: list[int] | None = None,
     ) -> QualityTracePoint:
         parent = self._best_goal_parent(
             scene,
@@ -393,9 +405,13 @@ class RRTStar:
             if self.config.global_goal_connection or self.config.informed_sampling
             else None,
         )
-        best_length = (
-            costs[parent] + distance(nodes[parent], scene.goal) if parent is not None else None
-        )
+        best_length = None
+        if parent is not None:
+            if self.config.vertical_cost_scale != 1 and parents is not None:
+                points = [*self._reconstruct(nodes, parents, parent), scene.goal]
+                best_length = math.fsum(distance(a, b) for a, b in pairwise(points))
+            else:
+                best_length = costs[parent] + distance(nodes[parent], scene.goal)
         return QualityTracePoint(iteration, (time.perf_counter() - started) * 1000, best_length)
 
     def _sample(self, scene: Scene, rng: random.Random) -> Point3:
@@ -417,10 +433,15 @@ class RRTStar:
 
         if rng.random() < self.config.informed_uniform_ratio:
             return self._sample(scene, rng)
-        minimum_length = distance(scene.start, scene.goal)
+        z_scale = self.config.vertical_cost_scale
+        scaled_start = (scene.start[0], scene.start[1], scene.start[2] * z_scale)
+        scaled_goal = (scene.goal[0], scene.goal[1], scene.goal[2] * z_scale)
+        minimum_length = distance(scaled_start, scaled_goal)
         if not math.isfinite(best_length) or best_length < minimum_length:
             return self._sample(scene, rng)
-        axis = scale(subtract(scene.goal, scene.start), 1 / minimum_length)
+        if minimum_length <= 1e-12:
+            return self._sample(scene, rng)
+        axis = scale(subtract(scaled_goal, scaled_start), 1 / minimum_length)
         reference = (0.0, 0.0, 1.0) if abs(axis[2]) < 0.9 else (0.0, 1.0, 0.0)
         cross = (
             axis[1] * reference[2] - axis[2] * reference[1],
@@ -434,7 +455,7 @@ class RRTStar:
             axis[2] * second[0] - axis[0] * second[2],
             axis[0] * second[1] - axis[1] * second[0],
         )
-        center = scale(add(scene.start, scene.goal), 0.5)
+        center = scale(add(scaled_start, scaled_goal), 0.5)
         major = best_length / 2
         minor = (
             math.sqrt(max(0.0, (best_length - minimum_length) * (best_length + minimum_length))) / 2
@@ -442,7 +463,7 @@ class RRTStar:
         clearance = scene.required_clearance
         for _ in range(32):
             if minor <= 1e-12:
-                sample = add(scene.start, scale(subtract(scene.goal, scene.start), rng.random()))
+                sample = add(scaled_start, scale(subtract(scaled_goal, scaled_start), rng.random()))
             else:
                 direction = (rng.gauss(0, 1), rng.gauss(0, 1), rng.gauss(0, 1))
                 norm = math.sqrt(sum(value * value for value in direction))
@@ -459,6 +480,7 @@ class RRTStar:
                         for i in range(3)
                     ),
                 )
+            sample = (sample[0], sample[1], sample[2] / z_scale)
             if all(
                 lower + clearance <= value <= upper - clearance
                 for value, lower, upper in zip(
@@ -470,10 +492,13 @@ class RRTStar:
 
     def _steer(self, origin: Point3, target: Point3) -> Point3:
         delta = subtract(target, origin)
-        length = distance(origin, target)
+        length = self._cost(origin, target)
         if length <= self.config.step_size:
             return target
         return add(origin, scale(delta, self.config.step_size / length))
+
+    def _cost(self, a: Point3, b: Point3) -> float:
+        return flight_distance(a, b, self.config.vertical_cost_scale)
 
     def _propagate_cost_delta(
         self, root: int, improvement: float, parents: list[int], costs: list[float]

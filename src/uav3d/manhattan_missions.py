@@ -337,11 +337,13 @@ def simulate_mission_replanning(
     from uav3d.dynamic import dynamic_scenario_fingerprint
     from uav3d.dynamic_collision import spacetime_segment_is_free
     from uav3d.geometry import distance
+    from uav3d.predictive import TimedPath, TimedWaypoint
     from uav3d.replanning import DynamicRun, simulate_replanning
 
     if not tasks:
         return simulate_replanning(scenario, algorithm, **options)
     frames: list[DynamicFrame] = []
+    trace: list[TimedWaypoint] = []
     runs = []
     start = scenario.static_scene.start
     clock = 0.0
@@ -370,6 +372,12 @@ def simulate_mission_replanning(
                     sum(v[1] for v in units),
                 )
         run = simulate_replanning(leg, algorithm, start_time=clock, **leg_options)
+        if run.execution_timed_path is not None:
+            trace.extend(
+                run.execution_timed_path.waypoints
+                if not trace
+                else run.execution_timed_path.waypoints[1:]
+            )
         if options.get("smooth_turns") and len(run.frames) >= 2:
             path = run.frames[-2].planned_path
             departure_heading = next(
@@ -399,6 +407,8 @@ def simulate_mission_replanning(
                 raise ValueError(f"No safe service window at {tasks[index]['id']}")
             frames[-1] = replace(frames[-1], status="hold")
             clock = departure
+            if trace:
+                trace.append(TimedWaypoint(departure, goal, "wait"))
         start = goal
     metrics = replace(
         runs[-1].metrics,
@@ -437,4 +447,5 @@ def simulate_mission_replanning(
         parameters,
         tuple(frames),
         metrics,
+        TimedPath(tuple(trace)) if trace else None,
     )

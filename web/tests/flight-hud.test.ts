@@ -52,7 +52,7 @@ describe("recorded flight instruments", () => {
 
 describe("retained flight HUD", () => {
   function fixture(playback?: HTMLElement) {
-    const fields = new Map([".hud-aircraft", ...["altitude", "speed", "heading"].map(key => `[data-readout="${key}"]`)]
+    const fields = new Map([".hud-aircraft", ".hud-key-plan", ".hud-key-flown", ...["altitude", "speed", "heading"].map(key => `[data-readout="${key}"]`)]
       .map(key => [key, { textContent: "" }]));
     const root = { hidden: false, dataset: {} as Record<string, string>, title: "", className: "", innerHTML: "",
       style: { setProperty: vi.fn() }, setAttribute: vi.fn(), querySelector: (key: string) => fields.get(key), append: vi.fn(), remove: vi.fn() };

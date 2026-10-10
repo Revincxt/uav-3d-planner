@@ -47,19 +47,24 @@ export function analysesFromBundles(stat: DemoBundle, dyn: DynamicBundleV1, pred
   const s = stat.scenarios[0]!, d = dyn.scenarios[0]!, p = pred.scenarios[0]!;
   if (!s.city || !d.city || !p.city) throw new Error("Results require the current official Manhattan city datasets.");
   if (new Set([s.city.sourceSha256, d.city.sourceSha256, p.city.sourceSha256].map((digest) => digest.replace(/^sha256:/, ""))).size !== 1) throw new Error("The studies use different Manhattan extracts.");
-  return [
-    { id: "static", label: "Static",
+  return [staticAnalysis(stat), dynamicAnalysis(dyn), predictiveAnalysis(pred)];
+}
+export function staticAnalysis(stat: DemoBundle): Analysis {
+  return { id: "static", label: "Static",
       planners: stat.planners.map((planner) => plannerSummary(planner.id, planner.label,
         stat.scenarios.flatMap((scenario) => scenario.results.filter((run) => run.plannerId === planner.id).map((run) => ({ id: scenario.id, label: scenario.label,
           success: run.status === "success", routeM: run.metrics.smoothedLengthM, planningTimeMs: run.metrics.planningTimeMs, arrivalTimeS: null, waitTimeS: null,
-          work: run.searchEffort.value, workUnit: run.searchEffort.kind, failureReason: run.failureReason }))))) },
-    { id: "dynamic", label: "Dynamic",
+          work: run.searchEffort.value, workUnit: run.searchEffort.kind, failureReason: run.failureReason }))))) };
+}
+export function dynamicAnalysis(dyn: DynamicBundleV1): Analysis {
+  return { id: "dynamic", label: "Dynamic",
       planners: dyn.planners.map((planner) => plannerSummary(planner.id, planner.label,
         dyn.scenarios.flatMap((scenario) => scenario.runs.filter((run) => run.plannerId === planner.id).map((run) => ({ id: scenario.id, label: scenario.label.replace(/ · reactive$/, ""),
           success: run.metrics.success, routeM: run.metrics.success ? run.metrics.executedPathLengthM : null, planningTimeMs: null, arrivalTimeS: run.metrics.completionTimeS,
-          waitTimeS: null, work: run.metrics.totalPlanningWork, workUnit: run.metrics.workUnit, failureReason: run.metrics.failureReason }))))) },
-    { id: "predictive", label: "Predictive",
+          waitTimeS: null, work: run.metrics.totalPlanningWork, workUnit: run.metrics.workUnit, failureReason: run.metrics.failureReason }))))) };
+}
+export function predictiveAnalysis(pred: PredictiveBundleV3): Analysis {
+  return { id: "predictive", label: "Predictive",
       planners: pred.planners.map((planner) => plannerSummary(planner.id, planner.label,
-        pred.scenarios.flatMap((scenario) => scenario.runs.filter((run) => run.plannerId === planner.id).map((run) => predictiveObservation(scenario, run))))) },
-  ];
+        pred.scenarios.flatMap((scenario) => scenario.runs.filter((run) => run.plannerId === planner.id).map((run) => predictiveObservation(scenario, run))))) };
 }

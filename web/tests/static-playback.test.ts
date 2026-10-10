@@ -12,6 +12,13 @@ const { readFileSync } = await import(filesystemModule);
 const bundle = validateBundle(JSON.parse(readFileSync(new URL("../public/demo-data.json", import.meta.url), "utf8")));
 
 describe("static route playback", () => {
+  it("uses the physical climb rate without creating an artificial stop", () => {
+    const path = staticPlaybackPath([[0, 0, 10], [30, 0, 50], [90, 0, 50]], undefined, 15, 3);
+    expect(path[1]!.timeS).toBeCloseTo(40 / 3);
+    expect(path[2]!.timeS).toBeCloseTo(40 / 3 + 4);
+    expect(timedPosition(path, 20 / 3)).toEqual([15, 0, 30]);
+    expect(() => staticPlaybackPath([[0, 0, 0]], undefined, 15, 0)).toThrow("climb");
+  });
   it("adds a display clock without moving, rounding or dropping any original point", () => {
     const points: RoutePoint[] = [[0, 0, 10], [30, 0, 50], [30, 60, 50]];
     const original = structuredClone(points), path = staticPlaybackPath(points, undefined, 10);

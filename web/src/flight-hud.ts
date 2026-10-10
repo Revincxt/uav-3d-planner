@@ -1,4 +1,5 @@
-import { flightHeading, routeColorCSS, timedPosition, waypointIndex, type OverviewRoute } from "./route-overview";
+import { displayHeading, routeColorCSS, timedPosition, waypointIndex, type OverviewRoute } from "./route-overview";
+import { PLAN_LABELS, planMeaning } from "./trajectory-semantics";
 
 export interface FlightReadout {
   altitudeM: number;
@@ -14,7 +15,7 @@ export function flightReadout(route: OverviewRoute, timeS: number): FlightReadou
   const speedMps = right && timeS >= left.timeS && right.timeS > left.timeS
     ? Math.hypot(...right.position.map((value, axis) => value - left.position[axis]!)) / (right.timeS - left.timeS)
     : 0;
-  const heading = flightHeading(path, timeS);
+  const heading = displayHeading(path, timeS);
   const headingDeg = ((Math.atan2(heading.x, -heading.z) * 180 / Math.PI) + 360) % 360;
   return {
     altitudeM: timedPosition(path, timeS)[2], speedMps, headingDeg,
@@ -26,18 +27,22 @@ export class FlightHud {
   private readonly root = document.createElement("section");
   private readonly name: HTMLElement;
   private readonly fields: HTMLElement[];
+  private readonly key: HTMLElement;
+  private readonly historyKey: HTMLElement;
   private lastUpdateMs = -Infinity;
   private routeId = "";
   constructor(container: HTMLElement, playback?: HTMLElement) {
     this.root.className = "flight-hud";
     this.root.setAttribute("aria-label", "Recorded flight telemetry");
-    this.root.innerHTML = `<div class="hud-telemetry"><div class="hud-heading"><span class="hud-aircraft">UAV 01</span><span class="hud-frame" title="Local east, north, up coordinates">ENU</span></div>
+    this.root.innerHTML = `<div class="hud-telemetry"><div class="hud-heading"><span class="hud-aircraft">UAV 01</span><span class="hud-route-key"><span class="hud-key-flown">Flown</span><span class="hud-key-plan">Fixed route</span></span></div>
       <div class="hud-flight"><div class="hud-compass" aria-hidden="true"><svg class="hud-dial" viewBox="0 0 80 80" fill="none"><circle cx="40" cy="40" r="38.5" /><circle class="hud-dial-inner" cx="40" cy="40" r="28.5" />${Array.from({ length: 24 }, (_, index) => `<path d="M40 4.5v${index % 3 ? 3 : 6}" transform="rotate(${index * 15} 40 40)" class="${index % 3 ? "hud-tick" : "hud-tick-major"}" />`).join("")}</svg><span>N</span><span>E</span><span>S</span><span>W</span><i class="hud-bearing"><svg viewBox="0 0 20 36"><path class="hud-needle" d="M10 1 16 23 10 20 4 23Z" /><path class="hud-needle-tail" d="m10 35-3-11h6Z" /></svg></i><i class="hud-compass-center"></i></div><div class="hud-instruments">
       <div class="hud-reading"><span>ALT <small>m</small></span><output data-readout="altitude">—</output></div>
       <div class="hud-reading"><span>SPD <small>m/s</small></span><output data-readout="speed" title="Trajectory speed in simulation units, not wall-clock playback speed">—</output></div>
       <div class="hud-reading"><span>HDG <small>°</small></span><output data-readout="heading">—</output></div></div></div>
       </div>`;
     this.name = this.root.querySelector<HTMLElement>(".hud-aircraft")!;
+    this.key = this.root.querySelector<HTMLElement>(".hud-key-plan")!;
+    this.historyKey = this.root.querySelector<HTMLElement>(".hud-key-flown")!;
     this.fields = ["altitude", "speed", "heading"].map(key => this.root.querySelector<HTMLElement>(`[data-readout="${key}"]`)!);
     if (playback) this.root.append(playback);
     container.append(this.root);
@@ -49,6 +54,15 @@ export class FlightHud {
     const readout = flightReadout(route, timeS);
     this.root.hidden = readout === null;
     if (!readout) return;
+    const meaning = planMeaning(route);
+    this.historyKey.textContent = timeS <= 0 ? "Result" : "Flown";
+    this.root.dataset.planMeaning = meaning;
+    if (this.key.textContent !== PLAN_LABELS[meaning]) this.key.textContent = PLAN_LABELS[meaning];
+    this.key.title = meaning === "recorded"
+      ? "Future recorded result for comparison, not knowledge available to the reactive planner."
+      : meaning === "local" ? "Latest recorded local plan; replaced when the UAV replans."
+      : meaning === "scheduled" ? "Preplanned space-time route checked against known traffic schedules."
+      : "Fixed route around static obstacles; playback does not replan.";
     if (changed) {
       this.routeId = route.id; this.root.dataset.routeId = route.id;
       this.name.textContent = `UAV ${String(index + 1).padStart(2, "0")}`;

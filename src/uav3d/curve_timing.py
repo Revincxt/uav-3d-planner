@@ -16,6 +16,8 @@ def smooth_timed_horizontal_curves(
     path: TimedPath,
     turn_scale_m: float,
     sample_spacing_m: float,
+    *,
+    round_reversals: bool = False,
 ) -> tuple[TimedPath, int, float | None]:
     """Interpolate service positions and preserve every original Z/time and hold boundary."""
     clocks: list[float] = []
@@ -69,6 +71,7 @@ def smooth_timed_horizontal_curves(
         protected=frozenset(protected),
         turn_scale_m=turn_scale_m,
         sample_spacing_m=sample_spacing_m,
+        round_reversals=round_reversals,
     )
     output: list[TimedWaypoint] = []
     for point, clock in zip(curves.points, curves.parameters, strict=True):

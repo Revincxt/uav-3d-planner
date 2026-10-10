@@ -449,7 +449,9 @@ def run_multistop_episode(
 ) -> PredictiveEpisode:
     """Hard service stops partition search and smoothing without resetting hazard clocks."""
     from uav3d.dynamic_collision import spacetime_segment_is_free
-    from uav3d.planners.space_time_astar import SpaceTimeAStar3D, SpaceTimeAStarConfig
+    from uav3d.flight_cost import mission_altitude_levels, with_turn_clearance
+    from uav3d.mission_refinement import ContinuousAnchorSpaceTimeAStar, refine_mission_trajectory
+    from uav3d.planners.space_time_astar import SpaceTimeAStarConfig
 
     tasks = scenario.metadata.get("mission", {}).get("taskPoints", [])
     if not tasks:
@@ -469,6 +471,8 @@ def run_multistop_episode(
         "taskPointCount": len(tasks),
         "legCount": len(tasks) + 1,
         "serviceDurationTotalS": sum(task["serviceDurationS"] for task in tasks),
+        "verticalCostScale": 5,
+        "maxClimbRateMps": runtime.EXECUTION_ENVELOPE.max_abs_climb_rate_mps,
     }
     if predictive:
         parameters.update(
@@ -490,8 +494,12 @@ def run_multistop_episode(
             )
             leg = replace(
                 scenario,
-                static_scene=replace(
-                    scenario.static_scene, start=waypoints[-1].position, goal=goal
+                static_scene=with_turn_clearance(
+                    replace(
+                        scenario.static_scene,
+                        start=waypoints[-1].position,
+                        goal=goal,
+                    )
                 ),
             )
             config = SpaceTimeAStarConfig(
@@ -501,8 +509,12 @@ def run_multistop_episode(
                 time_horizon=horizon,
                 max_expansions=runtime.MAX_EXPANDED_STATES - expanded,
                 connectivity=runtime.SPACE_TIME_CONNECTIVITY,
+                max_climb_rate=runtime.EXECUTION_ENVELOPE.max_abs_climb_rate_mps,
+                altitude_levels=mission_altitude_levels(
+                    scenario.static_scene, runtime.RESOLUTION_M
+                ),
             )
-            result = SpaceTimeAStar3D(config).plan(leg, start_time=clock)
+            result = ContinuousAnchorSpaceTimeAStar(config).plan(leg, start_time=clock)
             expanded += result.expanded_spacetime_states
             replans = index + 1
             if not result.success or result.timed_path is None:
@@ -545,6 +557,9 @@ def run_multistop_episode(
             turn_scale_m=runtime.SMOOTHING_TURN_RADIUS_M,
             curve_sample_spacing_m=runtime.SMOOTHING_SAMPLE_SPACING_M,
             allow_horizontal_escape=True,
+            vertical_cost_scale=5,
+            altitude_levels=mission_altitude_levels(scenario.static_scene, runtime.RESOLUTION_M),
+            max_climb_rate=runtime.EXECUTION_ENVELOPE.max_abs_climb_rate_mps,
         )
         if not run.metrics.success:
             raise RuntimeError(f"{scenario.scenario_id}/{planner_id}: {run.metrics.failure_reason}")
@@ -552,7 +567,7 @@ def run_multistop_episode(
         expanded, replans = run.metrics.total_planning_work, run.metrics.replans
     if not raw.is_safe(scenario):
         raise RuntimeError(f"Unsafe multistop raw path: {scenario.scenario_id}/{planner_id}")
-    smoothing = runtime._postprocess_trajectory(scenario, raw, raw_safe=True)
+    smoothing = refine_mission_trajectory(scenario, raw, runtime.EXECUTION_ENVELOPE)
     for path in (raw, smoothing.timed_path, smoothing.execution_candidate):
         if path is not None:
             audit_task_visits(
@@ -601,6 +616,11 @@ def compute_case(
     for planner in runtime.PREDICTIVE_ALGORITHMS:
         started = time.perf_counter()
         episode = run_multistop_episode(scenario, planner, runtime)
+        if not episode.smoothing.execution_qualified or episode.execution_timed_path is None:
+            raise RuntimeError(
+                f"unqualified execution from {scenario.scenario_id}/{planner}: "
+                f"{episode.smoothing.execution_status}"
+            )
         if not episode.raw_timed_path.is_safe(scenario) or not episode.timed_path.is_safe(scenario):
             raise RuntimeError(f"unsafe trajectory from {scenario.scenario_id}/{planner}")
         if episode.execution_timed_path is not None and not episode.execution_timed_path.is_safe(

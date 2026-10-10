@@ -5,6 +5,7 @@ from __future__ import annotations
 import heapq
 import itertools
 import math
+from bisect import bisect_left
 from dataclasses import dataclass, field
 
 from uav3d.collision import point_is_free, segment_is_free
@@ -19,6 +20,7 @@ _CACHE_LIMIT = 100_000
 class VoxelGrid:
     scene: Scene
     resolution: float
+    altitude_levels: tuple[float, ...] = ()
     _shape: GridIndex = field(init=False, repr=False, compare=False)
     _point_cache: dict[GridIndex, bool] = field(
         default_factory=dict, init=False, repr=False, compare=False
@@ -33,6 +35,13 @@ class VoxelGrid:
     def __post_init__(self) -> None:
         if not math.isfinite(self.resolution) or self.resolution <= 0:
             raise ValueError("grid resolution must be finite and positive")
+        if self.altitude_levels and (
+            any(not math.isfinite(z) for z in self.altitude_levels)
+            or any(b <= a for a, b in itertools.pairwise(self.altitude_levels))
+            or self.altitude_levels[0] < self.scene.bounds.minimum[2]
+            or self.altitude_levels[-1] > self.scene.bounds.maximum[2]
+        ):
+            raise ValueError("altitude levels must be finite, strictly increasing and in bounds")
         object.__setattr__(
             self,
             "_shape",
@@ -43,12 +52,20 @@ class VoxelGrid:
                 )
             ),
         )
+        if self.altitude_levels:
+            object.__setattr__(self, "_shape", (*self._shape[:2], len(self.altitude_levels)))
 
     @property
     def shape(self) -> GridIndex:
         return self._shape
 
     def point(self, index: GridIndex) -> Point3:
+        if self.altitude_levels:
+            return (
+                self.scene.bounds.minimum[0] + index[0] * self.resolution,
+                self.scene.bounds.minimum[1] + index[1] * self.resolution,
+                self.altitude_levels[index[2]],
+            )
         return tuple(
             lower + component * self.resolution
             for lower, component in zip(self.scene.bounds.minimum, index, strict=True)
@@ -56,10 +73,16 @@ class VoxelGrid:
 
     def nearest_index(self, point: Point3) -> GridIndex:
         shape = self.shape
-        return tuple(
+        indices = tuple(
             max(0, min(size - 1, round((value - lower) / self.resolution)))
             for value, lower, size in zip(point, self.scene.bounds.minimum, shape, strict=True)
-        )  # type: ignore[return-value]
+        )
+        if self.altitude_levels:
+            insertion = bisect_left(self.altitude_levels, point[2])
+            candidates = {max(0, insertion - 1), min(len(self.altitude_levels) - 1, insertion)}
+            z = min(candidates, key=lambda i: (abs(self.altitude_levels[i] - point[2]), i))
+            return (indices[0], indices[1], z)
+        return indices  # type: ignore[return-value]
 
     def anchor_indices(self, point: Point3) -> list[GridIndex]:
         """Return every visible free grid vertex in the local 3x3x3 anchor stencil."""

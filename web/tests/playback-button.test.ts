@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { showPlaybackButton } from "../src/playback-state";
+import { showPlaybackButton, showPlaybackState } from "../src/playback-state";
 
 describe("icon-only playback control", () => {
   it("retains its SVG and toggles accessible action labels, without visible text", () => {
@@ -14,5 +14,16 @@ describe("icon-only playback control", () => {
     expect(button.title).toBe("Play");
     expect(button.innerHTML).toBe('<svg aria-hidden="true"></svg>');
     expect(button.textContent).toBe("");
+  });
+  it("styles an actual starting forecast hold as waiting, not ready", () => {
+    const host = { textContent: "", dataset: {} as Record<string, string>, title: "",
+      ownerDocument: { documentElement: { dataset: {} } } };
+    showPlaybackState(host as unknown as HTMLElement, "predictive", "Ready", false,
+      { kind: "waiting", reason: "forecast-aware waiting action", remainingS: 3.1 });
+    expect(host.textContent).toBe("Space-time · Await slot · 4 s");
+    expect(host.dataset.action).toBe("waiting");
+    showPlaybackState(host as unknown as HTMLElement, "predictive", "Flying", false, { kind: "climbing" });
+    expect(host.textContent).toBe("Space-time · Climbing");
+    expect(host.dataset.action).toBe("flying");
   });
 });
