@@ -11,7 +11,7 @@ import pytest
 from uav3d.curve_timing import smooth_timed_horizontal_curves
 from uav3d.dynamic import DynamicScenario
 from uav3d.geometry import Point3, lerp
-from uav3d.horizontal_curves import _span, smooth_horizontal_curves
+from uav3d.horizontal_curves import _heading_samples, _span, smooth_horizontal_curves
 from uav3d.predictive import TimedPath, TimedWaypoint
 from uav3d.scene import Bounds3D, Scene
 
@@ -80,6 +80,23 @@ def test_quintic_span_matches_tangents_and_zero_second_derivatives() -> None:
         assert 5 * (controls[5][axis] - controls[4][axis]) / 10 == pytest.approx((0.0, 4.0)[axis])
         assert controls[0][axis] - 2 * controls[1][axis] + controls[2][axis] == pytest.approx(0)
         assert controls[3][axis] - 2 * controls[4][axis] + controls[5][axis] == pytest.approx(0)
+
+
+def test_heading_refinement_does_not_bisect_stationary_tangents_into_numeric_noise() -> None:
+    span = _span(
+        (0.0, 0.0, 0.0),
+        (0.0, 0.0, 0.0),
+        440.0,
+        442.0,
+        (0.1, 0.0),
+        (-0.1, 0.0),
+        2,
+        math.pi,
+    )
+    samples = _heading_samples(span)
+    assert samples[0] == span.start and samples[-1] == span.end
+    assert len(samples) < 256
+    assert min(b - a for a, b in pairwise(samples)) > 1e-5
 
 
 def test_height_profile_keeps_every_knot_peak_and_trough_exactly() -> None:

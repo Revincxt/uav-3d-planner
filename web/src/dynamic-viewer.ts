@@ -2,9 +2,6 @@ import * as THREE from "three";
 import { MapCameraMotion } from "./map-camera-motion";
 import type { RoutePick } from "./route-picking";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { Line2 } from "three/addons/lines/Line2.js";
-import { LineGeometry } from "three/addons/lines/LineGeometry.js";
-import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { addZoneVisual, fitMapCamera, type ZoneVisual } from "./viewer-geometry";
 import { cityMissionBounds } from "./city-scene";
 import { enuToThree } from "./coordinates";
@@ -15,13 +12,11 @@ import { positionEncounterCamera } from "./encounter-view";
 import { createTrafficAircraft, sizeTrafficAircraft, updateTrafficAircraft } from "./traffic-aircraft";
 import { sameSharedWorld } from "./shared-world";
 import { disposeRenderObject } from "./render-resources";
-import { createEndpointMarker, sceneLineStyle, vehicleGeometry } from "./scene-style";
 import { addMissionTaskMarkers, avoidDroneMarkerOverlap, orientMissionTaskGates, sizeMissionTaskMarkers } from "./mission-tasks";
 import { updateMapSurround } from "./map-surround";
 import { configureMapNavigation, FrameRenderer, mapFramingPadding, positionTopOverview, positionWesternOverview } from "./map-navigation";
 
 import type {
-  DynamicFrame,
   DynamicScenario,
   StaticNoFlyZone,
   Vec3,
@@ -30,27 +25,10 @@ import type {
 type ViewPreset = "isometric" | "top" | "reset";
 
 
-interface ThemePalette {
-  background: number;
-  foreground: number;
-  movingSphere: number;
-  plannedPath: number;
-  executedPath: number;
-  goal: number;
-}
-
-const LIGHT_PALETTE: ThemePalette = {
+const SCENE_PALETTE = {
   background: 0xffffff,
-  foreground: 0x285334,
   movingSphere: 0x98535b,
-  plannedPath: 0x28a745,
-  executedPath: 0x12722e,
-  goal: 0x174f27,
 };
-
-function disposeObject(object: THREE.Object3D): void {
-  disposeRenderObject(object);
-}
 
 export class DynamicViewer {
   private readonly renderer: THREE.WebGLRenderer;
@@ -62,15 +40,11 @@ export class DynamicViewer {
   private readonly content = new THREE.Group();
   private readonly sun = new THREE.DirectionalLight(0xffffff, 2);
   private readonly resizeObserver: ResizeObserver;
-  private readonly lineMaterials = new Set<LineMaterial>();
   private scenario: DynamicScenario | null = null;
   private temporaryZones = new Map<string, ZoneVisual>();
   private movingSpheres = new Map<string, THREE.Object3D>();
-  private vehicle: THREE.Mesh | null = null;
-  private plannedPath: Line2 | null = null;
-  private executedPath: Line2 | null = null;
   private cityBounds = new THREE.Box3();
-  private mapScope: "city" | "mission" = "city";
+  private readonly routeBounds = new WeakMap<DynamicScenario, THREE.Box3>();
   private viewPreset: ViewPreset = "isometric";
   private cityLayer?: RetainedCity;
   private overview?: RouteOverview;
@@ -109,7 +83,7 @@ export class DynamicViewer {
     this.scenario = scenario;
     if (shared) {
       const tasks = this.content.getObjectByName("mission-task-points");
-      if (tasks) { tasks.removeFromParent(); disposeObject(tasks); }
+      if (tasks) { tasks.removeFromParent(); disposeRenderObject(tasks); }
       addMissionTaskMarkers(this.content, scenario.mission);
     } else this.buildScene();
     if (first) this.setView("isometric");
@@ -121,10 +95,6 @@ export class DynamicViewer {
     this.scene.add(this.overview.group);
     this.overview.setRoutes(routes, activeId, this.container.clientWidth, this.container.clientHeight);
     orientMissionTaskGates(this.content, routes.find(route => route.id === activeId)?.points ?? [], routeColor(routes.findIndex(route => route.id === activeId)));
-    if (this.vehicle) this.vehicle.visible = false;
-    if (this.plannedPath) this.plannedPath.visible = false;
-    if (this.executedPath) this.executedPath.visible = false;
-    this.content.traverse(object => { if (object.name.startsWith("endpoint-")) object.visible = false; });
     this.render();
   }
 
@@ -138,7 +108,6 @@ export class DynamicViewer {
   }
   setPlaying(playing: boolean): void { this.overview?.setPlaying(playing); this.render(); }
   get followedRouteId(): string | null { return this.follow?.routeId ?? null; }
-  setTime(timeS: number): void { this.playbackTimeS = timeS; this.overview?.setTime(timeS); this.render(); }
 
   setFollowRoute(id: string | null): void {
     this.motion?.cancel();
@@ -152,20 +121,16 @@ export class DynamicViewer {
     this.render();
   }
 
-  setFrame(frame: DynamicFrame, timeS = frame.timeS, completedAtS = timeS): void {
+  setTime(timeS: number): void {
     if (!this.scenario) return;
     this.playbackTimeS = timeS;
     this.overview?.setTime(timeS);
-    const hazardTime = this.scenario.mission?.sharedWorld ? timeS : Math.min(timeS, completedAtS);
-    let animatedShadows = this.vehicle?.castShadow ?? false;
-    this.vehicle?.position.fromArray(enuToThree(frame.vehicle));
-
-    const activeZones = new Set(this.overview
-      ? this.scenario.temporaryNoFlyZones.filter(z => z.activeFromS <= hazardTime && hazardTime < z.activeUntilS).map(z => z.id)
-      : frame.activeTemporaryZoneIds);
-    for (const [id, visual] of this.temporaryZones) {
+    let animatedShadows = false;
+    for (const zone of this.scenario.temporaryNoFlyZones) {
+      const visual = this.temporaryZones.get(zone.id);
+      if (!visual) continue;
       animatedShadows ||= visual.fill.castShadow;
-      const active = activeZones.has(id);
+      const active = zone.activeFromS <= timeS && timeS < zone.activeUntilS;
       visual.fill.visible = visual.outline.visible = active;
       visual.fill.material.opacity = active ? 0.18 : 0.025;
       visual.outline.traverse((child) => {
@@ -175,29 +140,16 @@ export class DynamicViewer {
       });
     }
 
-    const states = new Map(frame.movingSpheres.map((state) => [state.id, state]));
-    for (const [id, mesh] of this.movingSpheres) {
+    for (const definition of this.scenario.movingSpheres) {
+      const mesh = this.movingSpheres.get(definition.id);
+      if (!mesh) continue;
       animatedShadows ||= mesh.castShadow;
-      const state = states.get(id);
-      mesh.visible = state !== undefined;
-      if (state) mesh.position.fromArray(enuToThree(state.position));
-      if (this.overview) {
-        const definition = this.scenario.movingSpheres.find(s => s.id === id);
-        if (definition) { mesh.visible = true; updateTrafficAircraft(mesh, definition, hazardTime); }
-      }
+      mesh.visible = true;
+      updateTrafficAircraft(mesh, definition, timeS);
     }
 
-    if (!this.overview) {
-      this.replaceLine("planned", frame.path);
-      this.replaceLine("executed", frame.executedPath);
-    }
     if (animatedShadows) this.renderer.shadowMap.needsUpdate = true;
     this.render();
-  }
-
-  setMapScope(scope: "city" | "mission"): void {
-    this.mapScope = scope;
-    this.setView(this.viewPreset);
   }
 
   observeEncounter(position: Vec3): void {
@@ -243,14 +195,10 @@ export class DynamicViewer {
     this.renderer.domElement.remove();
   }
 
-  private get palette(): ThemePalette {
-    return LIGHT_PALETTE;
-  }
-
   private buildScene(): void {
     if (!this.scenario) return;
     this.clearContent();
-    const palette = this.palette;
+    const palette = SCENE_PALETTE;
     this.scene.background = new THREE.Color(palette.background);
     this.cityLayer ??= new RetainedCity();
     this.cityBounds = this.cityLayer.mount(this.content, this.scenario, texture => {
@@ -279,39 +227,17 @@ export class DynamicViewer {
       this.content.add(mesh);
     }
 
-    this.addEndpoint(this.scenario.start, "start");
-    this.addEndpoint(this.scenario.goal, "goal");
     addMissionTaskMarkers(this.content, this.scenario.mission);
-    this.vehicle = new THREE.Mesh(
-      vehicleGeometry(Boolean(this.scenario.city)),
-      new THREE.MeshStandardMaterial({
-        color: palette.foreground,
-        emissive: palette.background,
-        emissiveIntensity: 0.16,
-        depthTest: true,
-        depthWrite: true,
-      }),
-    );
-    this.vehicle.rotation.z = -Math.PI / 2;
-    this.vehicle.position.fromArray(enuToThree(this.scenario.start));
-    this.vehicle.name = "vehicle";
-    this.vehicle.visible = !this.overview;
-    this.vehicle.receiveShadow = true;
-    this.content.add(this.vehicle);
     this.configureSun();
   }
 
   private clearContent(): void {
     this.temporaryZones.clear();
     this.movingSpheres.clear();
-    this.vehicle = null;
-    this.plannedPath = null;
-    this.executedPath = null;
-    this.lineMaterials.clear();
     for (const child of [...this.content.children]) {
       if (child === this.cityLayer?.group) continue;
       this.content.remove(child);
-      disposeObject(child);
+      disposeRenderObject(child);
     }
     this.cityBounds.makeEmpty();
   }
@@ -339,50 +265,7 @@ export class DynamicViewer {
     return addZoneVisual(this.content, zone, role === "temporary");
   }
 
-  private addEndpoint(point: Vec3, role: "start" | "goal"): void {
-    if (this.overview) return;
-    const palette = this.palette;
-    const marker = createEndpointMarker(role, Boolean(this.scenario?.city),
-      role === "start" ? palette.executedPath : palette.goal,
-      role === "start" ? palette.executedPath : palette.foreground, role === "start" ? 0.08 : 0.04);
-    marker.position.fromArray(enuToThree(point));
-    marker.name = `endpoint-${role}`;
-    marker.receiveShadow = true;
-    this.content.add(marker);
-  }
 
-  private replaceLine(role: "planned" | "executed", points: Vec3[]): void {
-    const previous = role === "planned" ? this.plannedPath : this.executedPath;
-    if (previous) {
-      this.content.remove(previous);
-      this.lineMaterials.delete(previous.material);
-      disposeObject(previous);
-    }
-    if (points.length < 2) {
-      if (role === "planned") this.plannedPath = null;
-      else this.executedPath = null;
-      return;
-    }
-    const palette = this.palette;
-    const geometry = new LineGeometry();
-    geometry.setPositions(points.flatMap((point) => enuToThree(point)));
-    const material = new LineMaterial({
-      ...sceneLineStyle(Boolean(this.scenario?.city), role === "planned" ? 2.8 : 3.6,
-        role === "planned"),
-      color: role === "planned" ? palette.plannedPath : palette.executedPath,
-    });
-    material.resolution.set(Math.max(1, this.container.clientWidth), Math.max(1, this.container.clientHeight));
-    this.lineMaterials.add(material);
-    const line = new Line2(geometry, material);
-    line.name = `trajectory-${role}`;
-    // Draw the executed prefix last only where it coincides with the planned path.
-    // Both still test against the same opaque scene depth.
-    line.renderOrder = role === "planned" ? 0 : 1;
-    if (role === "planned") line.computeLineDistances();
-    this.content.add(line);
-    if (role === "planned") this.plannedPath = line;
-    else this.executedPath = line;
-  }
 
   private resize(): void {
     const width = Math.max(1, this.container.clientWidth);
@@ -390,8 +273,7 @@ export class DynamicViewer {
     this.renderer.setSize(width, height, false);
     if (!this.follow?.resize(width, height))
       fitMapCamera(this.camera, this.sceneBounds(), width, height,
-        this.observationBounds ? 1.12 : mapFramingPadding(this.mapScope, this.viewPreset === "isometric"));
-    for (const material of this.lineMaterials) material.resolution.set(width, height);
+        this.observationBounds ? 1.12 : mapFramingPadding(this.viewPreset === "isometric"));
     this.overview?.resize(width, height);
     this.render();
   }
@@ -400,16 +282,29 @@ export class DynamicViewer {
     if (this.observationBounds) return this.observationBounds.clone();
     if (!this.scenario) return new THREE.Box3(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 50, 50));
     const bounds = this.missionBounds();
-    if (this.mapScope === "city") bounds.union(this.cityBounds);
-    if (this.mapScope === "city" && this.overview) bounds.union(this.overview.bounds);
+    bounds.union(this.cityBounds);
+    if (this.overview) bounds.union(this.overview.bounds);
     return bounds;
   }
 
   private missionBounds(): THREE.Box3 {
     if (!this.scenario) return new THREE.Box3();
     if (this.scenario.city) {
-      return cityMissionBounds(this.scenario, this.scenario.runs.flatMap((run) => run.frames.flatMap((frame) =>
-        [frame.vehicle, ...frame.path, ...frame.executedPath])));
+      let bounds = this.routeBounds.get(this.scenario);
+      if (!bounds) {
+        const scenario = this.scenario;
+        function* points() {
+          for (const run of scenario.runs) for (const frame of run.frames) {
+            yield frame.vehicle; yield* frame.path;
+          }
+          // Validated histories are cumulative prefixes of the final trace.
+          // Its bounds include every earlier execution without scanning them all.
+          for (const run of scenario.runs) yield* run.frames.at(-1)!.executedPath;
+        }
+        bounds = cityMissionBounds(scenario, points());
+        this.routeBounds.set(scenario, bounds);
+      }
+      return bounds.clone();
     }
     const { min, max } = this.scenario.bounds;
     const bounds = new THREE.Box3(

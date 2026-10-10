@@ -22,6 +22,7 @@ export interface DynamicProtocol {
   pathShortcut?: 1;
   preserveAltitude?: 1;
   smoothTurns?: 1;
+  curveDimensions?: 3;
   turnScaleM?: number;
   curveSampleSpacingM?: number;
   horizontalEscape?: 1;

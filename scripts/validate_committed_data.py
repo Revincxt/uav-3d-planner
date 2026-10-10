@@ -59,7 +59,7 @@ def audit_city(bundle: dict[str, Any], city: Any) -> None:
             raise ValueError(f"Changed or incomplete source geometry: {scenario['id']}")
         if scenario["city"]["sourceSha256"] != city.metadata["sourceSha256"]:
             raise ValueError("City source digest mismatch")
-        if scenario["city"].get("planningRegion", {}).get("id") != "midtown-expanded-v3":
+        if scenario["city"].get("planningRegion", {}).get("id") != "manhattan-south-expanded-v4":
             raise ValueError("Stale planning region")
     provenance = bundle.get("computationSourceProvenance", bundle.get("sourceProvenance"))
     if provenance:

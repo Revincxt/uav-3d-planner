@@ -18,10 +18,10 @@ import { DynamicViewer } from "./dynamic-viewer";
 import { mountFollowControls } from "./drone-follow";
 import { TaskArrivalNotice } from "./task-arrival-notice";
 import { PlaybackClock, mountPlaybackSpeedControls } from "./playback-clock";
-import { missionCaption, mountInspector, mountTabs, mountWorkspace } from "./workspace";
+import { mountInspector, mountTabs, mountWorkspace } from "./workspace";
 import { dynamicRoutes, overviewDuration, waypointIndex, type OverviewRoute } from "./route-overview";
 import { playbackAction, showPlaybackButton, showPlaybackState } from "./playback-state";
-import { encounterView, mountEncounterControl, showChallenge } from "./encounter-view";
+import { encounterView, mountEncounterControl } from "./encounter-view";
 import { flightPhase, RouteStatusStrip } from "./trajectory-semantics";
 
 const element = <T extends HTMLElement>(selector: string): T => {
@@ -157,9 +157,6 @@ async function start(): Promise<void> {
   const announce = (message: string): void => {
     element("#live-region").textContent = message;
   };
-  const updateSceneCaption = (): void => {
-    element("#scene-caption").textContent = missionCaption(currentScenario, "city");
-  };
 
   const duration = (): number => overviewDuration(routes);
   const taskNotice = new TaskArrivalNotice(viewerHost);
@@ -178,7 +175,7 @@ async function start(): Promise<void> {
     timelineValue.value = `${currentTimeS.toFixed(1)} s`;
     previous.disabled = currentTimeS === 0;
     next.disabled = currentTimeS === duration();
-    viewer?.setFrame(frame, currentTimeS, currentRun.frames.at(-1)!.timeS);
+    viewer?.setTime(currentTimeS);
     if (notify) taskNotice.advance(routes.find(route => route.id === viewer?.followedRouteId), previousTimeS, currentTimeS);
     else taskNotice.reset();
     const route = routes.find(route => route.id === currentScenario.id)!;
@@ -188,7 +185,6 @@ async function start(): Promise<void> {
     routeInteraction.update(currentTimeS, !notify);
     routeStates.update(routes, currentTimeS, !notify);
     showPlaybackState(element("#playback-state"), "reactive", playbackAction(route.timedPath!, currentTimeS, route.mission, frame), false, flightPhase(route, currentTimeS));
-    showChallenge(document.querySelector("#scene-challenge"), route.mission);
     if (frame !== lastMetricsFrame) {
       renderFrameMetrics(frame, frameIndex, currentRun.frames.length);
       lastMetricsFrame = frame;
@@ -265,8 +261,6 @@ async function start(): Promise<void> {
     if (!plannerSelect.value) plannerSelect.value = bundle.planners[0]!.id;
     renderComparison(bundle, scenario);
     updateRun(plannerSelect.value, false);
-    element("#scene-title").textContent = "Manhattan";
-    updateSceneCaption();
     viewerHost.setAttribute(
       "aria-label",
       `${routes.length} tasks share one obstacle world and clock. Focus: ${scenario.label}: ${scenario.buildings.length} buildings, ` +
@@ -316,11 +310,7 @@ async function start(): Promise<void> {
   currentRun = currentScenario.runs[0]!;
   updateScenario();
   mountWorkspace({
-    scenarios: bundle.scenarios.map((scenario) => ({
-      ...scenario,
-      group: "Manhattan",
-      summary: scenario.mission ? `${scenario.mission.origin} → ${scenario.mission.destination}` : scenario.description,
-    })),
+    scenarios: bundle.scenarios,
     select: scenarioSelect,
   });
   mountInspector();

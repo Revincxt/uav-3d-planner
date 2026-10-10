@@ -12,6 +12,7 @@ from pathlib import Path
 from export_manhattan_static_dynamic import PROTOCOL, mission_scenes, shared_dynamic_scenarios
 
 from uav3d.dynamic_collision import spacetime_segment_is_free
+from uav3d.flight_cost import mission_altitude_levels
 from uav3d.geometry import almost_equal, lerp
 from uav3d.manhattan_city import build_manhattan_city
 from uav3d.manhattan_missions import simulate_mission_replanning
@@ -134,15 +135,24 @@ def main():
         preserve_altitude=True,
         planning_guard_s=PROTOCOL["planningGuardS"],
         smooth_turns=True,
+        spatial_curves=True,
         turn_scale_m=60,
         curve_sample_spacing_m=2,
         allow_horizontal_escape=True,
+        vertical_cost_scale=PROTOCOL["verticalCostScale"],
+        max_climb_rate=PROTOCOL["maxClimbRateMps"],
     )
     rows = []
     for (mission, _), scenario, case in zip(missions, scenarios, dynamic["scenarios"], strict=True):
         for algorithm in REPLANNING_ALGORITHMS:
             control = simulate_mission_replanning(
-                replace(scenario, moving_spheres=()), algorithm, mission["taskPoints"], **options
+                replace(scenario, moving_spheres=()),
+                algorithm,
+                mission["taskPoints"],
+                altitude_levels=mission_altitude_levels(
+                    scenario.static_scene, PROTOCOL["resolutionM"]
+                ),
+                **options,
             )
             if not control.metrics.success:
                 raise ValueError("Traffic-free dynamic control failed")

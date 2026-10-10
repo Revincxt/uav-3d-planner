@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from itertools import pairwise
 from typing import Literal
 
-from uav3d.curve_timing import smooth_timed_horizontal_curves
+from uav3d.curve_timing import smooth_timed_curves
 from uav3d.dynamic import DynamicScenario
 from uav3d.dynamic_collision import spacetime_segment_is_free
 from uav3d.geometry import Point3, add, almost_equal, distance, dot, lerp, scale, subtract
@@ -73,6 +73,7 @@ class PredictiveSmoothingResult:
     execution_original_duration_s: float | None = None
     execution_candidate_duration_s: float | None = None
     preserve_altitude: bool = False
+    altitude_deviation_limit_m: float | None = None
 
     def __post_init__(self) -> None:
         if self.execution_timing_iterations < 0:
@@ -155,6 +156,10 @@ class PredictiveSmoothingResult:
         if self.preserve_altitude:
             result["optimization_axes"] = ["x", "y"]
             result["altitude_policy"] = "preserve-raw-z-time-profile"
+        elif self.altitude_deviation_limit_m is not None:
+            result["optimization_axes"] = ["x", "y", "z"]
+            result["altitude_policy"] = "bounded-spatial-spline-v1"
+            result["altitude_deviation_limit_m"] = self.altitude_deviation_limit_m
         return result
 
 
@@ -173,6 +178,7 @@ def _evaluate_execution_candidate(
     *,
     preserve_altitude: bool = False,
     schedule_dynamic_waits: bool = False,
+    dense_curves: bool = False,
 ) -> _ExecutionEvaluation:
     timing_input = (
         insert_braking_holds(geometry_candidate, envelope)
@@ -182,7 +188,7 @@ def _evaluate_execution_candidate(
     timing = retime_timed_path(
         timing_input,
         envelope,
-        serialization_decimal_places=11 if preserve_altitude else None,
+        serialization_decimal_places=11 if preserve_altitude or dense_curves else None,
     )
     if timing_input is not geometry_candidate:
         timing = TrajectoryTimingResult(
@@ -690,7 +696,11 @@ def _shortcut_horizontal_timed_path(scenario: DynamicScenario, path: TimedPath) 
 
 
 def shortcut_timed_path(
-    scenario: DynamicScenario, path: TimedPath, *, preserve_altitude: bool = False
+    scenario: DynamicScenario,
+    path: TimedPath,
+    *,
+    preserve_altitude: bool = False,
+    max_altitude_deviation_m: float | None = None,
 ) -> TimedPath:
     """Remove visible movement waypoints while preserving absolute times and every wait.
 
@@ -705,7 +715,13 @@ def shortcut_timed_path(
         raise ValueError("shortcut input must expose a collision-free timed path")
     if preserve_altitude:
         return _shortcut_horizontal_timed_path(scenario, path)
+    if max_altitude_deviation_m is not None:
+        _positive_finite("max_altitude_deviation_m", max_altitude_deviation_m)
     raw = path.waypoints
+    task_positions = [
+        tuple(task["position"])
+        for task in scenario.static_scene.metadata.get("missionTaskPoints", [])
+    ]
     output = [raw[0]]
     index = 0
     while index < len(raw) - 1:
@@ -714,12 +730,33 @@ def shortcut_timed_path(
             index += 1
             continue
         block_end = index + 1
-        while block_end + 1 < len(raw) and raw[block_end + 1].action == "move":
+        while (
+            block_end + 1 < len(raw)
+            and raw[block_end + 1].action == "move"
+            and not any(almost_equal(raw[block_end].position, p) for p in task_positions)
+        ):
             block_end += 1
         following = index + 1
         for candidate in range(block_end, index, -1):
             if almost_equal(raw[index].position, raw[candidate].position):
                 continue  # Do not silently turn a moving loop into an undocumented wait.
+            if max_altitude_deviation_m is not None:
+                start, end = raw[index], raw[candidate]
+                duration = end.time_s - start.time_s
+                if any(
+                    abs(
+                        p.position[2]
+                        - (
+                            start.position[2]
+                            + (end.position[2] - start.position[2])
+                            * (p.time_s - start.time_s)
+                            / duration
+                        )
+                    )
+                    > max_altitude_deviation_m + 1e-9
+                    for p in raw[index + 1 : candidate]
+                ):
+                    continue
             if spacetime_segment_is_free(
                 scenario,
                 raw[index].position,
@@ -751,6 +788,7 @@ def smooth_predictive_timed_path(
     curve_method: Literal["fillet", "bspline"] = "fillet",
     schedule_dynamic_waits: bool = False,
     round_reversals: bool = False,
+    max_altitude_deviation_m: float = 12.0,
 ) -> PredictiveSmoothingResult:
     """Round movement blocks and return only an exactly audited dense linear trajectory.
 
@@ -772,17 +810,17 @@ def smooth_predictive_timed_path(
     but never changes candidate positions or removes any original height knot.
 
     ``curve_method='bspline'`` uses local quintic spans, including tangent-connected
-    interpolation through service stops. Colliding turns shrink independently. Geometry
-    retains z(t); its optional final execution must still pass retiming and collision gates.
+    interpolation through service stops. Colliding turns shrink independently. XYZ is
+    smoothed together unless altitude is explicitly locked; height changes are bounded
+    near the input profile. Final execution must still pass retiming and collision gates.
     """
 
     _positive_finite("requested_radius_m", requested_radius_m)
     _positive_finite("sample_spacing_m", sample_spacing_m)
     _positive_finite("max_speed_mps", max_speed_mps)
     if curve_method not in ("fillet", "bspline"):
-        raise ValueError("unsupported horizontal curve method")
-    if curve_method == "bspline" and not preserve_altitude:
-        raise ValueError("local B-spline curves require XY-only altitude preservation")
+        raise ValueError("unsupported curve method")
+    _positive_finite("max_altitude_deviation_m", max_altitude_deviation_m)
     if not raw_path.is_safe(scenario):
         raise ValueError("raw_path must be collision-free before smoothing")
     if not _within_speed_limit(raw_path, max_speed_mps):
@@ -831,18 +869,25 @@ def smooth_predictive_timed_path(
             execution_original_duration_s=execution.timing.original_duration_s,
             execution_candidate_duration_s=execution.timing.candidate_duration_s,
             preserve_altitude=preserve_altitude,
+            altitude_deviation_limit_m=(
+                max_altitude_deviation_m
+                if curve_method == "bspline" and not preserve_altitude
+                else None
+            ),
         )
 
     for scale_factor in (1.0, 0.75, 0.5, 0.25):
         candidate_radius = requested_radius_m * scale_factor
         try:
             if curve_method == "bspline":
-                candidate, rounded_corners, applied_radius = smooth_timed_horizontal_curves(
+                candidate, rounded_corners, applied_radius = smooth_timed_curves(
                     scenario,
                     geometry_input,
                     candidate_radius,
                     sample_spacing_m,
                     round_reversals=round_reversals,
+                    preserve_altitude=preserve_altitude,
+                    max_altitude_deviation_m=max_altitude_deviation_m,
                 )
             elif preserve_altitude:
                 candidate, rounded_corners, applied_radius = _build_horizontal_candidate(
@@ -869,6 +914,7 @@ def smooth_predictive_timed_path(
             envelope,
             preserve_altitude=preserve_altitude,
             schedule_dynamic_waits=schedule_dynamic_waits,
+            dense_curves=curve_method == "bspline",
         )
         method = (
             "spacetime-shortcut-plus-local-quintic-bspline"
@@ -892,6 +938,7 @@ def smooth_predictive_timed_path(
         envelope,
         preserve_altitude=preserve_altitude,
         schedule_dynamic_waits=schedule_dynamic_waits,
+        dense_curves=curve_method == "bspline",
     )
     if execution.candidate is None and best_geometry is not None:
         candidate, rounded_corners, applied_radius, execution = best_geometry

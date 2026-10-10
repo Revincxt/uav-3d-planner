@@ -52,6 +52,14 @@ describe("real planning city presentation", () => {
     expect(bounds.getSize(new THREE.Vector3()).x).toBeLessThan(1000);
     expect(bounds.containsPoint(new THREE.Vector3(600, 95, -700))).toBe(true);
   });
+
+  it('frames a single-pass replay iterator without flattening its history', () => {
+    const points = [[300, 400, 65], [600, 700, 95]];
+    let visits = 0;
+    function* history() { for (const point of points) { visits++; yield point; } }
+    expect(cityMissionBounds(cityScenario, history())).toEqual(cityMissionBounds(cityScenario, points));
+    expect(visits).toBe(2);
+  });
 });
 
 describe("physical map context", () => {

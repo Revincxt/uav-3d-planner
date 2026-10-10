@@ -38,14 +38,6 @@ const movingScenario = {
   runs: [],
 };
 
-const frame = {
-  vehicle: [15, 15, 20],
-  activeTemporaryZoneIds: [],
-  movingSpheres: [{ id: "traffic", position: [30, 50, 40] }],
-  path: [],
-  executedPath: [],
-};
-
 const cityPresentation = {
   bounds: { min: [-240.46513, -186.36859, 0], max: [2542.36633, 2496.13957, 480] },
   city: {
@@ -74,16 +66,15 @@ function viewerHarness(Viewer: typeof SceneViewer | typeof DynamicViewer | typeo
   viewer.scene.add(viewer.content);
   viewer.sun = new THREE.DirectionalLight();
   viewer.cityBounds = new THREE.Box3();
-  viewer.lineMaterials = Viewer === SceneViewer ? [] : new Set();
+  viewer.routeBounds = new WeakMap();
+  if (Viewer === PredictiveViewer) viewer.lineMaterials = new Set();
   viewer.container = { clientWidth: 900, clientHeight: 600 };
-  viewer.paths = new THREE.Group();
   viewer.temporaryZones = new Map();
   viewer.movingSpheres = new Map();
-  viewer.mapScope = "city";
   viewer.layerVisibility = { buildings: true, zones: true, dynamic: true };
   for (const name of [
     "buildingsGroup", "zonesGroup", "dynamicGroup",
-    "primaryPathGroup", "evidenceGroup",
+    "evidenceGroup",
   ]) {
     viewer[name] = new THREE.Group();
     if (Viewer === PredictiveViewer) viewer.content.add(viewer[name]);
@@ -98,7 +89,6 @@ function dynamicHarness() {
   const viewer = viewerHarness(DynamicViewer);
   viewer.setScenario(movingScenario);
   viewer.renderer.shadowMap.needsUpdate = false;
-  viewer.replaceLine = vi.fn(() => null);
   return viewer;
 }
 
@@ -109,7 +99,6 @@ function predictiveHarness() {
     { timeS: 0, position: [10, 10, 20] },
     { timeS: 10, position: [90, 90, 20] },
   ];
-  viewer.replaceLine = vi.fn(() => null);
   viewer.setRun({
     rawTimedPath: path,
     geometryTimedPath: path,
@@ -137,13 +126,10 @@ function depthHarness(Viewer: typeof SceneViewer | typeof DynamicViewer | typeof
     results: [{ plannerId: "astar-3d", paths: { raw: points, smoothed: points } }],
   };
   const before = JSON.stringify(scenario);
-  if (Viewer === SceneViewer) {
-    viewer.setScenario(scenario, new Set(["astar-3d"]), "smoothed");
-  } else if (Viewer === DynamicViewer) {
-    viewer.setScenario(scenario);
-    viewer.setFrame({ ...frame, path: points, executedPath: points.slice(0, 2) });
-  } else {
-    viewer.setScenario(scenario);
+  viewer.setScenario(scenario);
+  viewer.setRoutes([{ id: scenario.id, label: scenario.label, points,
+    timedPath: points.map((position, i) => ({ timeS: i * 5, position })), playbackKind: "fixed" }], scenario.id);
+  if (Viewer === PredictiveViewer) {
     const path = points.map((position, index) => ({ timeS: index * 5, position }));
     const witness = {
       separationM: 2,
@@ -184,7 +170,7 @@ describe("world-space scene occlusion", () => {
       ] }] };
     viewer.setScenario(scenario);
     viewer.overview = { setTime: vi.fn() };
-    viewer.setFrame({ ...frame, timeS: 10 }, 20, 10);
+    viewer.setTime(20);
     expect(viewer.movingSpheres.get("traffic").position.toArray()).toEqual([50,40,-50]);
     const traffic = viewer.movingSpheres.get("traffic");
     viewer.setScenario({ ...scenario, id: "another-task" });
@@ -208,7 +194,7 @@ describe("world-space scene occlusion", () => {
   ] as const)("depth-tests every %s scene object, including trajectories and evidence", (_name, Viewer) => {
     const viewer = depthHarness(Viewer);
     let tested = 0;
-    viewer.content.traverse((object: THREE.Object3D) => {
+    viewer.scene.traverse((object: THREE.Object3D) => {
       if (!(object instanceof THREE.Mesh || object instanceof THREE.Line)) return;
       for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
         expect(material.depthTest, object.name).toBe(true);
@@ -226,7 +212,7 @@ describe("world-space scene occlusion", () => {
   ] as const)("makes %s endpoint symbols opaque, smaller, and normally depth-ordered", (_name, Viewer) => {
     const viewer = depthHarness(Viewer);
     for (const role of ["start", "goal"] as const) {
-      const endpoint = viewer.content.getObjectByName(`endpoint-${role}`)!;
+      const endpoint = viewer.scene.getObjectByName(`overview-${role}-${viewer.scenario.id}`)!;
       endpoint.traverse((object: THREE.Object3D) => {
         if (!(object instanceof THREE.Mesh)) return;
         const material = object.material as THREE.MeshStandardMaterial;
@@ -234,7 +220,10 @@ describe("world-space scene occlusion", () => {
         expect(material.depthTest && material.depthWrite).toBe(true);
       });
       expect(endpoint.renderOrder).toBe(0);
-      if (role === "start") expect(((endpoint as THREE.Mesh).geometry as THREE.SphereGeometry).parameters.radius).toBe(6);
+      if (role === "start") {
+        expect(endpoint.userData.kind).toBe("launch-marker");
+        expect(endpoint.getObjectByName("launch-pad-frame")).toBeDefined();
+      }
       else {
         expect(endpoint.userData.kind).toBe("finish-marker");
         expect(endpoint.getObjectByName("finish-checkered-flag")).toBeDefined();
@@ -248,17 +237,17 @@ describe("world-space scene occlusion", () => {
     ["static", SceneViewer],
     ["dynamic", DynamicViewer],
     ["predictive", PredictiveViewer],
-  ] as const)("keeps %s trajectory widths in world units without depth-buffer pollution", (_name, Viewer) => {
+  ] as const)("keeps %s active trajectories readable without depth-buffer pollution", (_name, Viewer) => {
     const viewer = depthHarness(Viewer);
     let paths = 0;
-    viewer.content.traverse((object: THREE.Object3D) => {
+    viewer.scene.traverse((object: THREE.Object3D) => {
       if (!(object instanceof Line2)) return;
-      expect(object.material.worldUnits).toBe(true);
+      expect(object.material.worldUnits).toBe(!object.name.startsWith("overview-"));
       expect(object.material.depthWrite).toBe(false);
-      expect(object.material.alphaToCoverage).toBe(true);
+      expect(object.material.alphaToCoverage, object.name).toBe(!object.name.startsWith("overview-plan-"));
       expect(object.material.linewidth).toBeGreaterThan(0);
-      expect(object.material.linewidth).toBeLessThanOrEqual(4.7);
-      expect(object.renderOrder).toBeLessThanOrEqual(1);
+      expect(object.material.linewidth).toBeLessThanOrEqual(7.3);
+      expect(object.renderOrder).toBeLessThanOrEqual(3);
       paths += 1;
     });
     expect(paths).toBeGreaterThan(0);
@@ -270,11 +259,15 @@ describe("world-space scene occlusion", () => {
     ["predictive", PredictiveViewer],
   ] as const)("depth-orders the %s vehicle and preserves physical traffic radii", (_name, Viewer) => {
     const viewer = depthHarness(Viewer);
-    expect(viewer.vehicle.geometry.parameters.radius).toBe(4);
-    expect(viewer.vehicle.geometry.parameters.height).toBe(10);
-    expect(viewer.vehicle.material.transparent).toBe(false);
-    expect(viewer.vehicle.material.depthWrite).toBe(true);
-    expect(viewer.vehicle.renderOrder).toBe(0);
+    const drone = viewer.overview.vehicle(viewer.scenario.id);
+    expect(drone.userData.kind).toBe("quadcopter");
+    drone.traverse((object: THREE.Object3D) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      expect(object.material.transparent).toBe(false);
+      expect(object.material.depthTest && object.material.depthWrite).toBe(true);
+      expect(object.castShadow).toBe(false);
+    });
+    expect(viewer.content.getObjectByName("vehicle")).toBeUndefined();
     const traffic = viewer.movingSpheres.get("traffic");
     if (traffic.userData.kind === "cargo-drone") {
       expect(traffic.userData.separationRadiusM).toBe(2);
@@ -297,19 +290,18 @@ describe("world-space scene occlusion", () => {
     viewer.clearContent();
   });
 
-  it("retains depth-tested world-space styling when predictive path buffers are reused", () => {
+  it("retains the single predictive overview renderer and its buffers during playback", () => {
     const viewer = depthHarness(PredictiveViewer);
-    const primary = viewer.primaryPath;
-    const executed = viewer.executedPath;
-    expect(viewer.rawPath).toBeUndefined();
-    expect(viewer.rawPathGroup).toBeUndefined();
+    const lines: Line2[] = [];
+    viewer.overview.group.traverse((object: THREE.Object3D) => { if (object instanceof Line2) lines.push(object); });
+    const geometries = lines.map(line => line.geometry);
+    expect(viewer.content.getObjectByName("vehicle")).toBeUndefined();
     for (const time of [7, 0, 5, 10]) {
       viewer.setTime(time);
-      expect(viewer.primaryPath).toBe(primary);
-      expect(viewer.executedPath).toBe(executed);
-      for (const line of [primary, executed]) {
+      for (const [index, line] of lines.entries()) {
+        expect(line.geometry).toBe(geometries[index]);
         expect(line.material.depthTest).toBe(true);
-        expect(line.material.worldUnits).toBe(true);
+        expect(line.material.worldUnits).toBe(false);
         expect(line.material.depthWrite).toBe(false);
       }
     }
@@ -345,9 +337,7 @@ describe("cached viewer shadows", () => {
   ] as const)("invalidates %s shadows on the first scene and every rebuild", (_name, Viewer) => {
     const viewer = viewerHarness(Viewer);
     const scenario = Viewer === SceneViewer ? staticScenario : movingScenario;
-    const rebuild = () => Viewer === SceneViewer
-      ? viewer.setScenario(scenario, new Set(), "smoothed")
-      : viewer.setScenario(scenario);
+    const rebuild = () => viewer.setScenario(scenario);
 
     rebuild();
     expect(viewer.renderer.shadowMap.needsUpdate).toBe(true);
@@ -358,36 +348,37 @@ describe("cached viewer shadows", () => {
 
   it("reuses the dynamic city shadow map when animated objects do not cast shadows", () => {
     const viewer = dynamicHarness();
-    expect(viewer.vehicle.castShadow).toBe(false);
+    expect(viewer.content.getObjectByName("vehicle")).toBeUndefined();
     expect(viewer.movingSpheres.get("traffic").castShadow).toBe(false);
-    viewer.setFrame(frame);
+    viewer.setTime(2);
     expect(viewer.renderer.shadowMap.needsUpdate).toBe(false);
   });
 
-  it("invalidates dynamic shadows if the moving vehicle actually casts a shadow", () => {
+  it("does not allocate the obsolete single-mission vehicle or path renderer", () => {
     const viewer = dynamicHarness();
-    viewer.vehicle.castShadow = true;
-    viewer.setFrame(frame);
-    expect(viewer.renderer.shadowMap.needsUpdate).toBe(true);
+    viewer.setTime(2);
+    expect(viewer.content.getObjectByName("vehicle")).toBeUndefined();
+    expect(viewer.content.getObjectByName("trajectory-planned")).toBeUndefined();
+    expect(viewer.content.getObjectByName("trajectory-executed")).toBeUndefined();
   });
 
   it("invalidates dynamic shadows if a moving traffic mesh actually casts a shadow", () => {
     const viewer = dynamicHarness();
     viewer.movingSpheres.get("traffic").castShadow = true;
-    viewer.setFrame(frame);
-    expect(viewer.renderer.shadowMap.needsUpdate).toBe(true);
-  });
-
-  it("refreshes the predictive vehicle shadow during playback", () => {
-    const viewer = predictiveHarness();
-    expect(viewer.vehicle.castShadow).toBe(true);
     viewer.setTime(2);
     expect(viewer.renderer.shadowMap.needsUpdate).toBe(true);
   });
 
+  it("does not allocate a hidden predictive cone vehicle", () => {
+    const viewer = predictiveHarness();
+    expect(viewer.content.getObjectByName("vehicle")).toBeUndefined();
+    viewer.dynamicGroup.traverse((child: THREE.Object3D) => { child.castShadow = false; });
+    viewer.setTime(2);
+    expect(viewer.renderer.shadowMap.needsUpdate).toBe(false);
+  });
+
   it("detects a predictive caster inside its moving traffic group", () => {
     const viewer = predictiveHarness();
-    viewer.vehicle.castShadow = false;
     const traffic = viewer.movingSpheres.get("traffic");
     expect(traffic.castShadow).toBe(false);
     expect(traffic.children[0].castShadow).toBe(true);
@@ -397,7 +388,6 @@ describe("cached viewer shadows", () => {
 
   it("reuses predictive shadows when no animated object casts one", () => {
     const viewer = predictiveHarness();
-    viewer.vehicle.castShadow = false;
     viewer.dynamicGroup.traverse((child: THREE.Object3D) => { child.castShadow = false; });
     viewer.setTime(2);
     expect(viewer.renderer.shadowMap.needsUpdate).toBe(false);
@@ -423,17 +413,15 @@ describe("cached viewer shadows", () => {
 
   it("does not refresh predictive shadows for hidden moving traffic", () => {
     const viewer = predictiveHarness();
-    viewer.vehicle.castShadow = false;
     viewer.setLayerVisibility("dynamic", false);
     viewer.renderer.shadowMap.needsUpdate = false;
     viewer.setTime(2);
     expect(viewer.renderer.shadowMap.needsUpdate).toBe(false);
   });
 
-  it("does not invalidate shadows for non-casting zone and raw-path layer changes", () => {
+  it("does not invalidate shadows for non-casting zone layer changes", () => {
     const viewer = predictiveHarness();
     viewer.setLayerVisibility("zones", false);
-    viewer.setLayerVisibility("raw", true);
     expect(viewer.renderer.shadowMap.needsUpdate).toBe(false);
   });
 });
@@ -449,9 +437,7 @@ describe("shared map background lifecycle", () => {
       ...(Viewer === SceneViewer ? staticScenario : movingScenario),
       ...cityPresentation,
     };
-    const rebuild = () => Viewer === SceneViewer
-      ? viewer.setScenario(scenario, new Set(), "smoothed")
-      : viewer.setScenario(scenario);
+    const rebuild = () => viewer.setScenario(scenario);
     rebuild();
     for (let cycle = 0; cycle < 2; cycle += 1) {
       const oldContext = viewer.content.getObjectByName("city-context") as THREE.Group;
@@ -493,9 +479,7 @@ describe("shared map background lifecycle", () => {
       ...cityPresentation,
     };
     const originalScenario = JSON.stringify(scenario);
-    const rebuild = () => Viewer === SceneViewer
-      ? viewer.setScenario(scenario, new Set(), "smoothed")
-      : viewer.setScenario(scenario);
+    const rebuild = () => viewer.setScenario(scenario);
     rebuild();
     const oldContext = viewer.content.getObjectByName("city-context") as THREE.Group;
     expect(oldContext).toBeDefined();
@@ -548,8 +532,7 @@ describe("shared map background lifecycle", () => {
     viewer.renderer.setSize = vi.fn();
     // Exercise the real framing math; only the GPU renderer stays stubbed.
     viewer.setView = Viewer.prototype.setView;
-    if (Viewer === SceneViewer) viewer.setScenario(scenario, new Set(), "smoothed");
-    else viewer.setScenario(scenario);
+    viewer.setScenario(scenario);
     const context = viewer.content.getObjectByName("city-context") as THREE.Group;
     const backgroundProbe = new THREE.Mesh(
       new THREE.PlaneGeometry(80_000, 80_000), new THREE.MeshBasicMaterial(),
@@ -562,16 +545,14 @@ describe("shared map background lifecycle", () => {
       bounds: { min: viewer.sceneBounds().min.toArray(), max: viewer.sceneBounds().max.toArray() },
       city: { min: viewer.cityBounds.min.toArray(), max: viewer.cityBounds.max.toArray() },
     });
-    for (const scope of ["city", "mission"] as const) {
-      for (const preset of ["isometric", "top"] as const) {
-        viewer.setMapScope(scope);
-        viewer.setView(preset);
-        const before = snapshot();
-        context.add(backgroundProbe);
-        viewer.setView(preset);
-        expect(snapshot()).toEqual(before);
-        context.remove(backgroundProbe);
-      }
+    for (const preset of ["isometric", "top"] as const) {
+      const view = Viewer === PredictiveViewer && preset === "top" ? "xy" : preset;
+      viewer.setView(view);
+      const before = snapshot();
+      context.add(backgroundProbe);
+      viewer.setView(view);
+      expect(snapshot()).toEqual(before);
+      context.remove(backgroundProbe);
     }
     backgroundProbe.geometry.dispose();
     backgroundProbe.material.dispose();

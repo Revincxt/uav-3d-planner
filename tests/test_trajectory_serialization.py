@@ -58,6 +58,25 @@ def test_default_preserves_historical_timing_without_decimal_export_guard() -> N
     assert retime_timed_path(raw, serialization_decimal_places=None).timed_path == raw
 
 
+def test_micro_chords_on_large_absolute_clock_keep_knots_and_qualify_roundtrip() -> None:
+    raw = TimedPath(
+        tuple(
+            TimedWaypoint(
+                500.0 + index * 1e-7,
+                (2000.0 + index * 1e-6, 1000.0, 110.0),
+                "start" if index == 0 else "move",
+            )
+            for index in range(12)
+        )
+    )
+    result = retime_timed_path(raw, serialization_decimal_places=11)
+    assert result.status == "qualified" and result.qualification.qualified
+    assert result.timed_path.positions == raw.positions
+    assert len(result.timed_path.waypoints) == len(raw.waypoints)
+    assert qualify_timed_path_execution(_round_trip(result.timed_path)).qualified
+    assert result.timed_path.duration_s < 0.02
+
+
 def test_round_trip_guard_keeps_height_sequence_real_wait_and_duration_lower_bounds() -> None:
     raw = TimedPath(
         (

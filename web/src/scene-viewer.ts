@@ -1,8 +1,5 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { Line2 } from "three/addons/lines/Line2.js";
-import { LineGeometry } from "three/addons/lines/LineGeometry.js";
-import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
 import { enuToThree } from "./coordinates";
 import { addZoneVisual, fitMapCamera } from "./viewer-geometry";
@@ -13,29 +10,15 @@ import { DroneFollow } from "./drone-follow";
 import { positionEncounterCamera } from "./encounter-view";
 import { sameSharedWorld } from "./shared-world";
 import { disposeRenderObject } from "./render-resources";
-import { createEndpointMarker, sceneLineStyle } from "./scene-style";
 import { addMissionTaskMarkers, avoidDroneMarkerOverlap, orientMissionTaskGates, sizeMissionTaskMarkers } from "./mission-tasks";
 import { updateMapSurround } from "./map-surround";
 import { configureMapNavigation, FrameRenderer, mapFramingPadding, positionTopOverview, positionWesternOverview } from "./map-navigation";
 import { MapCameraMotion } from "./map-camera-motion";
 import type { RoutePick } from "./route-picking";
-import type { DemoScenario, PlannerId, Vec3 } from "./schema";
+import type { DemoScenario, Vec3 } from "./schema";
 
-type PathMode = "raw" | "smoothed";
 type ViewPreset = "isometric" | "top" | "reset";
 
-const PATH_STYLES: Record<
-  PlannerId,
-  { color: number; dashed: boolean; dashScale: number }
-> = {
-  "astar-3d": { color: 0x2aa84c, dashed: false, dashScale: 1 },
-  "lazy-theta-star": { color: 0x0d7062, dashed: true, dashScale: 1.2 },
-  "rrt-star": { color: 0x83a923, dashed: true, dashScale: 0.45 },
-};
-
-function disposeObject(object: THREE.Object3D): void {
-  disposeRenderObject(object);
-}
 
 export class SceneViewer {
   private readonly renderer: THREE.WebGLRenderer;
@@ -45,15 +28,11 @@ export class SceneViewer {
   private motion?: MapCameraMotion;
   private readonly frames = new FrameRenderer(() => this.drawFrame());
   private readonly content = new THREE.Group();
-  private readonly paths = new THREE.Group();
   private readonly sun = new THREE.DirectionalLight(0xffffff, 2);
-  private readonly lineMaterials: LineMaterial[] = [];
   private readonly resizeObserver: ResizeObserver;
   private scenario: DemoScenario | null = null;
-  private mode: PathMode = "smoothed";
-  private visiblePlanners = new Set<PlannerId>();
   private cityBounds = new THREE.Box3();
-  private mapScope: "city" | "mission" = "city";
+  private readonly routeBounds = new WeakMap<DemoScenario, THREE.Box3>();
   private viewPreset: ViewPreset = "isometric";
   private cityLayer?: RetainedCity;
   private overview?: RouteOverview;
@@ -87,34 +66,26 @@ export class SceneViewer {
     this.resizeObserver.observe(container);
   }
 
-  setScenario(scenario: DemoScenario, visible: Set<PlannerId>, mode: PathMode): void {
+  setScenario(scenario: DemoScenario): void {
     const first = !this.scenario;
     if (sameSharedWorld(this.scenario?.mission, scenario.mission)) {
       this.scenario = scenario;
-      this.visiblePlanners = new Set(visible); this.mode = mode;
       const tasks = this.content.getObjectByName("mission-task-points");
-      if (tasks) { tasks.removeFromParent(); disposeObject(tasks); }
+      if (tasks) { tasks.removeFromParent(); disposeRenderObject(tasks); }
       addMissionTaskMarkers(this.content, scenario.mission);
-      this.addPaths();
       if (this.observationBounds && !this.follow?.routeId) this.observeEncounter(scenario.mission?.challenge?.focusPosition ?? scenario.start);
       this.render();
       return;
     }
     this.clearContent();
     this.scenario = scenario;
-    this.visiblePlanners = new Set(visible);
-    this.mode = mode;
-    this.content.add(this.paths);
     this.cityLayer ??= new RetainedCity();
     this.cityBounds = this.cityLayer.mount(this.content, scenario, texture => {
       if (texture) this.renderer.initTexture(texture);
       this.frames.request();
     });
-    scenario.noFlyZones.forEach((zone) => this.addNoFlyZone(zone));
-    this.addEndpoint(scenario.start, "start");
-    this.addEndpoint(scenario.goal, "goal");
+    scenario.noFlyZones.forEach((zone) => addZoneVisual(this.content, zone));
     addMissionTaskMarkers(this.content, scenario.mission);
-    this.addPaths();
     this.configureSun();
     if (first) this.setView("isometric");
     else if (this.observationBounds && !this.follow?.routeId) this.observeEncounter(scenario.mission?.challenge?.focusPosition ?? scenario.start);
@@ -126,8 +97,6 @@ export class SceneViewer {
     this.scene.add(this.overview.group);
     this.overview.setRoutes(routes, activeId, this.container.clientWidth, this.container.clientHeight);
     orientMissionTaskGates(this.content, routes.find(route => route.id === activeId)?.points ?? [], routeColor(routes.findIndex(route => route.id === activeId)));
-    this.paths.visible = false;
-    this.content.traverse(object => { if (object.name.startsWith("endpoint-")) object.visible = false; });
     this.render();
   }
 
@@ -158,25 +127,6 @@ export class SceneViewer {
     this.follow.onChange = enabled => this.onFollowChange?.(enabled);
     this.follow.start(id, drone.position, this.overview!.heading(id, this.playbackTimeS), this.container.clientWidth, this.container.clientHeight);
     this.render();
-  }
-
-  setPathMode(mode: PathMode): void {
-    if (!this.scenario || this.mode === mode) return;
-    this.mode = mode;
-    this.addPaths();
-    this.render();
-  }
-
-  setPlannerVisibility(planners: Set<PlannerId>): void {
-    if (!this.scenario) return;
-    this.visiblePlanners = new Set(planners);
-    this.addPaths();
-    this.render();
-  }
-
-  setMapScope(scope: "city" | "mission"): void {
-    this.mapScope = scope;
-    this.setView(this.viewPreset);
   }
 
   observeEncounter(position: Vec3): void {
@@ -223,13 +173,11 @@ export class SceneViewer {
   }
 
   private clearContent(): void {
-    this.lineMaterials.length = 0;
     for (const child of [...this.content.children]) {
       if (child === this.cityLayer?.group) continue;
       this.content.remove(child);
-      disposeObject(child);
+      disposeRenderObject(child);
     }
-    this.paths.clear();
     this.cityBounds.makeEmpty();
   }
 
@@ -252,48 +200,7 @@ export class SceneViewer {
     this.renderer.shadowMap.needsUpdate = true;
   }
 
-  private addNoFlyZone(zone: DemoScenario["noFlyZones"][number]): void {
-    addZoneVisual(this.content, zone);
-  }
 
-  private addEndpoint(point: Vec3, kind: "start" | "goal"): void {
-    if (this.overview) return;
-    const marker = createEndpointMarker(kind, Boolean(this.scenario?.city), kind === "start" ? 0x28a745 : 0x009b87);
-    marker.position.fromArray(enuToThree(point));
-    marker.name = `endpoint-${kind}`;
-    marker.receiveShadow = true;
-    this.content.add(marker);
-  }
-
-  private addPaths(): void {
-    if (!this.scenario) return;
-    if (this.overview) return;
-    for (const child of [...this.paths.children]) {
-      this.paths.remove(child);
-      disposeObject(child);
-    }
-    this.lineMaterials.length = 0;
-    for (const result of this.scenario.results) {
-      if (!result.paths || !this.visiblePlanners.has(result.plannerId)) continue;
-      const path = result.paths[this.mode];
-      const positions = path.flatMap((point) => enuToThree(point));
-      const style = PATH_STYLES[result.plannerId];
-      const geometry = new LineGeometry();
-      geometry.setPositions(positions);
-      const material = new LineMaterial({
-        ...sceneLineStyle(Boolean(this.scenario.city), 3.2, style.dashed),
-        color: style.color,
-        dashSize: (this.scenario.city ? 18 : 7) * style.dashScale,
-        gapSize: this.scenario.city ? 10 : 4,
-      });
-      material.resolution.set(Math.max(1, this.container.clientWidth), Math.max(1, this.container.clientHeight));
-      this.lineMaterials.push(material);
-      const line = new Line2(geometry, material);
-      line.name = `trajectory-${result.plannerId}`;
-      line.computeLineDistances();
-      this.paths.add(line);
-    }
-  }
 
   private resize(): void {
     const width = Math.max(1, this.container.clientWidth);
@@ -301,8 +208,7 @@ export class SceneViewer {
     this.renderer.setSize(width, height, false);
     if (!this.follow?.resize(width, height))
       fitMapCamera(this.camera, this.sceneBounds(), width, height,
-        this.observationBounds ? 1.12 : mapFramingPadding(this.mapScope, this.viewPreset === "isometric"));
-    this.lineMaterials.forEach((material) => material.resolution.set(width, height));
+        this.observationBounds ? 1.12 : mapFramingPadding(this.viewPreset === "isometric"));
     this.overview?.resize(width, height);
     this.render();
   }
@@ -311,16 +217,25 @@ export class SceneViewer {
     if (this.observationBounds) return this.observationBounds.clone();
     if (!this.scenario) return new THREE.Box3(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 50, 50));
     const bounds = this.missionBounds();
-    if (this.mapScope === "city") bounds.union(this.cityBounds);
-    if (this.mapScope === "city" && this.overview) bounds.union(this.overview.bounds);
+    bounds.union(this.cityBounds);
+    if (this.overview) bounds.union(this.overview.bounds);
     return bounds;
   }
 
   private missionBounds(): THREE.Box3 {
     if (!this.scenario) return new THREE.Box3();
     if (this.scenario.city) {
-      return cityMissionBounds(this.scenario, this.scenario.results.flatMap((result) => result.paths
-        ? [...result.paths.raw, ...result.paths.smoothed] : []));
+      let bounds = this.routeBounds.get(this.scenario);
+      if (!bounds) {
+        const scenario = this.scenario;
+        function* points() {
+          for (const result of scenario.results) if (result.paths) {
+            yield* result.paths.raw; yield* result.paths.smoothed;
+          }
+        }
+        bounds = cityMissionBounds(scenario, points()); this.routeBounds.set(scenario, bounds);
+      }
+      return bounds.clone();
     }
     const { min, max } = this.scenario.bounds;
     const bounds = new THREE.Box3(

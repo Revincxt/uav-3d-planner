@@ -16,11 +16,9 @@ const scenario = {
 
 function runWithWitness(
   witness: PredictiveMinimumSeparationWitness | null,
-): Pick<PredictiveRun, "plannerMetrics" | "geometryMetrics" | "executionMetrics"> {
+): Pick<PredictiveRun, "executionMetrics"> {
   const metrics = { minimumSeparationWitness: witness } as PredictiveRun["geometryMetrics"];
   return {
-    plannerMetrics: metrics,
-    geometryMetrics: metrics,
     executionMetrics: metrics,
   };
 }
@@ -44,7 +42,6 @@ describe("minimum-separation viewer evidence", () => {
     const evidence = minimumSeparationEvidence(
       scenario,
       runWithWitness(witness(true)),
-      "geometry",
     );
 
     expect(evidence).not.toBeNull();
@@ -59,7 +56,6 @@ describe("minimum-separation viewer evidence", () => {
     const evidence = minimumSeparationEvidence(
       scenario,
       runWithWitness(witness(false)),
-      "execution",
     );
 
     expect(evidence?.connectorDashed).toBe(true);
@@ -67,13 +63,13 @@ describe("minimum-separation viewer evidence", () => {
   });
 
   it("returns no renderable evidence when the run has no witness", () => {
-    const evidence = minimumSeparationEvidence(scenario, runWithWitness(null), "raw");
+    const evidence = minimumSeparationEvidence(scenario, runWithWitness(null));
 
     expect(evidence).toBeNull();
     expect(isMinimumSeparationEvidenceTime(evidence, 0)).toBe(false);
   });
 
-  it("keeps witnesses scoped to the selected evidence layer", () => {
+  it("does not substitute intermediate witnesses for the displayed final flight", () => {
     const exact = witness(true);
     const metrics = { minimumSeparationWitness: exact } as PredictiveRun["geometryMetrics"];
     const run = {
@@ -82,8 +78,6 @@ describe("minimum-separation viewer evidence", () => {
       executionMetrics: null,
     };
 
-    expect(minimumSeparationEvidence(scenario, run, "raw")).toBeNull();
-    expect(minimumSeparationEvidence(scenario, run, "geometry")?.witness).toBe(exact);
-    expect(minimumSeparationEvidence(scenario, run, "execution")).toBeNull();
+    expect(minimumSeparationEvidence(scenario, run)).toBeNull();
   });
 });

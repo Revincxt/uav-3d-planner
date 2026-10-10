@@ -43,8 +43,8 @@ if TYPE_CHECKING:
     from uav3d.manhattan_city import ManhattanCity
     from uav3d.predictive_study import PredictiveEpisode, PredictiveEpisodeMetrics
 
-PROTOCOL_ID = "manhattan-space-time-v3"
-DATASET_ID = "manhattan-urban-missions-v3"
+PROTOCOL_ID = "manhattan-space-time-v4"
+DATASET_ID = "manhattan-island-missions-v4"
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -64,88 +64,88 @@ class Mission:
 MISSIONS = (
     Mission(
         "manhattan-westside-delivery",
-        "South Chelsea → North Hell's Kitchen",
-        "South Chelsea dispatch roof",
+        "Financial west → North Hell's Kitchen",
+        "Financial west dispatch roof",
         "North Hell's Kitchen receiving roof",
         "Simulated time-sensitive delivery along the western corridor",
-        (-74.0062, 40.7387),
+        (-74.0143, 40.7061),
         (-73.9924, 40.7656),
         90.0,
     ),
     Mission(
         "manhattan-medical-transfer",
-        "NYU medical district → Columbus Circle",
-        "NYU medical district dispatch roof",
+        "Lower East Side → Columbus Circle medical relay",
+        "Lower East Side dispatch roof",
         "Columbus Circle simulated relay roof",
         "Simulated long-distance cold-chain medical specimen transfer",
-        (-73.9741, 40.7424),
+        (-73.9947, 40.7114),
         (-73.9847, 40.7665),
         110.0,
         "medical-north",
     ),
     Mission(
         "manhattan-midtown-rooftops",
-        "Flatiron → Midtown East",
-        "South Flatiron equipment dispatch roof",
+        "Seaport → Midtown East equipment relay",
+        "Seaport equipment dispatch roof",
         "Midtown East receiving roof",
         "Simulated cross-district rooftop equipment delivery",
-        (-73.9921, 40.7385),
+        (-74.0016, 40.7068),
         (-73.9697, 40.7595),
         90.0,
         "east-logistics",
     ),
     Mission(
         "manhattan-riverfront-logistics",
-        "Chelsea Piers → East Midtown",
-        "Chelsea Piers riverfront dispatch roof",
+        "Battery north → East Midtown logistics",
+        "Battery north dispatch roof",
         "East Midtown logistics roof",
         "Simulated west-to-east logistics across scheduled airspace and traffic",
-        (-74.0073, 40.7448),
-        (-73.9728, 40.7560),
+        (-74.0160, 40.7101),
+        (-73.9704, 40.7611),
         100.0,
         "riverfront-logistics",
     ),
     Mission(
         "manhattan-westside-backhaul",
-        "Central Park South → Chelsea depot",
+        "Central Park South → Financial west depot",
         "Central Park South return-parcel roof",
-        "Chelsea interior consolidation roof",
+        "Financial west consolidation roof",
         "Simulated southbound return-parcel backhaul through shared scheduled traffic",
         (-73.9815, 40.7658),
-        (-74.0040, 40.7389),
+        (-74.0137, 40.7043),
         90.0,
         "west-backhaul",
     ),
     Mission(
         "manhattan-medical-return",
-        "Plaza district → Bellevue district",
+        "Plaza district → Lower East Side medical return",
         "Plaza district medical dispatch roof",
-        "Bellevue district medical receiving roof",
+        "Lower East Side medical receiving roof",
         "Simulated hospital-network return of temperature-controlled equipment",
         (-73.9752, 40.7661),
-        (-73.9722, 40.7417),
+        (-73.9972, 40.7106),
         110.0,
         "medical-south",
     ),
     Mission(
         "manhattan-eastside-backhaul",
-        "Rockefeller district → Chelsea east depot",
+        "Rockefeller district → Seaport supply return",
         "Rockefeller district collection roof",
-        "Chelsea east supply consolidation roof",
+        "Seaport supply consolidation roof",
         "Simulated reusable supply collection along Fifth Avenue and Broadway",
         (-73.9771, 40.7601),
-        (-73.9961, 40.7385),
+        (-74.0053, 40.7043),
         90.0,
         "east-backhaul",
     ),
     Mission(
         "manhattan-riverfront-return",
-        "Sutton district → West Chelsea",
+        "Sutton district → Battery Park priority return",
         "Sutton district priority dispatch roof",
-        "West Chelsea priority receiving roof",
+        "Battery Park priority receiving roof",
         "Simulated westbound spare-parts transfer through shared reserved airspace",
         (-73.9718, 40.7614),
-        (-74.0063, 40.7470),
+        (-74.0166, 40.7035),
         100.0,
         "riverfront-backhaul",
     ),
@@ -185,12 +185,10 @@ def study_runtime() -> ModuleType:
         SMOOTHING_SAMPLE_SPACING_M=2.0,
         SPACE_TIME_CONNECTIVITY=26,
         TRAJECTORY_SHORTCUT=True,
-        TRAJECTORY_PRESERVE_ALTITUDE=True,
+        TRAJECTORY_PRESERVE_ALTITUDE=False,
         TRAJECTORY_LOCAL_CURVES=True,
         TRAJECTORY_SCHEDULE_DYNAMIC_WAITS=True,
-        TRAJECTORY_POSTPROCESSOR=(
-            "horizontal-local-quintic-bspline-altitude-preserving-envelope-v5"
-        ),
+        TRAJECTORY_POSTPROCESSOR=("spatial-local-quintic-bspline-bounded-altitude-envelope-v6"),
         EXECUTION_ENVELOPE=DiscreteExecutionEnvelope(
             max_speed_mps=15.0,
             max_abs_climb_rate_mps=3.0,
@@ -213,10 +211,12 @@ def study_runtime() -> ModuleType:
                 "trajectoryShortcut": runtime.TRAJECTORY_SHORTCUT,
                 "trajectoryPreserveAltitude": runtime.TRAJECTORY_PRESERVE_ALTITUDE,
                 "trajectoryCurveDegree": 5,
+                "trajectoryCurveDimensions": 3,
+                "trajectoryAltitudeDeviationLimitM": 12,
                 "reactivePlanningGuardS": runtime.REPLAN_INTERVAL_S,
                 "reactiveHorizontalEscape": True,
                 "trajectoryDynamicScheduling": "certified-move-block-departures",
-                "trajectoryBrakingPolicy": "qualified-hover-at-retained-sharp-height-knots",
+                "trajectoryBrakingPolicy": "qualified-hover-only-at-unroundable-corners",
             }
         )
         return protocol
@@ -304,19 +304,13 @@ def build_manhattan_missions(city: ManhattanCity) -> tuple[DynamicScenario, ...]
             tasks,
             fraction=0.26,
             speed=15,
+            anchor_clearance_m=180,
             protected_anchors=protected_anchors,
-            continuous_patrol=index < 7,
+            continuous_patrol=True,
             patrol_centres=tuple(patrol_centres),
         )
         traffic: tuple[MovingSphere, ...] = (
-            (
-                encounter.aircraft(
-                    f"{mission.mission_id}-scheduled-cargo",
-                    horizon=900,
-                ),
-            )
-            if index < 7
-            else ()
+            encounter.aircraft(f"{mission.mission_id}-scheduled-cargo", horizon=900),
         )
         if traffic:
             patrol_centres.append(encounter.position)
@@ -331,8 +325,8 @@ def build_manhattan_missions(city: ManhattanCity) -> tuple[DynamicScenario, ...]
             "Shared reserved return corridor",
         )
         scheduled: list[TemporaryCylinder] = []
-        if index in (0, 2, 3):
-            fractions = (0.35, 0.68) if index == 2 else ((0.78,) if index == 3 else (0.42,))
+        if index in (0, 2, 3, 5, 7):
+            fractions = (0.35, 0.68) if index in (2, 5, 7) else ((0.78,) if index == 3 else (0.42,))
             for number, fraction in enumerate(fractions):
                 slot = select_encounter(
                     scene,
@@ -398,7 +392,30 @@ def build_manhattan_missions(city: ManhattanCity) -> tuple[DynamicScenario, ...]
                 },
             )
         )
-    return share_dynamic_airspace(tuple(scenarios), "manhattan-predictive-shared-v2")
+    for index in range(4):
+        scenario = scenarios[index]
+        scene = scenario.static_scene
+        tasks = scene.metadata["missionTaskPoints"]
+        encounter = select_encounter(
+            scene,
+            static_reference(scene, tasks, resolution=60),
+            tasks,
+            fraction=0.62,
+            speed=15,
+            anchor_clearance_m=180,
+            protected_anchors=protected_anchors,
+            continuous_patrol=True,
+            patrol_centres=tuple(patrol_centres),
+        )
+        patrol_centres.append(encounter.position)
+        scenarios[index] = replace(
+            scenario,
+            moving_spheres=(
+                *scenario.moving_spheres,
+                encounter.aircraft(f"{scenario.scenario_id}-secondary-cargo", horizon=900),
+            ),
+        )
+    return share_dynamic_airspace(tuple(scenarios), "manhattan-predictive-shared-v3")
 
 
 def _audit_serialized_case(
@@ -466,7 +483,7 @@ def run_multistop_episode(
         "smoothingTurnRadiusM": runtime.SMOOTHING_TURN_RADIUS_M,
         "smoothingSampleSpacingM": runtime.SMOOTHING_SAMPLE_SPACING_M,
         "trajectoryShortcut": 1,
-        "trajectoryPreserveAltitude": 1,
+        "trajectoryPreserveAltitude": int(runtime.TRAJECTORY_PRESERVE_ALTITUDE),
         "trajectoryCurveDegree": 5,
         "taskPointCount": len(tasks),
         "legCount": len(tasks) + 1,
@@ -554,6 +571,7 @@ def run_multistop_episode(
             shortcut_paths=True,
             preserve_altitude=True,
             smooth_turns=True,
+            spatial_curves=True,
             turn_scale_m=runtime.SMOOTHING_TURN_RADIUS_M,
             curve_sample_spacing_m=runtime.SMOOTHING_SAMPLE_SPACING_M,
             allow_horizontal_escape=True,

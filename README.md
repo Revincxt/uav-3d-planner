@@ -25,9 +25,7 @@ A 3D UAV path-planning simulator built on real Manhattan building data, featurin
 - **Predictive**: Use known traffic schedules for 4D space-time planning, avoiding future conflicts and restricted time windows.
 - **Benchmark**: Compare three aggregate metrics per study using bar charts.
 
-Explore a 3.6 × 3.8 km city model with 8 missions per study and 6–8 mandatory waypoints per route. Includes smooth trajectories, variable-speed playback, close-range drone following, and mission details.
-
-Planning and validation run offline in Python; the browser replays precomputed results. Missions and traffic are simulated, not approved for real-world flight. Joint collision avoidance between mission UAVs is not implemented.
+Explore a 4.5 × 7.7 km city model from Midtown to Battery Park, with 20,757 source buildings, 8 long-range missions per study, 6–8 mandatory waypoints per route, and 12 shared cargo drones in each dynamic study. Includes collision-checked XYZ spline smoothing, variable-speed playback, close-range drone following, and mission details.
 
 ## Quick Start
 
@@ -40,6 +38,8 @@ pnpm dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173). Precomputed results are restored automatically from verified lossless archives; no Python installation or route recomputation is needed. Online aerial imagery requires internet access, with a road-map fallback when offline.
+
+Native records are stored as checksum-verified compressed shards, each capped at 24 MiB for GitHub compatibility. They remain local audit inputs; the deployed site includes only lossless, deduplicated browser datasets and required assets.
 
 ## References
 

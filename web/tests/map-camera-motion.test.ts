@@ -1,4 +1,4 @@
-import { OrthographicCamera, Vector3 } from "three";
+import { OrthographicCamera, Spherical, Vector3 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { MapCameraMotion } from "../src/map-camera-motion";
 function fixture(reduced = false) {
@@ -30,5 +30,30 @@ describe("smooth safe map presets", () => {
     const f = fixture(); f.motion.transition(f.top, 0); f.motion.step(100); const position = f.camera.position.clone(); f.motion.cancel();
     expect(f.motion.step(200)).toBe(false); expect(f.camera.position.equals(position)).toBe(true);
     const reduced = fixture(true); reduced.motion.transition(reduced.top, 0); expect(reduced.camera.position.y).toBe(200); expect(reduced.motion.step(100)).toBe(false);
+  });
+  it("does not animate repeated selection of the current preset", () => {
+    const f = fixture(); f.request.mockClear();
+    f.motion.transition(f.west, 20);
+    expect(f.request).not.toHaveBeenCalled();
+    expect(f.motion.step(100)).toBe(false);
+  });
+  it("precomputes the orbit endpoints instead of allocating them on every animation frame", () => {
+    const f = fixture(), spherical = vi.spyOn(Spherical.prototype, "setFromVector3");
+    try {
+      f.motion.transition(f.top, 0);
+      expect(spherical).toHaveBeenCalledTimes(2); spherical.mockClear();
+      for (let t = 0; t < 320; t += 4) f.motion.step(t);
+      expect(spherical).not.toHaveBeenCalled();
+      f.motion.step(320);
+      expect(f.camera.position.toArray()).toEqual([-.001, 200, 0]);
+    } finally { spherical.mockRestore(); }
+  });
+  it("does not rebuild an unchanged projection during orientation-only motion", () => {
+    const f = fixture(), projection = vi.spyOn(f.camera, "updateProjectionMatrix");
+    f.motion.transition(() => { f.camera.position.set(-40, 150, 0); f.camera.lookAt(f.target); }, 0);
+    projection.mockClear();
+    for (let t = 0; t <= 320; t += 8) f.motion.step(t);
+    expect(projection).not.toHaveBeenCalled();
+    projection.mockRestore();
   });
 });

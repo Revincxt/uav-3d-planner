@@ -318,7 +318,12 @@ def retime_timed_path(
             abs(displacement[2]) / (declared.max_abs_climb_rate_mps * limit_factor),
             0.0
             if serialization_decimal_places is None
-            else 4.0 * 10.0 ** (-serialization_decimal_places),
+            # Sub-millisecond moving samples amplify decimal position error
+            # and subtraction of large absolute timestamps in acceleration.
+            # Preserve every geometry knot, but give it a representable clock
+            # interval. This guard is opt-in; historical research timing stays
+            # unchanged, and all actual/rounded constraints are still audited.
+            else max(0.001, 4.0 * 10.0 ** (-serialization_decimal_places)),
         )
 
     blocks = _movement_blocks(path)

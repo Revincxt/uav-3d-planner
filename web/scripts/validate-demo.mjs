@@ -1,9 +1,9 @@
-import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { readStudyData } from './study-reader.mjs';
 
 const file = process.argv[2] ? resolve(process.argv[2]) : new URL("../public/demo-data.json", import.meta.url);
-const data = JSON.parse(await readFile(file, "utf8"));
+const data = await readStudyData(file);
 
 const fail = (message) => {
   throw new Error(`demo-data.json: ${message}`);
@@ -19,10 +19,12 @@ const length = (path) =>
 
 const validateAltitudeProfile = (result) => {
   const policy = result.smoothing.altitudePolicy;
-  if (policy === undefined) return; // Historical exports retain their original 3D policy.
-  if (policy !== "preserve-raw-altitude-profile-v1"
-    || JSON.stringify(result.smoothing.optimizationAxes) !== '["x","y"]') {
-    fail(`${result.runId} must declare XY-only altitude-preserving smoothing`);
+  if (policy === undefined) return; // Generic research exports omit the city certificate.
+  const limit = result.smoothing.altitudeDeviationLimitM;
+  if (policy !== "bounded-spatial-spline-v1"
+    || JSON.stringify(result.smoothing.optimizationAxes) !== '["x","y","z"]'
+    || limit !== 12) {
+    fail(`${result.runId} must declare a valid spline altitude policy and optimization axes`);
   }
   const raw = result.paths.raw;
   const candidate = result.paths.smoothed;
@@ -33,8 +35,8 @@ const validateAltitudeProfile = (result) => {
     || Math.abs(outputProgress[0]) > 1e-9 || Math.abs(outputProgress.at(-1) - 1) > 1e-9
     || !Number.isFinite(result.smoothing.altitudeProfileMaxErrorM)
     || result.smoothing.altitudeProfileMaxErrorM < 0
-    || result.smoothing.altitudeProfileMaxErrorM > 1e-6) {
-    fail(`${result.runId} has an invalid altitude-preservation progress certificate`);
+    || result.smoothing.altitudeProfileMaxErrorM > limit + 1e-6) {
+    fail(`${result.runId} has an invalid altitude progress certificate`);
   }
   const cumulative = [0];
   for (let index = 1; index < raw.length; index += 1) {
@@ -52,8 +54,9 @@ const validateAltitudeProfile = (result) => {
   };
   // Checking the union of both profiles' knots also catches a missing raw peak or slope change.
   for (const value of new Set([...rawProgress, ...outputProgress])) {
-    if (Math.abs(heightAt(raw, rawProgress, value) - heightAt(candidate, outputProgress, value)) > 1e-6) {
-      fail(`${result.runId} XY smoothing changed its original altitude profile`);
+    if (Math.abs(heightAt(raw, rawProgress, value) - heightAt(candidate, outputProgress, value))
+        > result.smoothing.altitudeProfileMaxErrorM + 1e-6) {
+      fail(`${result.runId} smoothing exceeds its declared altitude deviation`);
     }
   }
 };
@@ -134,11 +137,8 @@ for (const scene of data.scenarios) {
     citySources.add(scene.city.sourceSha256);
     const width = scene.bounds.max[0] - scene.bounds.min[0], depth = scene.bounds.max[1] - scene.bounds.min[1];
     const regionId = scene.city.planningRegion?.id;
-    const completeExtent = regionId === "midtown-expanded-v3"
-      ? width >= 3500 && width <= 3700 && depth >= 3700 && depth <= 3900
-      : regionId === "midtown-landscape-v2"
-        ? width >= 3500 && depth >= 1800 && width / depth >= 1.7 && width / depth <= 2
-        : width >= 2000 && depth >= 2000;
+    const completeExtent = regionId === "manhattan-south-expanded-v4" &&
+      width >= 4400 && width <= 4800 && depth >= 7400 && depth <= 8000;
     if (!Array.isArray(scene.buildings) || scene.buildings.length < 1000
       || scene.city.buildingCount !== scene.buildings.length
       || !completeExtent) {

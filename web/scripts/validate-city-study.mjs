@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { readStudyData } from './study-reader.mjs';
 
 const source = JSON.parse(await readFile(resolve(process.argv[2] ?? "../data/manhattan/city.json"), "utf8"));
 const publicDirectory = resolve(process.argv[3] ?? "public");
@@ -31,10 +32,10 @@ const auditVisits = (positions, tasks, times, label) => {
   }
 };
 for (const track of ["demo", "dynamic", "predictive"]) {
-  const bundle = JSON.parse(await readFile(resolve(publicDirectory, `${track}-data.json`), "utf8"));
+  const bundle = await readStudyData(resolve(publicDirectory, `${track}-data.json`));
   if (bundle.scenarios.length !== 8) throw new Error(`${track}: exactly eight new Manhattan missions are required`);
   if (track !== "demo") for (const scenario of bundle.scenarios) {
-    if (scenario.movingSpheres.length !== 7) throw new Error(`${scenario.id}: requires seven shared cargo aircraft`);
+    if (scenario.movingSpheres.length !== 12) throw new Error(`${scenario.id}: requires twelve shared cargo aircraft`);
     for (const aircraft of scenario.movingSpheres) {
       const frames = aircraft.keyframes;
       if (frames[0].timeS !== 0 || frames.at(-1).timeS < bundle.protocol.maxTimeS) throw new Error(`${aircraft.id}: incomplete patrol horizon`);
@@ -60,14 +61,14 @@ for (const track of ["demo", "dynamic", "predictive"]) {
       || !Number.isFinite(task.serviceDurationS) || (task.visitMode === "fly-through" ? task.serviceDurationS !== 0 : task.serviceDurationS <= 0)
       || !Array.isArray(task.position) || task.position.length !== 3 || task.position.some((value, axis) => !Number.isFinite(value) || value < source.bounds.min[axis] || value > source.bounds.max[axis]))) throw new Error(`${scenario.id}: invalid source-backed ordered task`);
     if (new Set(tasks.map(task => task.id)).size !== tasks.length) throw new Error(`${scenario.id}: duplicate task IDs`);
-    if (scenario.mission.planningScale?.id !== "cross-district-multistop-v2"
-      || scenario.mission.planningScale.horizontalDistanceM < 2400 || scenario.mission.planningScale.cityAxisCoverage < 0.55) throw new Error(`${scenario.id}: missing cross-district planning evidence`);
+    if (scenario.mission.planningScale?.id !== "manhattan-island-multistop-v3"
+      || scenario.mission.planningScale.horizontalDistanceM < 4500 || scenario.mission.planningScale.cityAxisCoverage < 0.55) throw new Error(`${scenario.id}: missing island-scale planning evidence`);
     taskCount += tasks.length;
     const records = scenario.results ?? scenario.runs;
     for (const run of records) {
       if (run.status !== "success") throw new Error(`${scenario.id}: displayed mission did not succeed`);
       const length = run.metrics?.rawLengthM ?? run.plannerMetrics?.executedPathLengthM ?? run.metrics?.executedPathLengthM;
-      if (!Number.isFinite(length) || length < 2400) throw new Error(`${scenario.id}: missing recomputed city-scale path evidence`);
+      if (!Number.isFinite(length) || length < 4500) throw new Error(`${scenario.id}: missing recomputed island-scale path evidence`);
       if (track === "demo") {
         for (const [layer, positions] of Object.entries(run.paths)) auditVisits(positions, tasks, null, `${scenario.id}/${run.plannerId}/${layer}`);
       } else if (track === "dynamic") {

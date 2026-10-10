@@ -31,8 +31,9 @@ export interface PlannerResult {
   smoothing: {
     outcome: "bspline" | "shortcut" | "shortcut-fallback" | "not-run";
     collisionFree: boolean;
-    optimizationAxes?: ["x", "y"];
-    altitudePolicy?: "preserve-raw-altitude-profile-v1";
+    optimizationAxes?: ["x", "y", "z"];
+    altitudePolicy?: "bounded-spatial-spline-v1";
+    altitudeDeviationLimitM?: number;
     altitudeProfileMaxErrorM?: number;
     altitudeProfileProgress?: number[];
   };

@@ -89,17 +89,21 @@ class ManhattanGeometryTests(unittest.TestCase):
         self.assertGreater(north[1], 100)
         self.assertLess(abs(north[0]), 0.001)
 
-    def test_expanded_region_keeps_width_and_projection_origin(self) -> None:
+    def test_southern_expansion_covers_battery_park_and_preserves_projection_origin(self) -> None:
         self.assertEqual(ORIGIN_WGS84, (-74.005, 40.742))
         self.assertEqual(self.city.metadata["requestedBoundsWgs84"], list(ROI_WGS84))
-        self.assertEqual(self.city.metadata["planningRegion"]["id"], "midtown-expanded-v3")
-        self.assertEqual((ROI_WGS84[0], ROI_WGS84[2]), (-74.0078, -73.9670))
+        self.assertEqual(self.city.metadata["planningRegion"]["id"], "manhattan-south-expanded-v4")
+        self.assertEqual(ROI_WGS84, (-74.0200, 40.7000, -73.9670, 40.7676))
         width = self.city.bounds.maximum[0] - self.city.bounds.minimum[0]
         depth = self.city.bounds.maximum[1] - self.city.bounds.minimum[1]
-        self.assertGreater(width, 3500)
-        self.assertLess(width, 3700)
-        self.assertGreater(depth, 3700)
-        self.assertLess(depth, 3900)
+        self.assertGreater(width, 4400)
+        self.assertLess(width, 4800)
+        self.assertGreater(depth, 7400)
+        self.assertLess(depth, 8000)
+        self.assertGreater(len(self.city.buildings), 20000)
+        self.assertTrue(
+            all(str(f["properties"]["BASE_BBL"]).startswith("1") for f in self.source["features"])
+        )
 
     def test_real_city_is_shared_in_scenes_and_simulated_endpoints_are_free(self) -> None:
         start = self.city.rooftop_point(-73.9935, 40.7506)

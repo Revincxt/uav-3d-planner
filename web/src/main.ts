@@ -3,7 +3,7 @@ import "./styles.css";
 import { loadDemoBundle } from "./data";
 import { SceneViewer } from "./scene-viewer";
 import type { DemoBundle, DemoScenario, PlannerId } from "./schema";
-import { missionCaption, mountInspector, mountWorkspace } from "./workspace";
+import { mountInspector, mountWorkspace } from "./workspace";
 import "./workspace.css";
 import "./simulator-ui.css";
 import { mountBenchmark } from "./benchmark-panel";
@@ -15,7 +15,7 @@ import { mountFollowControls } from "./drone-follow";
 import { TaskArrivalNotice } from "./task-arrival-notice";
 import { PlaybackClock, mountPlaybackSpeedControls } from "./playback-clock";
 import { playbackAction, showPlaybackButton, showPlaybackState } from "./playback-state";
-import { encounterView, mountEncounterControl, showChallenge } from "./encounter-view";
+import { encounterView, mountEncounterControl } from "./encounter-view";
 import { flightPhase, RouteStatusStrip } from "./trajectory-semantics";
 
 const element = <T extends HTMLElement>(selector: string): T => {
@@ -108,12 +108,11 @@ async function start(): Promise<void> {
   const viewerElement = element("#scene-viewer");
   let selectedPlanner: PlannerId = "lazy-theta-star";
   const visible = new Set<PlannerId>([selectedPlanner]);
-  const pathMode = "smoothed";
   let cameraView: "isometric" | "top" = "isometric";
   let viewer: SceneViewer | null = null;
   const timeline = element<HTMLInputElement>("#timeline");
   const playPause = element<HTMLButtonElement>("#play-pause");
-  let routes = staticRoutes(bundle.scenarios, selectedPlanner, pathMode);
+  let routes = staticRoutes(bundle.scenarios, selectedPlanner);
   let currentTimeS = 0;
   const playbackClock = new PlaybackClock();
   let animationFrame: number | null = null;
@@ -131,11 +130,7 @@ async function start(): Promise<void> {
     select.append(option);
   });
   mountWorkspace({
-    scenarios: bundle.scenarios.map((scenario) => ({
-      ...scenario,
-      group: "Manhattan",
-      summary: scenario.mission ? `${scenario.mission.origin} → ${scenario.mission.destination}` : scenario.description,
-    })),
+    scenarios: bundle.scenarios,
     select,
   });
   mountInspector();
@@ -175,7 +170,6 @@ async function start(): Promise<void> {
     routeInteraction.update(currentTimeS, !notify);
     routeStates.update(routes, currentTimeS, !notify);
     showPlaybackState(element("#playback-state"), "fixed", playbackAction(route.timedPath!, currentTimeS, route.mission), false, flightPhase(route, currentTimeS));
-    showChallenge(document.querySelector("#scene-challenge"), route.mission);
   };
   const setPlaying = (playing: boolean): void => {
     viewer?.setPlaying(playing);
@@ -198,24 +192,12 @@ async function start(): Promise<void> {
   };
   const refreshRoutes = (): void => {
     setPlaying(false);
-    routes = staticRoutes(bundle.scenarios, selectedPlanner, pathMode);
+    routes = staticRoutes(bundle.scenarios, selectedPlanner);
     timeline.max = String(overviewDuration(routes));
     viewer?.setRoutes(routes, select.value);
     renderTime(currentTimeS);
   };
 
-  const updateComparisonCaption = (): void => {
-    const preservesAltitude = selectedScenario().results.every(
-      (result) => result.smoothing.altitudePolicy === "preserve-raw-altitude-profile-v1",
-    );
-    element("#comparison-caption").textContent = preservesAltitude
-      ? `${routes.length} routes · XY optimized · Z preserved`
-      : `${routes.length} routes`;
-  };
-  const updateSceneCaption = (): void => {
-    const scenario = selectedScenario();
-    element("#scene-caption").textContent = missionCaption(scenario, "city");
-  };
   const renderResults = (): void => {
     renderPlannerResults(bundle, selectedScenario(), visible, (plannerId, checked) => {
       if (!checked) return;
@@ -224,32 +206,22 @@ async function start(): Promise<void> {
       plannerSelect.value = plannerId;
       visible.clear();
       visible.add(plannerId);
-      viewer?.setPlannerVisibility(visible);
       refreshRoutes();
       renderResults();
       if (resume) beginPlayback();
       element("#live-region").textContent = `All ${routes.length} routes use ${bundle.planners.find((planner) => planner.id === plannerId)?.label ?? plannerId}`;
     });
-    updateComparisonCaption();
   };
 
   const update = (): void => {
     const resume = animationFrame !== null;
     const scenario = selectedScenario();
-    viewer?.setScenario(scenario, visible, pathMode);
+    viewer?.setScenario(scenario);
     viewer?.focusRoute(scenario.id);
     refreshRoutes();
     renderResults();
-    element("#scene-title").textContent = "Manhattan";
-    updateSceneCaption();
     element("#altitude-limit").textContent = `${scenario.constraints.maxAltitudeM} m`;
     element("#safety-margin").textContent = `${scenario.constraints.safetyMarginM} m`;
-    const startCoordinate = element("#start-coordinate");
-    const goalCoordinate = element("#goal-coordinate");
-    startCoordinate.textContent = scenario.mission?.origin ?? scenario.start.map((value) => value.toFixed(1)).join(", ");
-    goalCoordinate.textContent = scenario.mission?.destination ?? scenario.goal.map((value) => value.toFixed(1)).join(", ");
-    startCoordinate.title = `ENU / m: ${scenario.start.map((value) => value.toFixed(1)).join(", ")}`;
-    goalCoordinate.title = `ENU / m: ${scenario.goal.map((value) => value.toFixed(1)).join(", ")}`;
     viewerElement.setAttribute("aria-label", `${routes.length} tasks share one Manhattan obstacle world. Focus: ${scenario.label}.`);
     element("#live-region").textContent = `${scenario.label} loaded`;
     if (resume) beginPlayback();
@@ -260,7 +232,6 @@ async function start(): Promise<void> {
     const resume = animationFrame !== null;
     selectedPlanner = plannerSelect.value as PlannerId;
     visible.clear(); visible.add(selectedPlanner);
-    viewer?.setPlannerVisibility(visible);
     refreshRoutes();
     renderResults();
     if (resume) beginPlayback();

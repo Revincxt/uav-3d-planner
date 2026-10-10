@@ -6,9 +6,9 @@ export const MIN_MAP_ELEVATION_RAD = MIN_MAP_ELEVATION_DEG * Math.PI / 180;
 export const MAP_OVERVIEW_ELEVATION_DEG = MIN_MAP_ELEVATION_DEG;
 export const MAP_OVERVIEW_SOUTH_OF_WEST_DEG = 12;
 
-/** City panorama keeps both river banks in frame; focused missions retain the tight fit. */
-export function mapFramingPadding(scope: "city" | "mission", panorama: boolean): number {
-  return scope === "city" && panorama ? 1.5 : 1.12;
+/** City panorama keeps both river banks in frame; Top retains the tight fit. */
+export function mapFramingPadding(panorama: boolean): number {
+  return panorama ? 1.5 : 1.12;
 }
 
 /** Low western panorama: Manhattan runs across the frame, not vertically into the distance. */
@@ -30,7 +30,7 @@ export function positionTopOverview(camera: Camera, center: Vector3, span: numbe
   camera.up.set(0, 1, 0);
 }
 
-/** The world up axis never changes, including Top/Front/Side and subsequent dragging. */
+/** The world up axis never changes, including Top and subsequent dragging. */
 export function configureMapNavigation(controls: OrbitControls): void {
   controls.object.up.set(0, 1, 0);
   controls.minPolarAngle = 0;

@@ -39,24 +39,11 @@
 .workspace-static .flight-envelope > div { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; }
 .workspace-static .flight-envelope > div > span { color: var(--muted); }
 .workspace-static .flight-envelope strong { font-size: 11px; font-weight: 550; }
-.workspace-static .inspector-footer { display: flex; flex-shrink: 0; align-items: center; gap: 6px; margin-top: auto; padding: 12px 19px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
-.workspace-static .inspector-footer i { width: 5px; height: 5px; border-radius: 50%; background: #9eadbb; }
-.workspace-static .stage-footer { display: flex; align-items: center; gap: 23px; min-height: 41px; padding: 9px 17px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
-.workspace-static .stage-footer > span { display: inline-flex; align-items: center; gap: 7px; }
-.workspace-static .stage-footer strong { margin-left: 2px; color: var(--foreground); font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.workspace-static .route-dot { width: 6px; height: 6px; border-radius: 50%; }
-.workspace-static .start-dot { background: #12722e; }
-.workspace-static .goal-dot { background: #3f4540; }
-.workspace-static .canvas-corner-label { position: absolute; top: 20px; left: 20px; display: flex; align-items: center; gap: 7px; color: #6e7e8d; font-size: 9px; font-weight: 600; letter-spacing: .09em; pointer-events: none; }
-.workspace-static .canvas-corner-label > span:last-child { margin-left: 9px; color: #97a4b0; font-size: 9px; font-weight: 400; letter-spacing: .04em; }
-.workspace-static .canvas-live-dot { width: 5px; height: 5px; border-radius: 50%; background: #73a89d; }
-.workspace-static .canvas-hint { position: absolute; bottom: 21px; left: 20px; color: #8794a0; font-size: 10px; pointer-events: none; }
 .workspace-static .view-controls button svg { display: block; width: 18px; height: 18px; }
 
 @container flight-inspector (max-height: 700px) {
   .workspace-static .planner-status,
-  .workspace-static .flight-envelope,
-  .workspace-static .inspector-footer { display: none; }
+  .workspace-static .flight-envelope { display: none; }
 }
 
 @container flight-inspector (max-height: 520px) {
@@ -95,20 +82,4 @@
   .workspace-static .planner-metrics { grid-column: 1 / -1; padding-top: 6px; }
   .workspace-static .planner-metrics > div { justify-content: space-between; }
   .workspace-static .planner-metrics > div:last-child { padding-left: 12px; }
-}
-
-@media (max-width: 760px) {
-  .workspace-static .canvas-corner-label { top: 14px; left: 14px; }
-  .workspace-static .canvas-hint { display: none; }
-  .workspace-static .stage-footer { gap: 15px; min-height: 34px; padding: 8px 12px; }
-  .workspace-static .stage-footer strong { font-size: 9px; }
-}
-
-@media (max-width: 520px) {
-  .workspace-static .stage-footer > span { gap: 4px; }
-  .workspace-static .stage-footer { gap: 12px; }
-}
-
-@media (max-height: 660px) and (max-width: 1050px) {
-  .workspace-static .stage-footer { display: none; }
 }

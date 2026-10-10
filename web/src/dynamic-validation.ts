@@ -31,14 +31,9 @@ const PLANNERS = new Map<DynamicPlannerId, string>([
 const REPLAY_PROTOCOLS: Record<string, readonly number[]> = {
   "dynamic-replanning-demo-v1": [1, 4, 8, 180, 4, 120_000],
   "dynamic-replanning-v1": [1, 4, 8, 180, 4, 120_000],
-  "manhattan-reactive-demo-v1": [2, 10, 14, 600, 50, 20_000],
-  "manhattan-reactive-demo-v2": [2, 10, 14, 600, 50, 20_000],
-  "manhattan-reactive-demo-v3": [2, 10, 14, 600, 50, 20_000],
+  "manhattan-reactive-demo-v5": [2, 10, 14, 900, 50, 20_000],
 };
-const MANHATTAN_PROTOCOL_IDS = new Set([
-  "manhattan-reactive-demo-v1", "manhattan-reactive-demo-v2", "manhattan-reactive-demo-v3",
-]);
-const MANHATTAN_SHORTCUT_PROTOCOL_IDS = new Set(["manhattan-reactive-demo-v2", "manhattan-reactive-demo-v3"]);
+const MANHATTAN_PROTOCOL_ID = "manhattan-reactive-demo-v5";
 
 function fail(message: string): never {
   throw new Error(`dynamic-data.json: ${message}`);
@@ -185,7 +180,7 @@ function protocol(value: unknown): DynamicProtocol {
     fail("protocol does not match the declared deterministic replay configuration");
   }
   if (item.horizontalEscape !== undefined) {
-    if (item.horizontalEscape !== 1 || !parsed.id.startsWith("manhattan-reactive-demo-v"))
+    if (item.horizontalEscape !== 1 || parsed.id !== MANHATTAN_PROTOCOL_ID)
       fail("protocol.horizontalEscape must declare the Manhattan level avoidance controller");
     parsed.horizontalEscape = 1;
   }
@@ -194,12 +189,12 @@ function protocol(value: unknown): DynamicProtocol {
     if (parsed.verticalCostScale < 1) fail("vertical cost scale must be at least one");
     parsed.maxClimbRateMps = positive(item.maxClimbRateMps, "protocol.maxClimbRateMps");
   }
-  if (MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(parsed.id)) {
-    if (item.pathShortcut !== 1) fail("protocol.pathShortcut must be 1 for Manhattan v2/v3");
+  if ((parsed.id === MANHATTAN_PROTOCOL_ID)) {
+    if (item.pathShortcut !== 1) fail("protocol.pathShortcut must be 1 for current Manhattan replay");
     parsed.pathShortcut = 1;
   }
-  if (parsed.id === "manhattan-reactive-demo-v3") {
-    if (item.preserveAltitude !== 1) fail("protocol.preserveAltitude must be 1 for Manhattan v3");
+  if ((parsed.id === MANHATTAN_PROTOCOL_ID)) {
+    if (item.preserveAltitude !== 1) fail("protocol.preserveAltitude must be 1 for current Manhattan replay");
     parsed.preserveAltitude = 1;
     if (item.smoothTurns !== undefined || item.turnScaleM !== undefined || item.curveSampleSpacingM !== undefined) {
       if (item.smoothTurns !== 1) fail("protocol.smoothTurns must be 1 for local B-spline curves");
@@ -207,6 +202,10 @@ function protocol(value: unknown): DynamicProtocol {
       parsed.turnScaleM = positive(item.turnScaleM, "protocol.turnScaleM");
       parsed.curveSampleSpacingM = positive(item.curveSampleSpacingM, "protocol.curveSampleSpacingM");
     }
+  }
+  if (parsed.id === MANHATTAN_PROTOCOL_ID) {
+    if (item.curveDimensions !== 3 || item.smoothTurns !== 1) fail("protocol.curveDimensions must be 3 with smoothTurns for Manhattan v5");
+    parsed.curveDimensions = 3;
   }
   return parsed;
 }
@@ -772,7 +771,7 @@ function parseDynamicBundle(value: unknown): DynamicBundleV1 {
   }
   const parsedProtocol = protocol(item.protocol);
   const sourceCommit = text(item.sourceCommit, "sourceCommit");
-  if (MANHATTAN_PROTOCOL_IDS.has(parsedProtocol.id)) {
+  if ((parsedProtocol.id === MANHATTAN_PROTOCOL_ID)) {
     if (!/^local-snapshot:sha256:[0-9a-f]{64}$/.test(sourceCommit)) {
       fail("Manhattan sourceCommit must identify a local source snapshot");
     }
@@ -823,7 +822,7 @@ function parseDynamicBundle(value: unknown): DynamicBundleV1 {
   if (new Set(scenarios.map((entry) => entry.fingerprint)).size !== scenarios.length) {
     fail("scenario fingerprints must be unique");
   }
-  if (MANHATTAN_PROTOCOL_IDS.has(parsedProtocol.id)
+  if ((parsedProtocol.id === MANHATTAN_PROTOCOL_ID)
     && (scenarios.length !== 8 || scenarios.some((entry) => !entry.city
       || entry.city.buildingCount !== entry.buildings.length || entry.buildings.length < 1000
       || !hasCompleteCityExtent(entry.city, entry.bounds)
@@ -832,15 +831,17 @@ function parseDynamicBundle(value: unknown): DynamicBundleV1 {
   }
   const runIds = scenarios.flatMap((entry) => entry.runs.map((runRecord) => runRecord.runId));
   if (new Set(runIds).size !== runIds.length) fail("runId values must be unique across the bundle");
-  if (MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(parsedProtocol.id)) {
+  if ((parsedProtocol.id === MANHATTAN_PROTOCOL_ID)) {
     for (const entry of scenarios) {
       for (const runRecord of entry.runs) {
         if (runRecord.parameters.pathShortcut !== 1) {
-          fail(`${entry.id}/${runRecord.plannerId}: parameters.pathShortcut must be 1 for Manhattan v2/v3`);
+          fail(`${entry.id}/${runRecord.plannerId}: parameters.pathShortcut must be 1 for current Manhattan replay`);
         }
-        if (parsedProtocol.id === "manhattan-reactive-demo-v3" && runRecord.parameters.preserveAltitude !== 1) {
-          fail(`${entry.id}/${runRecord.plannerId}: parameters.preserveAltitude must be 1 for Manhattan v3`);
+        if ((parsedProtocol.id === MANHATTAN_PROTOCOL_ID) && runRecord.parameters.preserveAltitude !== 1) {
+          fail(`${entry.id}/${runRecord.plannerId}: parameters.preserveAltitude must be 1 for current Manhattan replay`);
         }
+        if (parsedProtocol.curveDimensions === 3 && runRecord.parameters.curveDimensions !== 3)
+          fail(`${entry.id}/${runRecord.plannerId}: curve dimensions disagree with protocol`);
         if (parsedProtocol.smoothTurns === 1 &&
             (runRecord.parameters.smoothTurns !== 1 || runRecord.parameters.turnScaleM !== parsedProtocol.turnScaleM ||
              runRecord.parameters.curveSampleSpacingM !== parsedProtocol.curveSampleSpacingM)) {

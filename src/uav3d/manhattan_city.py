@@ -19,9 +19,9 @@ from uav3d.scene import AABB, Bounds3D, Cylinder, Scene
 
 SERVICE_URL = "https://services6.arcgis.com/yG5s3afENB5iO9fj/arcgis/rest/services/BUILDING_view/FeatureServer/0"
 METADATA_URL = "https://github.com/CityOfNewYork/nyc-geo-metadata/blob/main/Metadata/Metadata_BuildingFootprints.md"
-# Keep the cross-Manhattan longitude span; expand north/south coverage to about 3.8 km.
+# Preserve the northern district and extend south across the Manhattan peninsula.
 # The projection origin stays fixed so buildings, maps and missions remain aligned.
-ROI_WGS84 = (-74.0078, 40.7368, -73.9670, 40.7676)
+ROI_WGS84 = (-74.0200, 40.7000, -73.9670, 40.7676)
 ORIGIN_WGS84 = (-74.005, 40.742)
 DATA_DIRECTORY = Path(__file__).resolve().parents[2] / "data" / "manhattan"
 FEET_TO_METRES = 0.3048
@@ -211,7 +211,7 @@ def preprocess_city(source: dict[str, Any], provenance: dict[str, Any]) -> dict[
     metadata = {
         **provenance,
         "id": "nyc-manhattan-midtown-official",
-        "name": "Manhattan · Midtown",
+        "name": "Manhattan · Midtown to Battery Park",
         "sourceKind": "nyc-open-data",
         "collisionModel": "conservative-aabb",
         "buildingCount": len(buildings),
@@ -247,15 +247,15 @@ def preprocess_city(source: dict[str, Any], provenance: dict[str, Any]) -> dict[
         "geometrySimplified": False,
         "maxSourceRoofHeightM": max_height,
         "planningRegion": {
-            "id": "midtown-expanded-v3",
+            "id": "manhattan-south-expanded-v4",
             "requestedBoundsWgs84": list(ROI_WGS84),
             "selectionPurpose": (
-                "Keep the 3.6 km cross-Manhattan width and expand north/south coverage "
-                "to about 3.8 km; "
-                "all intersecting source polygons retained whole."
+                "Extend the existing northern district south to Battery Park, including "
+                "Financial District, Tribeca, SoHo and Greenwich Village; retain complete "
+                "Manhattan polygons without clipping or simplification."
             ),
             "fixedProjectionOrigin": True,
-            "previousRegionWgs84": [-74.0078, 40.7450, -73.9670, 40.7605],
+            "previousRegionWgs84": [-74.0078, 40.7368, -73.9670, 40.7676],
         },
     }
     return {"schemaVersion": 1, "metadata": metadata, "bounds": bounds, "buildings": buildings}

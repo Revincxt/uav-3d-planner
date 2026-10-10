@@ -24,7 +24,7 @@ class ManhattanChallengeTests(unittest.TestCase):
         cls.static = json.loads((ROOT / "web/public/demo-data.json").read_text())
 
     def test_static_constraints_are_shared_and_service_roofs_stay_free(self):
-        self.assertEqual([len(scene.no_fly_zones) for _, scene in self.missions], [3] * 8)
+        self.assertEqual([len(scene.no_fly_zones) for _, scene in self.missions], [10] * 8)
         self.assertTrue(
             all(
                 scene.no_fly_zones is self.missions[0][1].no_fly_zones for _, scene in self.missions
@@ -43,7 +43,7 @@ class ManhattanChallengeTests(unittest.TestCase):
         scenarios = self.exporter["shared_dynamic_scenarios"](self.missions, baselines)
         modes = []
         for (_mission, scene), scenario in zip(self.missions, scenarios, strict=True):
-            self.assertEqual(len(scenario.moving_spheres), 7)
+            self.assertEqual(len(scenario.moving_spheres), 12)
             self.assertIs(scenario.moving_spheres, scenarios[0].moving_spheres)
             self.assertIs(scenario.temporary_cylinders, scenarios[0].temporary_cylinders)
             challenge = scenario.metadata["challenge"]
@@ -85,12 +85,12 @@ class ManhattanChallengeTests(unittest.TestCase):
                 "crossing",
             ],
         )
-        self.assert_continuous_traffic(scenarios[0], 600)
+        self.assert_continuous_traffic(scenarios[0], 900)
 
     def test_predictive_has_eight_task_queries_and_certified_shared_traffic(self):
         scenarios = build_manhattan_missions(self.city)
-        self.assertEqual([len(s.temporary_cylinders) for s in scenarios], [4] * 8)
-        self.assertEqual([len(s.moving_spheres) for s in scenarios], [7] * 8)
+        self.assertEqual([len(s.temporary_cylinders) for s in scenarios], [8] * 8)
+        self.assertEqual([len(s.moving_spheres) for s in scenarios], [12] * 8)
         self.assertTrue(all(s.moving_spheres is scenarios[0].moving_spheres for s in scenarios))
         self.assertTrue(
             all(s.temporary_cylinders is scenarios[0].temporary_cylinders for s in scenarios)

@@ -167,17 +167,17 @@ class ManhattanPredictiveEvidenceTests(unittest.TestCase):
         self.assertEqual(bundle["protocol"]["id"], PROTOCOL_ID)
         self.assertEqual(bundle["protocol"]["spaceTimeConnectivity"], 26)
         self.assertIs(bundle["protocol"]["trajectoryShortcut"], True)
-        self.assertIs(bundle["protocol"]["trajectoryPreserveAltitude"], True)
+        self.assertIs(bundle["protocol"]["trajectoryPreserveAltitude"], False)
         self.assertEqual(
             bundle["protocol"]["trajectoryPostprocessor"],
-            "horizontal-local-quintic-bspline-altitude-preserving-envelope-v5",
+            "spatial-local-quintic-bspline-bounded-altitude-envelope-v6",
         )
         self.assertTrue(bundle["sourceCommit"].startswith("local-snapshot:sha256:"))
         self.assertEqual(len(bundle["scenarios"]), 8)
         city = build_manhattan_city()
         scenarios = {scenario.scenario_id: scenario for scenario in build_manhattan_missions(city)}
         self.assertGreater(len(city.buildings), 4000)
-        self.assertEqual(city.metadata["planningRegion"]["id"], "midtown-expanded-v3")
+        self.assertEqual(city.metadata["planningRegion"]["id"], "manhattan-south-expanded-v4")
         self.assertEqual(
             {entry["id"] for entry in bundle["scenarios"]},
             {mission.mission_id for mission in MISSIONS},
@@ -201,9 +201,9 @@ class ManhattanPredictiveEvidenceTests(unittest.TestCase):
             for run in exported["runs"]:
                 self.assertEqual(run["status"], "success")
                 self.assertEqual(run["parameters"]["trajectoryShortcut"], 1)
-                self.assertEqual(run["parameters"]["trajectoryPreserveAltitude"], 1)
-                self.assertEqual(run["smoothing"]["optimizationAxes"], ["x", "y"])
-                self.assertEqual(run["smoothing"]["altitudePolicy"], "preserve-raw-z-time-profile")
+                self.assertEqual(run["parameters"]["trajectoryPreserveAltitude"], 0)
+                self.assertEqual(run["smoothing"]["optimizationAxes"], ["x", "y", "z"])
+                self.assertEqual(run["smoothing"]["altitudePolicy"], "bounded-spatial-spline-v1")
                 if run["plannerId"] == "space-time-astar-4d":
                     self.assertEqual(run["parameters"]["spaceTimeConnectivity"], 26)
                 else:
@@ -248,7 +248,7 @@ class ManhattanPredictiveEvidenceTests(unittest.TestCase):
                             metrics["minimumSeparationM"], witness.separation_m, places=5
                         )
 
-    def test_exported_geometry_preserves_every_raw_altitude_time_knot(self) -> None:
+    def test_exported_spatial_geometry_obeys_height_budget_at_every_time_knot(self) -> None:
         bundle = json.loads((ROOT / "web" / "public" / "predictive-data.json").read_text())
         for scenario in bundle["scenarios"]:
             for run in scenario["runs"]:
@@ -257,7 +257,7 @@ class ManhattanPredictiveEvidenceTests(unittest.TestCase):
                     self.assertTrue(raw and geometry)
                     self.assertAlmostEqual(raw[0]["timeS"], geometry[0]["timeS"], delta=1e-6)
                     self.assertAlmostEqual(raw[-1]["timeS"], geometry[-1]["timeS"], delta=1e-6)
-                    self.assertLessEqual(_max_altitude_difference(raw, geometry), 1e-6)
+                    self.assertLessEqual(_max_altitude_difference(raw, geometry), 12 + 1e-6)
                     raw_travel = math.fsum(
                         abs(right["position"][2] - left["position"][2])
                         for left, right in pairwise(raw)
@@ -266,7 +266,10 @@ class ManhattanPredictiveEvidenceTests(unittest.TestCase):
                         abs(right["position"][2] - left["position"][2])
                         for left, right in pairwise(geometry)
                     )
-                    self.assertAlmostEqual(raw_travel, geometry_travel, delta=1e-6)
+                    # Matching a 3D tangent can add a small local height excursion.
+                    # Bound total extra ascent/descent too, so the local deviation
+                    # budget cannot disguise inefficient repeated vertical cycles.
+                    self.assertLessEqual(geometry_travel, raw_travel + 12 + 1e-6)
                     execution = run["executionTimedPath"]
                     self.assertIsNotNone(execution)
                     # Scheduling may add only stationary copies. Every original
@@ -297,18 +300,9 @@ class ManhattanPredictiveEvidenceTests(unittest.TestCase):
     def test_published_source_and_download_hashes_match_their_artifacts(self) -> None:
         public = ROOT / "web" / "public"
         bundle = json.loads((public / "predictive-data.json").read_text(encoding="utf-8"))
-        # Published evidence identifies the original computation bytes, not a
-        # later formatting revision. Scope, hash chain and archived source bytes
-        # remain checked; semantic source edits must still fail.
+        # Scope, hash chain and exact computation bytes remain checked.
         provenance = bundle.get("computationSourceProvenance", bundle["sourceProvenance"])
         expected_sources = [entry["path"] for entry in source_provenance()["files"]]
-        if "refinement" in bundle:
-            self.assertEqual(
-                bundle["refinement"]["anchorAlignment"],
-                "continuously-certified-slow-connector",
-            )
-            self.assertIs(bundle["refinement"]["reactiveRawTracesRecomputed"], True)
-            expected_sources.append("scripts/refine_predictive_demo.py")
         self.assertEqual(
             sorted(entry["path"] for entry in provenance["files"]),
             sorted(expected_sources),

@@ -1,9 +1,9 @@
-"""Local clamped quintic B-spline spans, with hard anchors and exact chord checks.
+"""Collision-certified local quintic splines, with exact anchors and optional XY lock.
 
-A single clamped span is evaluated in its equivalent Bernstein form. XY position,
-first derivative and zero second derivative match at span/line joins. Z is lifted
-from the original piecewise-linear parameter profile, never from spline controls.
-The certified/executed result is the sampled polyline, not the ideal continuous spline.
+Three-dimensional spans match position, tangent and zero second derivative at
+line/span joins. The XY-only mode remains available for explicit altitude locks.
+Safety and deviation certificates apply to the executed dense polyline, not to
+an unsampled ideal spline or a continuous flight-dynamics model.
 """
 
 from __future__ import annotations
@@ -20,11 +20,12 @@ SegmentCheck = Callable[[Point3, Point3, float, float], bool]
 
 
 @dataclass(frozen=True, slots=True)
-class HorizontalCurveResult:
+class CurveResult:
     points: tuple[Point3, ...]
     parameters: tuple[float, ...]
     rounded_corners: int
     turn_scale_m: float | None
+    max_altitude_deviation_m: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,22 +41,31 @@ class _Span:
             self.start + (self.end - self.start) * i / self.steps for i in range(self.steps + 1)
         )
 
-    def xy(self, parameter: float) -> tuple[float, float]:
+    def point(self, parameter: float) -> Point3:
         u = max(0.0, min(1.0, (parameter - self.start) / (self.end - self.start)))
         coefficients = [math.comb(5, i) * u**i * (1 - u) ** (5 - i) for i in range(6)]
-        return cast_xy(
+        return cast_vector(
             tuple(
                 math.fsum(
                     weight * point[axis]
                     for weight, point in zip(coefficients, self.controls, strict=True)
                 )
-                for axis in range(2)
+                if any(point[axis] != self.controls[0][axis] for point in self.controls)
+                else self.controls[0][axis]
+                for axis in range(3)
             )
         )
 
 
-def cast_xy(values: tuple[float, ...]) -> tuple[float, float]:
-    return values[0], values[1]
+def cast_vector(values: tuple[float, ...]) -> Point3:
+    return values[0], values[1], values[2] if len(values) == 3 else 0.0
+
+
+def _lateral(vector: Point3) -> Point3:
+    horizontal = math.hypot(vector[0], vector[1])
+    if horizontal > 1e-9:
+        return -vector[1] / horizontal, vector[0] / horizontal, 0.0
+    return 1.0, 0.0, 0.0
 
 
 def _span(
@@ -63,30 +73,23 @@ def _span(
     b: Point3,
     start: float,
     end: float,
-    initial_velocity: tuple[float, float],
-    final_velocity: tuple[float, float],
+    initial_velocity: tuple[float, ...],
+    final_velocity: tuple[float, ...],
     spacing: float,
     angle: float,
 ) -> _Span:
     duration = end - start
+    initial, final = cast_vector(initial_velocity), cast_vector(final_velocity)
     controls = (
-        (a[0], a[1], 0.0),
-        (a[0] + initial_velocity[0] * duration / 5, a[1] + initial_velocity[1] * duration / 5, 0.0),
-        (
-            a[0] + initial_velocity[0] * duration * 2 / 5,
-            a[1] + initial_velocity[1] * duration * 2 / 5,
-            0.0,
-        ),
-        (
-            b[0] - final_velocity[0] * duration * 2 / 5,
-            b[1] - final_velocity[1] * duration * 2 / 5,
-            0.0,
-        ),
-        (b[0] - final_velocity[0] * duration / 5, b[1] - final_velocity[1] * duration / 5, 0.0),
-        (b[0], b[1], 0.0),
+        a,
+        cast_vector(tuple(a[i] + initial[i] * duration / 5 for i in range(3))),
+        cast_vector(tuple(a[i] + initial[i] * duration * 2 / 5 for i in range(3))),
+        cast_vector(tuple(b[i] - final[i] * duration * 2 / 5 for i in range(3))),
+        cast_vector(tuple(b[i] - final[i] * duration / 5 for i in range(3))),
+        b,
     )
     control_length = math.fsum(distance(a, b) for a, b in pairwise(controls))
-    # Dense headings as well as dense positions: a short turn must not become one chord.
+    # Dense spatial headings as well as positions, including climb/descent turns.
     steps = max(12, math.ceil(control_length / spacing), math.ceil(math.degrees(angle)))
     return _Span(start, end, controls, steps)
 
@@ -108,14 +111,20 @@ def _heading_samples(span: _Span) -> tuple[float, ...]:
     """Refine only undersampled bends instead of multiplying every straight span."""
     samples = list(span.sample_parameters())
     for _ in range(12):
-        points = [span.xy(u) for u in samples]
+        points = [span.point(u) for u in samples]
         split: set[int] = set()
         for i in range(1, len(points) - 1):
             a, b, c = points[i - 1 : i + 2]
-            incoming, outgoing = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
-            lengths = math.hypot(*incoming) * math.hypot(*outgoing)
-            if lengths > 1e-18 and (
-                incoming[0] * outgoing[0] + incoming[1] * outgoing[1]
+            incoming = tuple(b[i] - a[i] for i in range(3))
+            outgoing = tuple(c[i] - b[i] for i in range(3))
+            chord_lengths = (math.hypot(*incoming), math.hypot(*outgoing))
+            lengths = math.prod(chord_lengths)
+            # A heading is ill-conditioned near a spline's stationary tangent.
+            # Repeated bisection there creates nanometre chords, which amplify
+            # decimal export/absolute-clock noise into spurious acceleration.
+            # Keep the original knots; refine meaningful geometry, not noise.
+            if min(chord_lengths) >= 0.0001 and (
+                sum(a * b for a, b in zip(incoming, outgoing, strict=True))
                 < lengths * math.cos(math.radians(3))
             ):
                 split.update((i - 1, i))
@@ -125,7 +134,7 @@ def _heading_samples(span: _Span) -> tuple[float, ...]:
     return tuple(samples)
 
 
-def smooth_horizontal_curves(
+def smooth_curves(
     points: Sequence[Point3],
     parameters: Sequence[float],
     check: SegmentCheck,
@@ -133,16 +142,18 @@ def smooth_horizontal_curves(
     protected: frozenset[float] = frozenset(),
     turn_scale_m: float = 60.0,
     sample_spacing_m: float = 2.0,
-    start_direction: tuple[float, float] | None = None,
-    end_direction: tuple[float, float] | None = None,
+    start_direction: tuple[float, ...] | None = None,
+    end_direction: tuple[float, ...] | None = None,
     round_reversals: bool = False,
-) -> HorizontalCurveResult:
-    """Shrink only a blocked corner; keep safe curves elsewhere and every height knot.
-
-    Protected anchors are interpolated by two spans sharing their tangent. Other
-    corners are cut with one span. Vertical-only intervals are never displaced.
-    Boundary tangents optionally join online replan prefixes and service-leg seams.
-    """
+    preserve_altitude: bool,
+    max_altitude_deviation_m: float | None = None,
+    boundary_height_excursion: bool = False,
+) -> CurveResult:
+    """Shrink blocked turns independently while retaining every protected anchor."""
+    if max_altitude_deviation_m is not None and (
+        not math.isfinite(max_altitude_deviation_m) or max_altitude_deviation_m <= 0
+    ):
+        raise ValueError("altitude deviation limit must be finite and positive")
     if not math.isfinite(turn_scale_m) or turn_scale_m <= 0:
         raise ValueError("turn scale must be finite and positive")
     if not math.isfinite(sample_spacing_m) or sample_spacing_m <= 0:
@@ -171,17 +182,27 @@ def smooth_horizontal_curves(
             (parameter - parameters[index]) / (parameters[index + 1] - parameters[index]),
         )
 
-    # Drop only redundant XY knots, not a vertical column or a required stop.
+    def shape(point: Point3) -> Point3:
+        return (point[0], point[1], 0.0) if preserve_altitude else point
+
+    def sample(span: _Span, parameter: float) -> Point3:
+        point = span.point(parameter)
+        return (point[0], point[1], reference(parameter)[2]) if preserve_altitude else point
+
+    min_height, max_height = min(p[2] for p in points), max(p[2] for p in points)
+
+    # Only collinear knots in the active axes may be removed; keep every task anchor.
     anchors: list[int] = []
     for index, point in enumerate(points):
         while len(anchors) >= 2:
             left, middle = anchors[-2:]
-            a = (points[middle][0] - points[left][0], points[middle][1] - points[left][1])
-            b = (point[0] - points[middle][0], point[1] - points[middle][1])
+            a = tuple(shape(points[middle])[i] - shape(points[left])[i] for i in range(3))
+            b = tuple(shape(point)[i] - shape(points[middle])[i] for i in range(3))
             lengths = math.hypot(*a) * math.hypot(*b)
             if parameters[middle] in protected or lengths <= 1e-12:
                 break
-            if a[0] * b[0] + a[1] * b[1] <= 0 or abs(a[0] * b[1] - a[1] * b[0]) > lengths * 1e-8:
+            cosine = sum(x * y for x, y in zip(a, b, strict=True)) / lengths
+            if cosine < 1 - 1e-12:
                 break
             anchors.pop()
         anchors.append(index)
@@ -195,15 +216,19 @@ def smooth_horizontal_curves(
         b: Point3,
         start: float,
         end: float,
-        initial_velocity: tuple[float, float],
-        final_velocity: tuple[float, float],
+        initial_velocity: Point3,
+        final_velocity: Point3,
         spacing: float,
         angle: float,
     ) -> _Span:
         span = _span(a, b, start, end, initial_velocity, final_velocity, spacing, angle)
-        return replace(span, samples=_heading_samples(span)) if round_reversals else span
+        return (
+            replace(span, samples=_heading_samples(span))
+            if round_reversals or not preserve_altitude
+            else span
+        )
 
-    def accept(candidate: list[_Span]) -> bool:
+    def accept(candidate: list[_Span], *, boundary: bool = False) -> bool:
         samples = _parameters(
             parameters,
             [u for span in candidate for u in span.sample_parameters()],
@@ -212,21 +237,32 @@ def smooth_horizontal_curves(
         lifted = []
         for u in samples:
             span = candidate[0] if u <= candidate[0].end else candidate[-1]
-            xy = span.xy(u)
-            lifted.append((xy[0], xy[1], reference(u)[2]))
+            point = sample(span, u)
+            if not preserve_altitude and (
+                (
+                    not (boundary and boundary_height_excursion)
+                    and (point[2] < min_height - 1e-8 or point[2] > max_height + 1e-8)
+                )
+                or (
+                    max_altitude_deviation_m is not None
+                    and abs(point[2] - reference(u)[2]) > max_altitude_deviation_m + 1e-8
+                )
+            ):
+                return False
+            lifted.append(point)
         return all(
             check(a, b, u, v)
             for (a, b), (u, v) in zip(pairwise(lifted), pairwise(samples), strict=True)
         )
 
     for left, middle, right in zip(anchors, anchors[1:], anchors[2:], strict=False):
-        previous, c, following = points[left], points[middle], points[right]
-        incoming = (c[0] - previous[0], c[1] - previous[1])
-        outgoing = (following[0] - c[0], following[1] - c[1])
+        previous, c, following = shape(points[left]), shape(points[middle]), shape(points[right])
+        incoming = tuple(c[i] - previous[i] for i in range(3))
+        outgoing = tuple(following[i] - c[i] for i in range(3))
         length_a, length_b = math.hypot(*incoming), math.hypot(*outgoing)
         if min(length_a, length_b) <= 1e-9:
             continue
-        cosine = (incoming[0] * outgoing[0] + incoming[1] * outgoing[1]) / (length_a * length_b)
+        cosine = sum(a * b for a, b in zip(incoming, outgoing, strict=True)) / (length_a * length_b)
         angle = math.acos(max(-1.0, min(1.0, cosine)))
         if angle < math.radians(0.001 if round_reversals else 0.2) or (
             angle > math.radians(175) and not round_reversals
@@ -234,9 +270,16 @@ def smooth_horizontal_curves(
             continue
         tangent = math.tan(angle / 2)
         trim = min(turn_scale_m * tangent, length_a * 0.45, length_b * 0.45)
-        v0 = cast_xy(tuple(value / (parameters[middle] - parameters[left]) for value in incoming))
-        v1 = cast_xy(tuple(value / (parameters[right] - parameters[middle]) for value in outgoing))
-        vm = ((v0[0] + v1[0]) / 2, (v0[1] + v1[1]) / 2)
+        v0 = cast_vector(
+            tuple(value / (parameters[middle] - parameters[left]) for value in incoming)
+        )
+        v1 = cast_vector(
+            tuple(value / (parameters[right] - parameters[middle]) for value in outgoing)
+        )
+        vm = cast_vector(tuple((v0[i] + v1[i]) / 2 for i in range(3)))
+        if not preserve_altitude and v0[2] * v1[2] <= 0:
+            # A protected height extremum requires a horizontal vertical tangent.
+            vm = (vm[0], vm[1], 0.0)
         factors: tuple[float, ...] = (1.0, 0.75, 0.5, 0.25, 0.125, 0.0625, 0.03125)
         if round_reversals:
             factors += (0.015625, 0.0078125, 0.00390625, 0.001953125)
@@ -248,14 +291,20 @@ def smooth_horizontal_curves(
             exit_ = (
                 parameters[middle] + (parameters[right] - parameters[middle]) * extent / length_b
             )
-            e, x = reference(entry), reference(exit_)
-            if round_reversals and angle > math.radians(175):
+            e, x = shape(reference(entry)), shape(reference(exit_))
+            if round_reversals and (
+                angle > math.radians(175)
+                or (
+                    parameters[middle] in protected
+                    and math.hypot(*vm) < 0.15 * (math.hypot(*v0) + math.hypot(*v1)) / 2
+                )
+            ):
                 # A collinear 180-degree spline has a zero-velocity cusp. Use
                 # two spans with a nonzero lateral tangent, testing both sides.
                 speed = (math.hypot(*v0) + math.hypot(*v1)) / 2
                 accepted = False
                 for side in (1, -1):
-                    lateral = (-incoming[1] / length_a * side, incoming[0] / length_a * side)
+                    lateral = tuple(value * side for value in _lateral(cast_vector(incoming)))
                     pivot = (
                         c
                         if parameters[middle] in protected
@@ -265,7 +314,7 @@ def smooth_horizontal_curves(
                             c[2],
                         )
                     )
-                    tangent_velocity = (lateral[0] * speed, lateral[1] * speed)
+                    tangent_velocity = cast_vector(tuple(value * speed for value in lateral))
                     candidate = [
                         make_span(
                             e,
@@ -311,13 +360,14 @@ def smooth_horizontal_curves(
         if direction is None or len(anchors) < 2 or math.hypot(*direction) <= 1e-9:
             continue
         left, right = anchors[:2] if beginning else anchors[-2:]
-        vector = (points[right][0] - points[left][0], points[right][1] - points[left][1])
+        vector = tuple(shape(points[right])[i] - shape(points[left])[i] for i in range(3))
+        direction = shape(cast_vector(direction))
         length = math.hypot(*vector)
         if length <= 1e-9:
             continue
-        velocity = cast_xy(tuple(v / (parameters[right] - parameters[left]) for v in vector))
+        velocity = cast_vector(tuple(v / (parameters[right] - parameters[left]) for v in vector))
         speed = math.hypot(*velocity)
-        desired = cast_xy(tuple(v * speed / math.hypot(*direction) for v in direction))
+        desired = cast_vector(tuple(v * speed / math.hypot(*direction) for v in direction))
         angle = math.acos(
             max(
                 -1.0,
@@ -345,8 +395,8 @@ def smooth_horizontal_curves(
             )
             candidate = [
                 make_span(
-                    reference(u),
-                    reference(v),
+                    shape(reference(u)),
+                    shape(reference(v)),
                     u,
                     v,
                     desired if beginning else velocity,
@@ -358,18 +408,18 @@ def smooth_horizontal_curves(
             if round_reversals and angle > math.radians(175):
                 accepted = False
                 midpoint_parameter = (u + v) / 2
-                midpoint = reference(midpoint_parameter)
+                midpoint = shape(reference(midpoint_parameter))
                 for side in (1, -1):
-                    lateral = (-vector[1] / length * side, vector[0] / length * side)
+                    lateral = tuple(value * side for value in _lateral(cast_vector(vector)))
                     pivot = (
                         midpoint[0] + lateral[0] * length * fraction * 0.5,
                         midpoint[1] + lateral[1] * length * fraction * 0.5,
                         midpoint[2],
                     )
-                    tangent_velocity = (lateral[0] * speed, lateral[1] * speed)
+                    tangent_velocity = cast_vector(tuple(value * speed for value in lateral))
                     candidate = [
                         make_span(
-                            reference(u),
+                            shape(reference(u)),
                             pivot,
                             u,
                             midpoint_parameter,
@@ -380,7 +430,7 @@ def smooth_horizontal_curves(
                         ),
                         make_span(
                             pivot,
-                            reference(v),
+                            shape(reference(v)),
                             midpoint_parameter,
                             v,
                             tangent_velocity,
@@ -389,12 +439,12 @@ def smooth_horizontal_curves(
                             angle,
                         ),
                     ]
-                    if accept(candidate):
+                    if accept(candidate, boundary=True):
                         accepted = True
                         break
                 if not accepted:
                     continue
-            if accept(candidate):
+            if accept(candidate, boundary=True):
                 patches.extend(candidate)
                 break
 
@@ -409,8 +459,7 @@ def smooth_horizontal_curves(
         point = reference(u)
         index = bisect_right(starts, u) - 1
         if index >= 0 and u <= patches[index].end:
-            xy = patches[index].xy(u)
-            point = (xy[0], xy[1], point[2])
+            point = sample(patches[index], u)
         # Hard anchors and endpoints remain bit-for-bit original coordinates.
         if u in protected or u == parameters[0] or u == parameters[-1]:
             point = reference(u)
@@ -419,7 +468,77 @@ def smooth_horizontal_curves(
         check(a, b, u, v)
         for (a, b), (u, v) in zip(pairwise(output), pairwise(output_parameters), strict=True)
     ):
-        raise ValueError("combined horizontal curve failed its final collision audit")
-    return HorizontalCurveResult(
-        tuple(output), tuple(output_parameters), corners, min(scales, default=None)
+        raise ValueError("combined spline curve failed its final collision audit")
+    return CurveResult(
+        tuple(output),
+        tuple(output_parameters),
+        corners,
+        min(scales, default=None),
+        max(
+            abs(point[2] - reference(u)[2])
+            for point, u in zip(output, output_parameters, strict=True)
+        ),
+    )
+
+
+def smooth_horizontal_curves(
+    points: Sequence[Point3],
+    parameters: Sequence[float],
+    check: SegmentCheck,
+    *,
+    protected: frozenset[float] = frozenset(),
+    turn_scale_m: float = 60.0,
+    sample_spacing_m: float = 2.0,
+    start_direction: tuple[float, ...] | None = None,
+    end_direction: tuple[float, ...] | None = None,
+    round_reversals: bool = False,
+) -> CurveResult:
+    """Explicit XY-only mode: retain the complete piecewise-linear height profile."""
+    return smooth_curves(
+        points,
+        parameters,
+        check,
+        protected=protected,
+        turn_scale_m=turn_scale_m,
+        sample_spacing_m=sample_spacing_m,
+        start_direction=start_direction,
+        end_direction=end_direction,
+        round_reversals=round_reversals,
+        preserve_altitude=True,
+    )
+
+
+def smooth_spatial_curves(
+    points: Sequence[Point3],
+    parameters: Sequence[float],
+    check: SegmentCheck,
+    *,
+    protected: frozenset[float] = frozenset(),
+    turn_scale_m: float = 60.0,
+    sample_spacing_m: float = 2.0,
+    start_direction: Point3 | None = None,
+    end_direction: Point3 | None = None,
+    round_reversals: bool = False,
+    max_altitude_deviation_m: float = 12.0,
+    boundary_height_excursion: bool = False,
+) -> CurveResult:
+    """Smooth XYZ tangents together, bounded near the input height profile.
+
+    Tasks/endpoints remain exact; accepted sampled chords cannot exceed the
+    original height range or the declared deviation budget. Blocked corners
+    shrink locally rather than invalidating safe curves elsewhere.
+    """
+    return smooth_curves(
+        points,
+        parameters,
+        check,
+        protected=protected,
+        turn_scale_m=turn_scale_m,
+        sample_spacing_m=sample_spacing_m,
+        start_direction=start_direction,
+        end_direction=end_direction,
+        round_reversals=round_reversals,
+        preserve_altitude=False,
+        max_altitude_deviation_m=max_altitude_deviation_m,
+        boundary_height_excursion=boundary_height_excursion,
     )

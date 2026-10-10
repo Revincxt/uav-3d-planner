@@ -7,7 +7,7 @@ import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
 import { predictiveAvoidanceEvents, FlightAnnouncements, type AvoidanceEvent } from "./flight-announcements";
 
-import { missionCaption, mountWorkspace, mountInspector, mountTabs } from "./workspace";
+import { mountWorkspace, mountInspector, mountTabs } from "./workspace";
 import { mountFollowControls } from "./drone-follow";
 import { TaskArrivalNotice } from "./task-arrival-notice";
 import { PlaybackClock, mountPlaybackSpeedControls } from "./playback-clock";
@@ -15,7 +15,7 @@ import { overviewDuration, predictiveRoutes, timedPosition, waypointIndex } from
 import { finalFlight, type FinalFlight } from "./final-flight";
 import { playbackAction, showPlaybackButton, showPlaybackState } from "./playback-state";
 import { flightPhase, RouteStatusStrip } from "./trajectory-semantics";
-import { encounterView, mountEncounterControl, showChallenge } from "./encounter-view";
+import { encounterView, mountEncounterControl } from "./encounter-view";
 
 import { loadPredictiveBundle } from "./predictive-data";
 import type {
@@ -153,111 +153,7 @@ function sampledValue(samples: TurnSample[], timeS: number): number {
   return nearest.angleDeg;
 }
 
-function renderEventAxis(
-  flight: FinalFlight,
-  duration: number,
-  timeS: number,
-): void {
-  const host = element<HTMLDivElement>("#event-axis");
-  const width = Math.max(300, Math.round(host.clientWidth || 760));
-  const height = 42;
-  const margin = 10;
-  const axisY = 14;
-  const x = (value: number): number => margin + (value / Math.max(duration, 1)) * (width - margin * 2);
-  const events = visibleEvents(flight).filter(({ frame }) => frame.timeS <= duration + EPSILON);
-  const witness = flight.metrics.minimumSeparationWitness;
-  const visibleWitness = witness !== null && witness.timeS <= duration + EPSILON ? witness : null;
 
-  const svg = svgElement("svg", {
-    viewBox: `0 0 ${width} ${height}`,
-    role: "img",
-    "aria-label":
-      `${events.length} recorded events over ${duration.toFixed(1)} seconds` +
-      (visibleWitness === null ? "; closest-approach witness unavailable" : "; closest-approach witness marked"),
-  });
-  const title = svgElement("title");
-  title.textContent = "Recorded event positions";
-  const desc = svgElement("desc");
-  desc.textContent =
-    "Marks locate planning, restriction, waiting, prediction, failure, and arrival events. " +
-    "The brown witness rule locates minimum separation; dashed means approximate. The blue rule is continuous replay time.";
-  svg.append(title, desc);
-  svg.append(
-    svgElement("line", {
-      x1: String(margin),
-      x2: String(width - margin),
-      y1: String(axisY),
-      y2: String(axisY),
-      class: "axis-line",
-    }),
-  );
-
-  for (const { frame } of events) {
-    const tick = svgElement("line", {
-      x1: String(x(frame.timeS)),
-      x2: String(x(frame.timeS)),
-      y1: "5",
-      y2: "23",
-      class: "event-tick",
-      "data-event-time": String(frame.timeS),
-    });
-    const tickTitle = svgElement("title");
-    tickTitle.textContent = `${frame.timeS.toFixed(1)} s — ${frame.event!.label}`;
-    tick.append(tickTitle);
-    svg.append(tick);
-  }
-
-  if (visibleWitness !== null) {
-    const witnessTick = svgElement("line", {
-      x1: String(x(visibleWitness.timeS)),
-      x2: String(x(visibleWitness.timeS)),
-      y1: "2",
-      y2: "27",
-      class: `witness-tick ${visibleWitness.exact ? "is-exact" : "is-approximate"}`,
-      "data-witness-time": String(visibleWitness.timeS),
-    });
-    const witnessTitle = svgElement("title");
-    witnessTitle.textContent =
-      `${visibleWitness.timeS.toFixed(2)} s — ${visibleWitness.separationM.toFixed(2)} m ` +
-      `${visibleWitness.exact ? "exact" : "approximate"} minimum-separation witness`;
-    witnessTick.append(witnessTitle);
-    svg.append(witnessTick);
-  }
-
-  svg.append(
-    svgElement("line", {
-      x1: String(x(timeS)),
-      x2: String(x(timeS)),
-      y1: "2",
-      y2: "27",
-      class: "event-tick is-current replay-time-rule",
-    }),
-  );
-  const startLabel = svgElement("text", { x: String(margin), y: "39" });
-  startLabel.textContent = "0 s";
-  const endLabel = svgElement("text", {
-    x: String(width - margin),
-    y: "39",
-    "text-anchor": "end",
-  });
-  endLabel.textContent = `${duration.toFixed(1)} s`;
-  svg.append(startLabel, endLabel);
-  host.replaceChildren(svg);
-  host.dataset.duration = String(duration);
-  host.dataset.width = String(width);
-  host.dataset.margin = String(margin);
-  updateEventAxis(timeS);
-}
-
-function updateEventAxis(timeS: number): void {
-  const host = element<HTMLDivElement>("#event-axis");
-  const duration = Number(host.dataset.duration ?? 1);
-  const width = Number(host.dataset.width ?? 300);
-  const margin = Number(host.dataset.margin ?? 10);
-  const x = margin + (Math.max(0, Math.min(timeS, duration)) / Math.max(duration, 1)) * (width - margin * 2);
-  host.querySelector<SVGLineElement>(".replay-time-rule")?.setAttribute("x1", String(x));
-  host.querySelector<SVGLineElement>(".replay-time-rule")?.setAttribute("x2", String(x));
-}
 
 function renderLineChart(
   host: HTMLElement,
@@ -533,7 +429,7 @@ async function start(): Promise<void> {
   let animationFrame: number | null = null;
   let lastUrlWrite = 0;
   let altitudeResizeObserver: ResizeObserver | null = null;
-  let cameraView: Exclude<ViewPreset, "fit"> = "isometric";
+  let cameraView: ViewPreset = "isometric";
 
   for (const scenario of bundle.scenarios) {
     const option = document.createElement("option");
@@ -545,14 +441,10 @@ async function start(): Promise<void> {
   const announce = (message: string): void => {
     element("#live-region").textContent = message;
   };
-  const updateSceneCaption = (): void => {
-    element("#case-geometry").textContent = missionCaption(currentScenario, "city");
-  };
   const setCameraView = (view: ViewPreset): void => {
-    if (view !== "fit") cameraView = view;
+    cameraView = view;
     viewer?.setView(view);
     document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
-      if (button.dataset.view === "fit") return;
       button.setAttribute("aria-pressed", String(button.dataset.view === cameraView));
     });
   };
@@ -564,7 +456,7 @@ async function start(): Promise<void> {
     const parameters = new URLSearchParams();
     parameters.set("scenario", currentScenario.id);
     parameters.set("planner", currentRun.plannerId);
-    const evidence = minimumSeparationEvidence(currentScenario, currentRun, "execution");
+    const evidence = minimumSeparationEvidence(currentScenario, currentRun);
     parameters.set(
       "time",
       isMinimumSeparationEvidenceTime(evidence, currentTimeS)
@@ -575,7 +467,7 @@ async function start(): Promise<void> {
   };
 
   const currentPath = (): TimedWaypoint[] => currentFlight.path;
-  let routes = predictiveRoutes(bundle.scenarios, currentRun.plannerId, "execution");
+  let routes = predictiveRoutes(bundle.scenarios, currentRun.plannerId);
   const duration = (): number => overviewDuration(routes);
 
   const renderCharts = (): void => {
@@ -648,15 +540,13 @@ async function start(): Promise<void> {
     const activeZones = currentScenario.temporaryNoFlyZones.filter(
       (zone) => zone.activeFromS <= focusedTime && focusedTime < zone.activeUntilS,
     );
-    const evidence = minimumSeparationEvidence(currentScenario, currentRun, "execution");
+    const evidence = minimumSeparationEvidence(currentScenario, currentRun);
     const witnessIsVisible = isMinimumSeparationEvidenceTime(evidence, currentTimeS);
     const witnessReadout = element<HTMLDivElement>("#viewer-witness-readout");
 
     timelineValue.value = `${currentTimeS.toFixed(2)} s`;
-    element("#viewer-time-value").textContent = `${currentTimeS.toFixed(2)} s`;
     showPlaybackState(element("#playback-state"), currentRun.predictive ? "predictive" : "reactive",
       playbackAction(path, currentTimeS, currentScenario.mission), !currentRun.predictive, flightPhase(focusedRoute, currentTimeS));
-    showChallenge(document.querySelector("#scene-challenge"), currentScenario.mission);
     witnessReadout.hidden = !witnessIsVisible;
     if (witnessIsVisible && evidence !== null) {
       const { witness } = evidence;
@@ -666,7 +556,6 @@ async function start(): Promise<void> {
       element("#viewer-witness-detail").textContent =
         `${witness.exact ? "Exact" : "Approximate"} witness · ${witness.timeS.toFixed(2)} s`;
     }
-    updateEventAxis(currentTimeS);
     updateChartCursor(element("#altitude-chart"), currentTimeS, position[2], "m");
     updateChartCursor(
       element("#turn-chart"),
@@ -733,7 +622,7 @@ async function start(): Promise<void> {
 
   const renderFlightDetails = (): void => {
     const metrics = currentFlight.metrics;
-    const evidence = minimumSeparationEvidence(currentScenario, currentRun, "execution");
+    const evidence = minimumSeparationEvidence(currentScenario, currentRun);
     const status = element("#run-status");
     status.textContent = formatStatus(currentRun.status);
     status.className = `run-status ${currentRun.status === "success" ? "is-success" : "is-failed"}`;
@@ -784,7 +673,7 @@ async function start(): Promise<void> {
     avoidanceEvents = avoidanceCache.get(run) ?? predictiveAvoidanceEvents(run);
     avoidanceCache.set(run, avoidanceEvents);
     plannerSelect.value = plannerId;
-    routes = predictiveRoutes(bundle.scenarios, plannerId, "execution");
+    routes = predictiveRoutes(bundle.scenarios, plannerId);
     currentTimeS = Math.min(currentTimeS, duration());
     timeline.max = String(duration());
     viewer?.setRun(run);
@@ -793,7 +682,6 @@ async function start(): Promise<void> {
     renderComparison(bundle, currentScenario, plannerId, (selectedPlannerId) => {
       updateRun(selectedPlannerId);
     });
-    renderEventAxis(currentFlight, duration(), currentTimeS);
     renderCharts();
     renderTime(currentTimeS);
     updateUrl(true);
@@ -825,8 +713,6 @@ async function start(): Promise<void> {
         (run) => bundle.planners.find((planner) => planner.id === run.plannerId)?.predictive,
       ) ??
       scenario.runs[0]!;
-    element("#scene-title").textContent = "Manhattan";
-    updateSceneCaption();
     setDefinitionRows(element("#scenario-meta"), [
 
       ["Buildings", scenario.environment.buildingCount.toLocaleString()],
@@ -944,22 +830,16 @@ async function start(): Promise<void> {
   updateUrl(true);
   mountWorkspace({
     select: scenarioSelect,
-    scenarios: bundle.scenarios.map((scenario) => ({
-      ...scenario,
-      group: "Manhattan",
-      summary: scenario.mission ? `${scenario.mission.origin} → ${scenario.mission.destination}` : scenario.description,
-    })),
+    scenarios: bundle.scenarios,
   });
   element("#load-state").remove();
   routeStates.update(routes, currentTimeS, true);
   mountFollowControls(viewer, scenarioSelect, enabled => { taskNotice.reset(); flightAnnouncements.reset(); routeInteraction.followChanged(enabled); });
 
   altitudeResizeObserver = new ResizeObserver(() => {
-    renderEventAxis(currentFlight, duration(), currentTimeS);
     renderCharts();
     renderTime(currentTimeS);
   });
-  altitudeResizeObserver.observe(element("#event-axis"));
   altitudeResizeObserver.observe(element("#altitude-chart"));
   altitudeResizeObserver.observe(element("#turn-chart"));
 

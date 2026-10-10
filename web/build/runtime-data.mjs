@@ -1,7 +1,7 @@
-import { readFile, stat } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { createHash } from 'node:crypto';
+import { readStudyDataWithHash } from '../scripts/study-reader.mjs';
 import { packRuntimeData } from '../shared/runtime-data.mjs';
 import { restoreStudyData } from '../scripts/study-data.mjs';
 const NAMES = ['demo-data', 'dynamic-data', 'predictive-data'];
@@ -14,13 +14,21 @@ export function runtimeDataPlugin(summarize) {
     if (summaryCache?.stamp === stamp) return summaryCache.promise;
     const promise = (async () => {
       const analyses = [], sources = {}; let citySha256;
-      for (const name of NAMES) {
-        const text = await readFile(resolve(root, 'public', `${name}.json`), 'utf8');
-        const result = summarize(name, JSON.parse(text));
+      for (const [index, name] of NAMES.entries()) {
+        const retained = cache.get(name);
+        let result, sha256;
+        if (retained?.stamp === stamps[index]) {
+          const asset = await retained.promise;
+          result = asset.summary; sha256 = asset.sha256;
+        } else {
+          // A dev-only Benchmark request need not build/compress all replay assets.
+          const source = await readStudyDataWithHash(resolve(root, 'public', `${name}.json`));
+          result = summarize(name, source.value); sha256 = source.sha256;
+        }
         const city = result.citySha256.replace(/^sha256:/, '');
         if (citySha256 && city !== citySha256) throw new Error('Benchmark datasets use different city extracts');
         citySha256 = city; analyses.push(result.analysis);
-        sources[name] = createHash('sha256').update(text).digest('hex');
+        sources[name] = sha256;
       }
       return JSON.stringify({ schema: 'uav-benchmark-v1', citySha256, sources, analyses });
     })();
@@ -30,9 +38,14 @@ export function runtimeDataPlugin(summarize) {
   async function asset(name) {
     const source = resolve(root, 'public', `${name}.json`), info = await stat(source), stamp = `${info.size}/${info.mtimeMs}`;
     if (cache.get(name)?.stamp === stamp) return cache.get(name).promise;
-    const promise = readFile(source, 'utf8').then(text => {
-      const packed = JSON.stringify(packRuntimeData(JSON.parse(text)));
-      return { packed, gzip: gzipSync(packed, { level: 6 }), bytes: info.size };
+    const promise = readStudyDataWithHash(source).then(({ value, sha256 }) => {
+      // Production needs both outputs. Audit/summarize while the native value is
+      // already present, then release it instead of rereading ~770 MiB later.
+      const packed = JSON.stringify(packRuntimeData(value));
+      // Some validators normalize optional mission declarations in-place.
+      // Capture the lossless record before that audit, not its narrowed schema.
+      const summary = summarize?.(name, value);
+      return { packed, gzip: gzipSync(packed, { level: 6 }), bytes: info.size, sha256, summary };
     });
     cache.set(name, { stamp, promise });
     try { return await promise; } catch (error) { cache.delete(name); throw error; }

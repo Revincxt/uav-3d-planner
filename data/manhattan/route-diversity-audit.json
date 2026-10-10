@@ -10,26 +10,44 @@
       "study": "static",
       "planner": "astar-3d",
       "missionCount": 8,
-      "worstPairFraction": 0.09697,
-      "meanPairFraction": 0.004039,
+      "worstPairFraction": 0.03202,
+      "meanPairFraction": 0.00334,
       "pairs": [
         {
           "missions": [
-            "flatiron-eastside-logistics",
-            "eastside-medical-return"
+            "midtown-medical-link",
+            "midtown-supply-backhaul"
           ],
-          "leftFraction": 0.081522,
-          "rightFraction": 0.09697,
-          "maxFraction": 0.09697
+          "leftFraction": 0.026738,
+          "rightFraction": 0.03202,
+          "maxFraction": 0.03202
         },
         {
           "missions": [
             "chelsea-midtown-delivery",
+            "midtown-west-backhaul"
+          ],
+          "leftFraction": 0.031609,
+          "rightFraction": 0.027638,
+          "maxFraction": 0.031609
+        },
+        {
+          "missions": [
+            "midtown-medical-link",
             "east-to-hudson-priority"
           ],
-          "leftFraction": 0.010256,
-          "rightFraction": 0.016129,
-          "maxFraction": 0.016129
+          "leftFraction": 0.024064,
+          "rightFraction": 0.02,
+          "maxFraction": 0.024064
+        },
+        {
+          "missions": [
+            "flatiron-eastside-logistics",
+            "midtown-supply-backhaul"
+          ],
+          "leftFraction": 0.005831,
+          "rightFraction": 0.004926,
+          "maxFraction": 0.005831
         },
         {
           "missions": [
@@ -78,24 +96,6 @@
         },
         {
           "missions": [
-            "midtown-medical-link",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
             "chelsea-midtown-delivery",
             "hudson-inspection"
           ],
@@ -115,15 +115,6 @@
         {
           "missions": [
             "chelsea-midtown-delivery",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
             "eastside-medical-return"
           ],
           "leftFraction": 0.0,
@@ -134,6 +125,15 @@
           "missions": [
             "chelsea-midtown-delivery",
             "midtown-supply-backhaul"
+          ],
+          "leftFraction": 0.0,
+          "rightFraction": 0.0,
+          "maxFraction": 0.0
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery",
+            "east-to-hudson-priority"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -196,7 +196,7 @@
         {
           "missions": [
             "flatiron-eastside-logistics",
-            "midtown-supply-backhaul"
+            "eastside-medical-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -271,26 +271,53 @@
       "study": "static",
       "planner": "lazy-theta-star",
       "missionCount": 8,
-      "worstPairFraction": 0.113772,
-      "meanPairFraction": 0.004827,
+      "worstPairFraction": 0.046341,
+      "meanPairFraction": 0.006061,
       "pairs": [
         {
           "missions": [
-            "flatiron-eastside-logistics",
-            "eastside-medical-return"
+            "midtown-medical-link",
+            "midtown-supply-backhaul"
           ],
-          "leftFraction": 0.086486,
-          "rightFraction": 0.113772,
-          "maxFraction": 0.113772
+          "leftFraction": 0.040107,
+          "rightFraction": 0.046341,
+          "maxFraction": 0.046341
         },
         {
           "missions": [
             "chelsea-midtown-delivery",
+            "hudson-inspection"
+          ],
+          "leftFraction": 0.04298,
+          "rightFraction": 0.041096,
+          "maxFraction": 0.04298
+        },
+        {
+          "missions": [
+            "midtown-medical-link",
             "east-to-hudson-priority"
           ],
-          "leftFraction": 0.015306,
-          "rightFraction": 0.02139,
-          "maxFraction": 0.02139
+          "leftFraction": 0.042781,
+          "rightFraction": 0.035955,
+          "maxFraction": 0.042781
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery",
+            "midtown-west-backhaul"
+          ],
+          "leftFraction": 0.031519,
+          "rightFraction": 0.025,
+          "maxFraction": 0.031519
+        },
+        {
+          "missions": [
+            "flatiron-eastside-logistics",
+            "midtown-supply-backhaul"
+          ],
+          "leftFraction": 0.006079,
+          "rightFraction": 0.004878,
+          "maxFraction": 0.006079
         },
         {
           "missions": [
@@ -339,44 +366,8 @@
         },
         {
           "missions": [
-            "midtown-medical-link",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "hudson-inspection"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
             "chelsea-midtown-delivery",
             "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "midtown-west-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -395,6 +386,15 @@
           "missions": [
             "chelsea-midtown-delivery",
             "midtown-supply-backhaul"
+          ],
+          "leftFraction": 0.0,
+          "rightFraction": 0.0,
+          "maxFraction": 0.0
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery",
+            "east-to-hudson-priority"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -457,7 +457,7 @@
         {
           "missions": [
             "flatiron-eastside-logistics",
-            "midtown-supply-backhaul"
+            "eastside-medical-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -532,17 +532,71 @@
       "study": "static",
       "planner": "rrt-star",
       "missionCount": 8,
-      "worstPairFraction": 0.064935,
-      "meanPairFraction": 0.002319,
+      "worstPairFraction": 0.081081,
+      "meanPairFraction": 0.008259,
       "pairs": [
+        {
+          "missions": [
+            "midtown-supply-backhaul",
+            "east-to-hudson-priority"
+          ],
+          "leftFraction": 0.081081,
+          "rightFraction": 0.075342,
+          "maxFraction": 0.081081
+        },
+        {
+          "missions": [
+            "midtown-medical-link",
+            "midtown-supply-backhaul"
+          ],
+          "leftFraction": 0.040761,
+          "rightFraction": 0.039312,
+          "maxFraction": 0.040761
+        },
         {
           "missions": [
             "flatiron-eastside-logistics",
             "eastside-medical-return"
           ],
-          "leftFraction": 0.054348,
-          "rightFraction": 0.064935,
-          "maxFraction": 0.064935
+          "leftFraction": 0.035294,
+          "rightFraction": 0.033333,
+          "maxFraction": 0.035294
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery",
+            "midtown-west-backhaul"
+          ],
+          "leftFraction": 0.032258,
+          "rightFraction": 0.02963,
+          "maxFraction": 0.032258
+        },
+        {
+          "missions": [
+            "midtown-medical-link",
+            "east-to-hudson-priority"
+          ],
+          "leftFraction": 0.019022,
+          "rightFraction": 0.018265,
+          "maxFraction": 0.019022
+        },
+        {
+          "missions": [
+            "hudson-inspection",
+            "midtown-west-backhaul"
+          ],
+          "leftFraction": 0.016949,
+          "rightFraction": 0.009877,
+          "maxFraction": 0.016949
+        },
+        {
+          "missions": [
+            "flatiron-eastside-logistics",
+            "midtown-supply-backhaul"
+          ],
+          "leftFraction": 0.005882,
+          "rightFraction": 0.004914,
+          "maxFraction": 0.005882
         },
         {
           "missions": [
@@ -591,24 +645,6 @@
         },
         {
           "missions": [
-            "midtown-medical-link",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
             "chelsea-midtown-delivery",
             "hudson-inspection"
           ],
@@ -628,15 +664,6 @@
         {
           "missions": [
             "chelsea-midtown-delivery",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
             "eastside-medical-return"
           ],
           "leftFraction": 0.0,
@@ -673,15 +700,6 @@
         {
           "missions": [
             "hudson-inspection",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
             "eastside-medical-return"
           ],
           "leftFraction": 0.0,
@@ -710,15 +728,6 @@
           "missions": [
             "flatiron-eastside-logistics",
             "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "midtown-supply-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -772,15 +781,6 @@
         {
           "missions": [
             "eastside-medical-return",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-supply-backhaul",
             "east-to-hudson-priority"
           ],
           "leftFraction": 0.0,
@@ -793,26 +793,62 @@
       "study": "dynamic",
       "planner": "repeated-astar-3d",
       "missionCount": 8,
-      "worstPairFraction": 0.100592,
-      "meanPairFraction": 0.004166,
+      "worstPairFraction": 0.050725,
+      "meanPairFraction": 0.005536,
       "pairs": [
+        {
+          "missions": [
+            "midtown-medical-link-reactive",
+            "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.041344,
+          "rightFraction": 0.050725,
+          "maxFraction": 0.050725
+        },
+        {
+          "missions": [
+            "midtown-medical-link-reactive",
+            "east-to-hudson-priority-reactive"
+          ],
+          "leftFraction": 0.033592,
+          "rightFraction": 0.02407,
+          "maxFraction": 0.033592
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery-reactive",
+            "midtown-west-backhaul-reactive"
+          ],
+          "leftFraction": 0.031161,
+          "rightFraction": 0.027228,
+          "maxFraction": 0.031161
+        },
         {
           "missions": [
             "flatiron-eastside-logistics-reactive",
             "eastside-medical-return-reactive"
           ],
-          "leftFraction": 0.07,
-          "rightFraction": 0.100592,
-          "maxFraction": 0.100592
+          "leftFraction": 0.019284,
+          "rightFraction": 0.025937,
+          "maxFraction": 0.025937
         },
         {
           "missions": [
-            "chelsea-midtown-delivery-reactive",
+            "eastside-medical-return-reactive",
             "east-to-hudson-priority-reactive"
           ],
-          "leftFraction": 0.010152,
-          "rightFraction": 0.016043,
-          "maxFraction": 0.016043
+          "leftFraction": 0.005764,
+          "rightFraction": 0.008753,
+          "maxFraction": 0.008753
+        },
+        {
+          "missions": [
+            "flatiron-eastside-logistics-reactive",
+            "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.002755,
+          "rightFraction": 0.004831,
+          "maxFraction": 0.004831
         },
         {
           "missions": [
@@ -861,24 +897,6 @@
         },
         {
           "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
             "chelsea-midtown-delivery-reactive",
             "hudson-inspection-reactive"
           ],
@@ -898,15 +916,6 @@
         {
           "missions": [
             "chelsea-midtown-delivery-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
             "eastside-medical-return-reactive"
           ],
           "leftFraction": 0.0,
@@ -917,6 +926,15 @@
           "missions": [
             "chelsea-midtown-delivery-reactive",
             "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.0,
+          "rightFraction": 0.0,
+          "maxFraction": 0.0
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery-reactive",
+            "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -979,15 +997,6 @@
         {
           "missions": [
             "flatiron-eastside-logistics-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
             "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
@@ -1025,15 +1034,6 @@
           "missions": [
             "eastside-medical-return-reactive",
             "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1054,35 +1054,71 @@
       "study": "dynamic",
       "planner": "repeated-lazy-theta-star",
       "missionCount": 8,
-      "worstPairFraction": 0.097143,
-      "meanPairFraction": 0.00502,
+      "worstPairFraction": 0.051813,
+      "meanPairFraction": 0.006283,
       "pairs": [
+        {
+          "missions": [
+            "midtown-medical-link-reactive",
+            "east-to-hudson-priority-reactive"
+          ],
+          "leftFraction": 0.051813,
+          "rightFraction": 0.041215,
+          "maxFraction": 0.051813
+        },
         {
           "missions": [
             "flatiron-eastside-logistics-reactive",
             "eastside-medical-return-reactive"
           ],
-          "leftFraction": 0.089552,
-          "rightFraction": 0.097143,
-          "maxFraction": 0.097143
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.027624,
-          "rightFraction": 0.015789,
-          "maxFraction": 0.027624
+          "leftFraction": 0.028986,
+          "rightFraction": 0.034188,
+          "maxFraction": 0.034188
         },
         {
           "missions": [
             "chelsea-midtown-delivery-reactive",
+            "midtown-west-backhaul-reactive"
+          ],
+          "leftFraction": 0.031073,
+          "rightFraction": 0.027228,
+          "maxFraction": 0.031073
+        },
+        {
+          "missions": [
+            "midtown-medical-link-reactive",
+            "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.028497,
+          "rightFraction": 0.029197,
+          "maxFraction": 0.029197
+        },
+        {
+          "missions": [
+            "midtown-supply-backhaul-reactive",
             "east-to-hudson-priority-reactive"
           ],
-          "leftFraction": 0.015228,
-          "rightFraction": 0.015789,
-          "maxFraction": 0.015789
+          "leftFraction": 0.012165,
+          "rightFraction": 0.013015,
+          "maxFraction": 0.013015
+        },
+        {
+          "missions": [
+            "eastside-medical-return-reactive",
+            "east-to-hudson-priority-reactive"
+          ],
+          "leftFraction": 0.005698,
+          "rightFraction": 0.010846,
+          "maxFraction": 0.010846
+        },
+        {
+          "missions": [
+            "flatiron-eastside-logistics-reactive",
+            "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.005797,
+          "rightFraction": 0.004866,
+          "maxFraction": 0.005797
         },
         {
           "missions": [
@@ -1131,24 +1167,6 @@
         },
         {
           "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
             "chelsea-midtown-delivery-reactive",
             "hudson-inspection-reactive"
           ],
@@ -1168,15 +1186,6 @@
         {
           "missions": [
             "chelsea-midtown-delivery-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
             "eastside-medical-return-reactive"
           ],
           "leftFraction": 0.0,
@@ -1187,6 +1196,15 @@
           "missions": [
             "chelsea-midtown-delivery-reactive",
             "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.0,
+          "rightFraction": 0.0,
+          "maxFraction": 0.0
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery-reactive",
+            "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1249,15 +1267,6 @@
         {
           "missions": [
             "flatiron-eastside-logistics-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
             "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
@@ -1284,26 +1293,17 @@
         },
         {
           "missions": [
+            "midtown-west-backhaul-reactive",
+            "east-to-hudson-priority-reactive"
+          ],
+          "leftFraction": 0.0,
+          "rightFraction": 0.0,
+          "maxFraction": 0.0
+        },
+        {
+          "missions": [
             "eastside-medical-return-reactive",
             "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-supply-backhaul-reactive",
-            "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1315,26 +1315,62 @@
       "study": "dynamic",
       "planner": "dstar-lite-3d",
       "missionCount": 8,
-      "worstPairFraction": 0.084848,
-      "meanPairFraction": 0.0036,
+      "worstPairFraction": 0.043689,
+      "meanPairFraction": 0.004922,
       "pairs": [
+        {
+          "missions": [
+            "midtown-medical-link-reactive",
+            "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.039683,
+          "rightFraction": 0.043689,
+          "maxFraction": 0.043689
+        },
+        {
+          "missions": [
+            "midtown-medical-link-reactive",
+            "east-to-hudson-priority-reactive"
+          ],
+          "leftFraction": 0.034392,
+          "rightFraction": 0.026374,
+          "maxFraction": 0.034392
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery-reactive",
+            "midtown-west-backhaul-reactive"
+          ],
+          "leftFraction": 0.033898,
+          "rightFraction": 0.029484,
+          "maxFraction": 0.033898
+        },
         {
           "missions": [
             "flatiron-eastside-logistics-reactive",
             "eastside-medical-return-reactive"
           ],
-          "leftFraction": 0.055,
-          "rightFraction": 0.084848,
-          "maxFraction": 0.084848
+          "leftFraction": 0.00551,
+          "rightFraction": 0.011527,
+          "maxFraction": 0.011527
         },
         {
           "missions": [
-            "chelsea-midtown-delivery-reactive",
+            "eastside-medical-return-reactive",
             "east-to-hudson-priority-reactive"
           ],
-          "leftFraction": 0.010204,
-          "rightFraction": 0.015957,
-          "maxFraction": 0.015957
+          "leftFraction": 0.005764,
+          "rightFraction": 0.008791,
+          "maxFraction": 0.008791
+        },
+        {
+          "missions": [
+            "flatiron-eastside-logistics-reactive",
+            "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.00551,
+          "rightFraction": 0.004854,
+          "maxFraction": 0.00551
         },
         {
           "missions": [
@@ -1383,24 +1419,6 @@
         },
         {
           "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
             "chelsea-midtown-delivery-reactive",
             "hudson-inspection-reactive"
           ],
@@ -1420,15 +1438,6 @@
         {
           "missions": [
             "chelsea-midtown-delivery-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
             "eastside-medical-return-reactive"
           ],
           "leftFraction": 0.0,
@@ -1439,6 +1448,15 @@
           "missions": [
             "chelsea-midtown-delivery-reactive",
             "midtown-supply-backhaul-reactive"
+          ],
+          "leftFraction": 0.0,
+          "rightFraction": 0.0,
+          "maxFraction": 0.0
+        },
+        {
+          "missions": [
+            "chelsea-midtown-delivery-reactive",
+            "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1501,15 +1519,6 @@
         {
           "missions": [
             "flatiron-eastside-logistics-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
             "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
@@ -1547,15 +1556,6 @@
           "missions": [
             "eastside-medical-return-reactive",
             "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "east-to-hudson-priority-reactive"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1576,35 +1576,80 @@
       "study": "predictive",
       "planner": "repeated-astar-3d",
       "missionCount": 8,
-      "worstPairFraction": 0.131579,
-      "meanPairFraction": 0.006867,
+      "worstPairFraction": 0.06213,
+      "meanPairFraction": 0.007654,
       "pairs": [
         {
           "missions": [
             "manhattan-medical-transfer",
-            "manhattan-westside-backhaul"
+            "manhattan-medical-return"
           ],
-          "leftFraction": 0.131579,
-          "rightFraction": 0.105263,
-          "maxFraction": 0.131579
+          "leftFraction": 0.06213,
+          "rightFraction": 0.061765,
+          "maxFraction": 0.06213
         },
         {
           "missions": [
             "manhattan-midtown-rooftops",
             "manhattan-medical-return"
           ],
-          "leftFraction": 0.02551,
-          "rightFraction": 0.038961,
-          "maxFraction": 0.038961
+          "leftFraction": 0.039437,
+          "rightFraction": 0.035294,
+          "maxFraction": 0.039437
         },
         {
           "missions": [
             "manhattan-westside-delivery",
-            "manhattan-riverfront-return"
+            "manhattan-riverfront-logistics"
           ],
-          "leftFraction": 0.011905,
-          "rightFraction": 0.021739,
-          "maxFraction": 0.021739
+          "leftFraction": 0.037791,
+          "rightFraction": 0.030691,
+          "maxFraction": 0.037791
+        },
+        {
+          "missions": [
+            "manhattan-westside-delivery",
+            "manhattan-westside-backhaul"
+          ],
+          "leftFraction": 0.026163,
+          "rightFraction": 0.022727,
+          "maxFraction": 0.026163
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-medical-return"
+          ],
+          "leftFraction": 0.015345,
+          "rightFraction": 0.023529,
+          "maxFraction": 0.023529
+        },
+        {
+          "missions": [
+            "manhattan-medical-transfer",
+            "manhattan-midtown-rooftops"
+          ],
+          "leftFraction": 0.017751,
+          "rightFraction": 0.014085,
+          "maxFraction": 0.017751
+        },
+        {
+          "missions": [
+            "manhattan-midtown-rooftops",
+            "manhattan-eastside-backhaul"
+          ],
+          "leftFraction": 0.002817,
+          "rightFraction": 0.004963,
+          "maxFraction": 0.004963
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-westside-backhaul"
+          ],
+          "leftFraction": 0.002558,
+          "rightFraction": 0.002525,
+          "maxFraction": 0.002558
         },
         {
           "missions": [
@@ -1627,24 +1672,6 @@
         {
           "missions": [
             "manhattan-westside-delivery",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
             "manhattan-medical-return"
           ],
           "leftFraction": 0.0,
@@ -1662,8 +1689,8 @@
         },
         {
           "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-midtown-rooftops"
+            "manhattan-westside-delivery",
+            "manhattan-riverfront-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1681,7 +1708,7 @@
         {
           "missions": [
             "manhattan-medical-transfer",
-            "manhattan-medical-return"
+            "manhattan-westside-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1726,34 +1753,7 @@
         {
           "missions": [
             "manhattan-midtown-rooftops",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
             "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-medical-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1837,44 +1837,80 @@
       "study": "predictive",
       "planner": "dstar-lite-reset-3d",
       "missionCount": 8,
-      "worstPairFraction": 0.136364,
-      "meanPairFraction": 0.008775,
+      "worstPairFraction": 0.061765,
+      "meanPairFraction": 0.007786,
       "pairs": [
         {
           "missions": [
             "manhattan-medical-transfer",
-            "manhattan-westside-backhaul"
+            "manhattan-medical-return"
           ],
-          "leftFraction": 0.136364,
-          "rightFraction": 0.110526,
-          "maxFraction": 0.136364
+          "leftFraction": 0.061765,
+          "rightFraction": 0.061584,
+          "maxFraction": 0.061765
         },
         {
           "missions": [
             "manhattan-midtown-rooftops",
             "manhattan-medical-return"
           ],
-          "leftFraction": 0.02551,
-          "rightFraction": 0.046358,
-          "maxFraction": 0.046358
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.035714,
-          "rightFraction": 0.041237,
-          "maxFraction": 0.041237
+          "leftFraction": 0.04023,
+          "rightFraction": 0.038123,
+          "maxFraction": 0.04023
         },
         {
           "missions": [
             "manhattan-westside-delivery",
-            "manhattan-riverfront-return"
+            "manhattan-riverfront-logistics"
           ],
-          "leftFraction": 0.017857,
-          "rightFraction": 0.021739,
-          "maxFraction": 0.021739
+          "leftFraction": 0.034884,
+          "rightFraction": 0.025641,
+          "maxFraction": 0.034884
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-medical-return"
+          ],
+          "leftFraction": 0.015385,
+          "rightFraction": 0.029326,
+          "maxFraction": 0.029326
+        },
+        {
+          "missions": [
+            "manhattan-westside-delivery",
+            "manhattan-westside-backhaul"
+          ],
+          "leftFraction": 0.026163,
+          "rightFraction": 0.025253,
+          "maxFraction": 0.026163
+        },
+        {
+          "missions": [
+            "manhattan-medical-transfer",
+            "manhattan-midtown-rooftops"
+          ],
+          "leftFraction": 0.017647,
+          "rightFraction": 0.014368,
+          "maxFraction": 0.017647
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-westside-backhaul"
+          ],
+          "leftFraction": 0.005128,
+          "rightFraction": 0.005051,
+          "maxFraction": 0.005128
+        },
+        {
+          "missions": [
+            "manhattan-midtown-rooftops",
+            "manhattan-eastside-backhaul"
+          ],
+          "leftFraction": 0.002874,
+          "rightFraction": 0.002481,
+          "maxFraction": 0.002874
         },
         {
           "missions": [
@@ -1897,24 +1933,6 @@
         {
           "missions": [
             "manhattan-westside-delivery",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
             "manhattan-medical-return"
           ],
           "leftFraction": 0.0,
@@ -1932,8 +1950,8 @@
         },
         {
           "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-midtown-rooftops"
+            "manhattan-westside-delivery",
+            "manhattan-riverfront-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1951,7 +1969,7 @@
         {
           "missions": [
             "manhattan-medical-transfer",
-            "manhattan-medical-return"
+            "manhattan-westside-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1978,7 +1996,7 @@
         {
           "missions": [
             "manhattan-midtown-rooftops",
-            "manhattan-westside-backhaul"
+            "manhattan-riverfront-logistics"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1987,7 +2005,7 @@
         {
           "missions": [
             "manhattan-midtown-rooftops",
-            "manhattan-eastside-backhaul"
+            "manhattan-westside-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -1997,24 +2015,6 @@
           "missions": [
             "manhattan-midtown-rooftops",
             "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-medical-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2098,44 +2098,80 @@
       "study": "predictive",
       "planner": "dstar-lite-reuse-3d",
       "missionCount": 8,
-      "worstPairFraction": 0.136364,
-      "meanPairFraction": 0.008775,
+      "worstPairFraction": 0.061765,
+      "meanPairFraction": 0.007786,
       "pairs": [
         {
           "missions": [
             "manhattan-medical-transfer",
-            "manhattan-westside-backhaul"
+            "manhattan-medical-return"
           ],
-          "leftFraction": 0.136364,
-          "rightFraction": 0.110526,
-          "maxFraction": 0.136364
+          "leftFraction": 0.061765,
+          "rightFraction": 0.061584,
+          "maxFraction": 0.061765
         },
         {
           "missions": [
             "manhattan-midtown-rooftops",
             "manhattan-medical-return"
           ],
-          "leftFraction": 0.02551,
-          "rightFraction": 0.046358,
-          "maxFraction": 0.046358
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.035714,
-          "rightFraction": 0.041237,
-          "maxFraction": 0.041237
+          "leftFraction": 0.04023,
+          "rightFraction": 0.038123,
+          "maxFraction": 0.04023
         },
         {
           "missions": [
             "manhattan-westside-delivery",
-            "manhattan-riverfront-return"
+            "manhattan-riverfront-logistics"
           ],
-          "leftFraction": 0.017857,
-          "rightFraction": 0.021739,
-          "maxFraction": 0.021739
+          "leftFraction": 0.034884,
+          "rightFraction": 0.025641,
+          "maxFraction": 0.034884
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-medical-return"
+          ],
+          "leftFraction": 0.015385,
+          "rightFraction": 0.029326,
+          "maxFraction": 0.029326
+        },
+        {
+          "missions": [
+            "manhattan-westside-delivery",
+            "manhattan-westside-backhaul"
+          ],
+          "leftFraction": 0.026163,
+          "rightFraction": 0.025253,
+          "maxFraction": 0.026163
+        },
+        {
+          "missions": [
+            "manhattan-medical-transfer",
+            "manhattan-midtown-rooftops"
+          ],
+          "leftFraction": 0.017647,
+          "rightFraction": 0.014368,
+          "maxFraction": 0.017647
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-westside-backhaul"
+          ],
+          "leftFraction": 0.005128,
+          "rightFraction": 0.005051,
+          "maxFraction": 0.005128
+        },
+        {
+          "missions": [
+            "manhattan-midtown-rooftops",
+            "manhattan-eastside-backhaul"
+          ],
+          "leftFraction": 0.002874,
+          "rightFraction": 0.002481,
+          "maxFraction": 0.002874
         },
         {
           "missions": [
@@ -2158,24 +2194,6 @@
         {
           "missions": [
             "manhattan-westside-delivery",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
             "manhattan-medical-return"
           ],
           "leftFraction": 0.0,
@@ -2193,8 +2211,8 @@
         },
         {
           "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-midtown-rooftops"
+            "manhattan-westside-delivery",
+            "manhattan-riverfront-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2212,7 +2230,7 @@
         {
           "missions": [
             "manhattan-medical-transfer",
-            "manhattan-medical-return"
+            "manhattan-westside-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2239,7 +2257,7 @@
         {
           "missions": [
             "manhattan-midtown-rooftops",
-            "manhattan-westside-backhaul"
+            "manhattan-riverfront-logistics"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2248,7 +2266,7 @@
         {
           "missions": [
             "manhattan-midtown-rooftops",
-            "manhattan-eastside-backhaul"
+            "manhattan-westside-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2258,24 +2276,6 @@
           "missions": [
             "manhattan-midtown-rooftops",
             "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-medical-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2359,44 +2359,107 @@
       "study": "predictive",
       "planner": "space-time-astar-4d",
       "missionCount": 8,
-      "worstPairFraction": 0.136646,
-      "meanPairFraction": 0.008277,
+      "worstPairFraction": 0.063768,
+      "meanPairFraction": 0.008811,
       "pairs": [
         {
           "missions": [
             "manhattan-medical-transfer",
-            "manhattan-westside-backhaul"
+            "manhattan-medical-return"
           ],
-          "leftFraction": 0.136646,
-          "rightFraction": 0.107692,
-          "maxFraction": 0.136646
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.047904,
-          "rightFraction": 0.045455,
-          "maxFraction": 0.047904
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.023952,
-          "rightFraction": 0.021277,
-          "maxFraction": 0.023952
+          "leftFraction": 0.063768,
+          "rightFraction": 0.060345,
+          "maxFraction": 0.063768
         },
         {
           "missions": [
             "manhattan-midtown-rooftops",
             "manhattan-medical-return"
           ],
-          "leftFraction": 0.019802,
-          "rightFraction": 0.023256,
-          "maxFraction": 0.023256
+          "leftFraction": 0.039216,
+          "rightFraction": 0.037356,
+          "maxFraction": 0.039216
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-medical-return"
+          ],
+          "leftFraction": 0.035176,
+          "rightFraction": 0.028736,
+          "maxFraction": 0.035176
+        },
+        {
+          "missions": [
+            "manhattan-westside-delivery",
+            "manhattan-riverfront-logistics"
+          ],
+          "leftFraction": 0.028818,
+          "rightFraction": 0.022613,
+          "maxFraction": 0.028818
+        },
+        {
+          "missions": [
+            "manhattan-medical-transfer",
+            "manhattan-midtown-rooftops"
+          ],
+          "leftFraction": 0.017391,
+          "rightFraction": 0.014006,
+          "maxFraction": 0.017391
+        },
+        {
+          "missions": [
+            "manhattan-medical-transfer",
+            "manhattan-riverfront-return"
+          ],
+          "leftFraction": 0.017391,
+          "rightFraction": 0.015487,
+          "maxFraction": 0.017391
+        },
+        {
+          "missions": [
+            "manhattan-medical-return",
+            "manhattan-riverfront-return"
+          ],
+          "leftFraction": 0.014368,
+          "rightFraction": 0.006637,
+          "maxFraction": 0.014368
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-eastside-backhaul"
+          ],
+          "leftFraction": 0.012563,
+          "rightFraction": 0.009662,
+          "maxFraction": 0.012563
+        },
+        {
+          "missions": [
+            "manhattan-westside-backhaul",
+            "manhattan-riverfront-return"
+          ],
+          "leftFraction": 0.007389,
+          "rightFraction": 0.006637,
+          "maxFraction": 0.007389
+        },
+        {
+          "missions": [
+            "manhattan-midtown-rooftops",
+            "manhattan-eastside-backhaul"
+          ],
+          "leftFraction": 0.005602,
+          "rightFraction": 0.004831,
+          "maxFraction": 0.005602
+        },
+        {
+          "missions": [
+            "manhattan-riverfront-logistics",
+            "manhattan-westside-backhaul"
+          ],
+          "leftFraction": 0.005025,
+          "rightFraction": 0.004926,
+          "maxFraction": 0.005025
         },
         {
           "missions": [
@@ -2445,8 +2508,8 @@
         },
         {
           "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-midtown-rooftops"
+            "manhattan-westside-delivery",
+            "manhattan-riverfront-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2464,7 +2527,7 @@
         {
           "missions": [
             "manhattan-medical-transfer",
-            "manhattan-medical-return"
+            "manhattan-westside-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2474,15 +2537,6 @@
           "missions": [
             "manhattan-medical-transfer",
             "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2509,43 +2563,7 @@
         {
           "missions": [
             "manhattan-midtown-rooftops",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
             "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-eastside-backhaul"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2573,15 +2591,6 @@
           "missions": [
             "manhattan-westside-backhaul",
             "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-riverfront-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,
@@ -2591,2627 +2600,6 @@
           "missions": [
             "manhattan-medical-return",
             "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-eastside-backhaul",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    }
-  ],
-  "baselineStudies": [
-    {
-      "study": "static",
-      "planner": "astar-3d",
-      "missionCount": 8,
-      "worstPairFraction": 0.016304,
-      "meanPairFraction": 0.001107,
-      "pairs": [
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.010309,
-          "rightFraction": 0.016304,
-          "maxFraction": 0.016304
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.005952,
-          "rightFraction": 0.014706,
-          "maxFraction": 0.014706
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "chelsea-midtown-delivery"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "hudson-inspection"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "hudson-inspection"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-supply-backhaul",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "static",
-      "planner": "lazy-theta-star",
-      "missionCount": 8,
-      "worstPairFraction": 0.010989,
-      "meanPairFraction": 0.000785,
-      "pairs": [
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.010309,
-          "rightFraction": 0.010989,
-          "maxFraction": 0.010989
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.005848,
-          "rightFraction": 0.010989,
-          "maxFraction": 0.010989
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "chelsea-midtown-delivery"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "hudson-inspection"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "hudson-inspection"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-supply-backhaul",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "static",
-      "planner": "rrt-star",
-      "missionCount": 8,
-      "worstPairFraction": 0.022222,
-      "meanPairFraction": 0.000794,
-      "pairs": [
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.005988,
-          "rightFraction": 0.022222,
-          "maxFraction": 0.022222
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "chelsea-midtown-delivery"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "hudson-inspection"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "hudson-inspection"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "flatiron-eastside-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "midtown-west-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "eastside-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return",
-            "midtown-supply-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-supply-backhaul",
-            "east-to-hudson-priority"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "dynamic",
-      "planner": "repeated-astar-3d",
-      "missionCount": 8,
-      "worstPairFraction": 0.014388,
-      "meanPairFraction": 0.000894,
-      "pairs": [
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.005814,
-          "rightFraction": 0.014388,
-          "maxFraction": 0.014388
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.010204,
-          "rightFraction": 0.010638,
-          "maxFraction": 0.010638
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "chelsea-midtown-delivery-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "hudson-inspection-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "hudson-inspection-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-supply-backhaul-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "dynamic",
-      "planner": "repeated-lazy-theta-star",
-      "missionCount": 8,
-      "worstPairFraction": 0.027211,
-      "meanPairFraction": 0.001932,
-      "pairs": [
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.011561,
-          "rightFraction": 0.027211,
-          "maxFraction": 0.027211
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.010204,
-          "rightFraction": 0.016129,
-          "maxFraction": 0.016129
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.006803,
-          "rightFraction": 0.010753,
-          "maxFraction": 0.010753
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "chelsea-midtown-delivery-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "hudson-inspection-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "hudson-inspection-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-supply-backhaul-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "dynamic",
-      "planner": "dstar-lite-3d",
-      "missionCount": 8,
-      "worstPairFraction": 0.015306,
-      "meanPairFraction": 0.000547,
-      "pairs": [
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.015306,
-          "rightFraction": 0.010582,
-          "maxFraction": 0.015306
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "chelsea-midtown-delivery-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "hudson-inspection-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-medical-link-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "hudson-inspection-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "chelsea-midtown-delivery-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "flatiron-eastside-logistics-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "hudson-inspection-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "midtown-west-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "flatiron-eastside-logistics-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "eastside-medical-return-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-west-backhaul-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "midtown-supply-backhaul-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "eastside-medical-return-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "midtown-supply-backhaul-reactive",
-            "east-to-hudson-priority-reactive"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "predictive",
-      "planner": "repeated-astar-3d",
-      "missionCount": 8,
-      "worstPairFraction": 0.048611,
-      "meanPairFraction": 0.002581,
-      "pairs": [
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-midtown-rooftops"
-          ],
-          "leftFraction": 0.048611,
-          "rightFraction": 0.045455,
-          "maxFraction": 0.048611
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.023669,
-          "rightFraction": 0.021739,
-          "maxFraction": 0.023669
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-medical-transfer"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-midtown-rooftops"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-eastside-backhaul",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "predictive",
-      "planner": "dstar-lite-reset-3d",
-      "missionCount": 8,
-      "worstPairFraction": 0.048611,
-      "meanPairFraction": 0.002701,
-      "pairs": [
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-midtown-rooftops"
-          ],
-          "leftFraction": 0.048611,
-          "rightFraction": 0.045714,
-          "maxFraction": 0.048611
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.017964,
-          "rightFraction": 0.027027,
-          "maxFraction": 0.027027
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-medical-transfer"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-midtown-rooftops"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-eastside-backhaul",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "predictive",
-      "planner": "dstar-lite-reuse-3d",
-      "missionCount": 8,
-      "worstPairFraction": 0.048611,
-      "meanPairFraction": 0.002701,
-      "pairs": [
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-midtown-rooftops"
-          ],
-          "leftFraction": 0.048611,
-          "rightFraction": 0.045714,
-          "maxFraction": 0.048611
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.017964,
-          "rightFraction": 0.027027,
-          "maxFraction": 0.027027
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-medical-transfer"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-midtown-rooftops"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-eastside-backhaul",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        }
-      ]
-    },
-    {
-      "study": "predictive",
-      "planner": "space-time-astar-4d",
-      "missionCount": 8,
-      "worstPairFraction": 0.060811,
-      "meanPairFraction": 0.00557,
-      "pairs": [
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.060811,
-          "rightFraction": 0.052326,
-          "maxFraction": 0.060811
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.047619,
-          "rightFraction": 0.047872,
-          "maxFraction": 0.047872
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.005556,
-          "rightFraction": 0.029412,
-          "maxFraction": 0.029412
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.017857,
-          "rightFraction": 0.016129,
-          "maxFraction": 0.017857
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-medical-transfer"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-midtown-rooftops"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-delivery",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-midtown-rooftops"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-transfer",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-logistics"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-midtown-rooftops",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-westside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-riverfront-logistics",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-medical-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-westside-backhaul",
-            "manhattan-riverfront-return"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-eastside-backhaul"
-          ],
-          "leftFraction": 0.0,
-          "rightFraction": 0.0,
-          "maxFraction": 0.0
-        },
-        {
-          "missions": [
-            "manhattan-medical-return",
-            "manhattan-riverfront-return"
           ],
           "leftFraction": 0.0,
           "rightFraction": 0.0,

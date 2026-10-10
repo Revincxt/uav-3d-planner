@@ -1,48 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { validatePredictiveBundle } from "../src/predictive-data";
 import losFixture from "./fixtures/predictive-los-only.json";
+import { readStudyData } from '../scripts/study-reader.mjs';
 
-const filesystemModule = "node:fs";
-const { readFileSync }: { readFileSync: (path: URL, encoding: "utf8") => string } = await import(filesystemModule);
-const source = readFileSync(new URL("../public/predictive-data.json", import.meta.url), "utf8");
-const cityBundle = () => JSON.parse(source);
-
-function omitSchedulingOnlyEvidence(bundle: ReturnType<typeof cityBundle>) {
-  delete bundle.protocol.trajectoryDynamicScheduling;
-  // A modern stopped reversal cannot be relabelled as legacy duration-only
-  // retiming. The schema fixture omits that optional flight instead; it does
-  // not fabricate a legacy timing certificate or weaken the old parser gate.
-  for (const scenario of bundle.scenarios) for (const run of scenario.runs) {
-    if (run.executionTimedPath?.length !== run.geometryTimedPath.length) {
-      run.executionTimedPath = run.executionWaitIntervals = run.executionMetrics = run.executionFrames = null;
-      Object.assign(run.smoothing.execution, { status: "not-evaluated", qualified: false,
-        collisionCertified: false, qualification: null, timingIterations: 0,
-        originalDurationS: null, candidateDurationS: null, addedDurationS: null });
-    }
-  }
-}
-
-function legacyV2Bundle() {
-  const bundle = cityBundle();
-  omitSchedulingOnlyEvidence(bundle);
-  bundle.protocol.id = "manhattan-space-time-v2";
-  bundle.protocol.trajectoryPostprocessor = "spacetime-shortcut-fillet-plus-sampling-stable-discrete-envelope-v3";
-  delete bundle.protocol.trajectoryPreserveAltitude;
-  delete bundle.protocol.trajectoryCurveDegree;
-  for (const scenario of bundle.scenarios) {
-    for (const run of scenario.runs) {
-      delete run.parameters.trajectoryPreserveAltitude;
-      delete run.parameters.trajectoryCurveDegree;
-      delete run.smoothing.optimizationAxes;
-      delete run.smoothing.altitudePolicy;
-      if (run.smoothing.method === "spacetime-shortcut-plus-local-quintic-bspline") {
-        // Schema-only legacy fixture, not evidence produced by the old postprocessor.
-        run.smoothing.method = "spacetime-shortcut-plus-sampled-circular-fillet";
-      }
-    }
-  }
-  return bundle;
-}
+const source = await readStudyData(new URL("../public/predictive-data.json", import.meta.url));
+// Each test owns its mutable declarations, without parsing/duplicating the full
+// enlarged city and long replay histories dozens of times. Validation still
+// inspects every native field and sample; only fixture construction is cheaper.
+const cityBundle = () => ({ ...source, protocol: structuredClone(source.protocol),
+  scenarios: source.scenarios.map((scenario: typeof source.scenarios[number]) => ({ ...scenario,
+    mission: structuredClone(scenario.mission),
+    environment: { ...scenario.environment },
+    runs: scenario.runs.map((run: typeof scenario.runs[number]) => ({ ...run,
+      parameters: { ...run.parameters }, smoothing: structuredClone(run.smoothing),
+    })),
+  })),
+});
 
 function losOnlyBundle() {
   const bundle = cityBundle();
@@ -66,10 +39,10 @@ function losOnlyBundle() {
         plannerId: planner.plannerId,
         runId: planner.runId,
         predictive: planner.predictive,
-        parameters: { ...planner.parameters, trajectoryPreserveAltitude: 1, trajectoryCurveDegree: 5 },
+        parameters: { ...planner.parameters, trajectoryPreserveAltitude: 0, trajectoryCurveDegree: 5 },
       };
       Object.assign(run.smoothing, {
-        optimizationAxes: ["x", "y"], altitudePolicy: "preserve-raw-z-time-profile",
+        optimizationAxes: ["x", "y", "z"], altitudePolicy: "bounded-spatial-spline-v1", altitudeDeviationLimitM: 12,
       });
       for (const metrics of [run.plannerMetrics, run.geometryMetrics, run.executionMetrics]) {
         metrics.workUnit = planner.workUnit;
@@ -89,11 +62,13 @@ function losOnlyBundle() {
 describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
   it("retains actual polygons, city provenance, missions and qualified evidence", () => {
     const bundle = validatePredictiveBundle(cityBundle());
-    expect(bundle.protocol.id).toBe("manhattan-space-time-v3");
+    expect(bundle.protocol.id).toBe("manhattan-space-time-v4");
     expect(bundle.protocol.spaceTimeConnectivity).toBe(26);
     expect(bundle.protocol.trajectoryShortcut).toBe(true);
-    expect(bundle.protocol.trajectoryPreserveAltitude).toBe(true);
+    expect(bundle.protocol.trajectoryPreserveAltitude).toBe(false);
     expect(bundle.protocol.trajectoryCurveDegree).toBe(5);
+    expect(bundle.protocol.trajectoryCurveDimensions).toBe(3);
+    expect(bundle.protocol.trajectoryAltitudeDeviationLimitM).toBe(12);
     expect(bundle.scenarios).toHaveLength(8);
     expect(bundle.scenarios.flatMap((scenario) => scenario.runs)).toHaveLength(32);
     for (const scenario of bundle.scenarios) {
@@ -101,21 +76,21 @@ describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
       expect(scenario.buildings.length).toBeGreaterThan(4000);
       expect(scenario.buildings.every((building) => building.footprint?.length)).toBe(true);
       expect(scenario.mission?.origin).toBeTruthy();
-      expect(scenario.movingSpheres).toHaveLength(7);
+      expect(scenario.movingSpheres).toHaveLength(12);
       for (const run of scenario.runs) {
         expect(run.status).toBe("success");
         expect(run.smoothing.execution.qualified).toBe(true);
         expect(run.plannerMetrics.safetyViolations).toBe(0);
         expect(run.executionMetrics?.safetyViolations).toBe(0);
         expect(run.parameters.trajectoryShortcut).toBe(1);
-        expect(run.parameters.trajectoryPreserveAltitude).toBe(1);
+        expect(run.parameters.trajectoryPreserveAltitude).toBe(0);
         expect(run.parameters.trajectoryCurveDegree).toBe(5);
         expect(["spacetime-shortcut-plus-local-quintic-bspline", "spacetime-shortcut-fillet-fallback", "spacetime-shortcut"])
           .toContain(run.smoothing.method);
         if (run.smoothing.method === "spacetime-shortcut-plus-local-quintic-bspline")
           expect(run.smoothing.roundedCornerCount).toBeGreaterThan(0);
-        expect(run.smoothing.optimizationAxes).toEqual(["x", "y"]);
-        expect(run.smoothing.altitudePolicy).toBe("preserve-raw-z-time-profile");
+        expect(run.smoothing.optimizationAxes).toEqual(["x", "y", "z"]);
+        expect(run.smoothing.altitudePolicy).toBe("bounded-spatial-spline-v1");
         expect(run.parameters.spaceTimeConnectivity).toBe(
           run.plannerId === "space-time-astar-4d" ? 26 : undefined,
         );
@@ -153,34 +128,10 @@ describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
     expect(() => validatePredictiveBundle(bundle)).toThrow(/NYC provenance/);
   });
 
-  it("accepts the legacy Manhattan v1 protocol shape without enhancement declarations", () => {
+  it.each([1, 2, 3])("rejects retired Manhattan space-time protocol v%s", (version) => {
     const bundle = cityBundle();
-    omitSchedulingOnlyEvidence(bundle);
-    bundle.protocol.id = "manhattan-space-time-v1";
-    bundle.protocol.trajectoryPostprocessor = "certified-fillet-plus-discrete-execution-envelope-v2";
-    delete bundle.protocol.spaceTimeConnectivity;
-    delete bundle.protocol.trajectoryShortcut;
-    delete bundle.protocol.trajectoryPreserveAltitude;
-    for (const scenario of bundle.scenarios) {
-      for (const run of scenario.runs) {
-        delete run.parameters.trajectoryShortcut;
-        delete run.parameters.spaceTimeConnectivity;
-        delete run.parameters.trajectoryPreserveAltitude;
-        delete run.smoothing.optimizationAxes;
-        delete run.smoothing.altitudePolicy;
-        run.smoothing.method = "sampled-circular-fillet";
-        // Schema-only fixture: v3's differently sampled angle diagnostics are not v1 evidence.
-        // Omit these optional fields; the dedicated test below still enforces the v1 angle gate.
-        run.smoothing.maxTurnAngleBeforeDeg = null;
-        run.smoothing.maxTurnAngleAfterDeg = null;
-        // Schema-only legacy fixture: v1 "applied" always declares a fillet radius.
-        // Newly computed v3 runs may instead use an applied, radius-free LOS shortcut.
-        if (run.smoothing.applied && run.smoothing.appliedTurnRadiusM === null) {
-          run.smoothing.appliedTurnRadiusM = run.smoothing.requestedTurnRadiusM;
-        }
-      }
-    }
-    expect(validatePredictiveBundle(bundle).protocol.id).toBe("manhattan-space-time-v1");
+    bundle.protocol.id = `manhattan-space-time-v${version}`;
+    expect(() => validatePredictiveBundle(bundle)).toThrow(/protocol/);
   });
 
   it.each([
@@ -190,23 +141,19 @@ describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
     ["trajectoryShortcut", 1],
     ["trajectoryShortcut", false],
     ["trajectoryPostprocessor", "certified-fillet-plus-discrete-execution-envelope-v2"],
-  ])("rejects an incompatible v2 protocol declaration for %s=%s", (field, value) => {
-    const bundle = legacyV2Bundle();
+  ])("rejects an incompatible v4 protocol declaration for %s=%s", (field, value) => {
+    const bundle = cityBundle();
     bundle.protocol[field as string] = value;
     expect(() => validatePredictiveBundle(bundle)).toThrow(/protocol\./);
   });
 
-  it("retains compatibility with the legacy Manhattan v2 free-3D postprocessor", () => {
-    expect(validatePredictiveBundle(legacyV2Bundle()).protocol.id).toBe("manhattan-space-time-v2");
-  });
-
-  it.each([undefined, false, 1])("rejects v3 protocol.trajectoryPreserveAltitude=%s", (value) => {
+  it.each([undefined, true, 0])("rejects v4 protocol.trajectoryPreserveAltitude=%s", (value) => {
     const bundle = cityBundle();
     bundle.protocol.trajectoryPreserveAltitude = value;
     expect(() => validatePredictiveBundle(bundle)).toThrow(/protocol\.trajectoryPreserveAltitude/);
   });
 
-  it("rejects a v3 protocol with the old free-3D postprocessor", () => {
+  it("rejects a v4 protocol with the old free-3D postprocessor", () => {
     const bundle = cityBundle();
     bundle.protocol.trajectoryPostprocessor = "spacetime-shortcut-fillet-plus-sampling-stable-discrete-envelope-v3";
     expect(() => validatePredictiveBundle(bundle)).toThrow(/protocol\.trajectoryPostprocessor/);
@@ -224,7 +171,19 @@ describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
     expect(() => validatePredictiveBundle(bundle)).toThrow(/parameters\.trajectoryCurveDegree/);
   });
 
-  it.each([undefined, 0, true])("requires numeric per-run altitude preservation: %s", (value) => {
+  it.each([undefined, 2, true])("requires three-dimensional protocol curves: %s", (value) => {
+    const bundle = cityBundle();
+    bundle.protocol.trajectoryCurveDimensions = value;
+    expect(() => validatePredictiveBundle(bundle)).toThrow(/protocol\.trajectoryCurveDimensions/);
+  });
+
+  it.each([undefined, 6, 24])("requires the declared total height budget: %s", (value) => {
+    const bundle = cityBundle();
+    bundle.protocol.trajectoryAltitudeDeviationLimitM = value;
+    expect(() => validatePredictiveBundle(bundle)).toThrow(/protocol\.trajectoryAltitudeDeviationLimitM/);
+  });
+
+  it.each([undefined, 1, true])("requires numeric per-run XYZ declaration: %s", (value) => {
     const bundle = cityBundle();
     bundle.scenarios[0].runs[0].parameters.trajectoryPreserveAltitude = value;
     expect(() => validatePredictiveBundle(bundle)).toThrow(/parameters\.trajectoryPreserveAltitude/);
@@ -232,22 +191,34 @@ describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
 
   it.each([
     ["optimizationAxes", undefined],
-    ["optimizationAxes", ["x", "y", "z"]],
+    ["optimizationAxes", ["x", "y"]],
     ["optimizationAxes", ["y", "x"]],
     ["altitudePolicy", undefined],
     ["altitudePolicy", "free-3d"],
-  ])("rejects missing or incompatible v3 smoothing %s", (field, value) => {
+    ["altitudeDeviationLimitM", undefined],
+    ["altitudeDeviationLimitM", 24],
+  ])("rejects missing or incompatible v4 smoothing %s", (field, value) => {
     const bundle = cityBundle();
     bundle.scenarios[0].runs[0].smoothing[field as string] = value;
     expect(() => validatePredictiveBundle(bundle)).toThrow(new RegExp(`smoothing\\.${field}`));
   });
 
-  it.each([1.5e-6, 2e-5, 0.25])("checks an interior raw altitude knot with absolute metre tolerance: %s", (offset) => {
+  it.each([12.0000015, 12.00002, 13])("checks an interior raw altitude knot against the XYZ budget: %s", (offset) => {
     const bundle = losOnlyBundle();
-    // The geometry has only two points: equal endpoints cannot prove preservation of the
-    // removed midpoint. Even 1.5 micrometres is below the old relative comparator at 90 m.
+    // Equal endpoints cannot prove the height budget at a removed raw midpoint.
+    // Check the union of all knots with an absolute metre tolerance.
     bundle.scenarios[0].runs[0].rawTimedPath[1].position[2] += offset;
-    expect(() => validatePredictiveBundle(bundle)).toThrow(/preserve raw z\(t\)/);
+    expect(() => validatePredictiveBundle(bundle)).toThrow(/declared altitude deviation/);
+  });
+
+  it("accepts a canonicalized zero trim scale for a qualified spatial reversal spline", () => {
+    const bundle = cityBundle();
+    const smoothing = bundle.scenarios[0].runs[0].smoothing;
+    expect(smoothing.method).toBe("spacetime-shortcut-plus-local-quintic-bspline");
+    smoothing.appliedTurnRadiusM = 0;
+    expect(validatePredictiveBundle(bundle).scenarios[0]!.runs[0]!.smoothing.appliedTurnRadiusM).toBe(0);
+    smoothing.appliedTurnRadiusM = -0.00001;
+    expect(() => validatePredictiveBundle(bundle)).toThrow(/appliedTurnRadiusM/);
   });
 
   it("also checks altitude knots introduced only by geometry sampling", () => {
@@ -256,9 +227,9 @@ describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
     const left = path[0], right = path[1];
     path.splice(1, 0, {
       timeS: (left.timeS + right.timeS) / 2,
-      position: [(left.position[0] + right.position[0]) / 2, left.position[1], left.position[2] + 0.25],
+      position: [(left.position[0] + right.position[0]) / 2, left.position[1], left.position[2] + 13],
     });
-    expect(() => validatePredictiveBundle(bundle)).toThrow(/preserve raw z\(t\)/);
+    expect(() => validatePredictiveBundle(bundle)).toThrow(/declared altitude deviation/);
   });
 
   it("requires shortcut declarations on every computed run", () => {
@@ -300,46 +271,34 @@ describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
   it.each([
     ["spacetime-shortcut", 1, null],
     ["spacetime-shortcut", 0, 24],
-    ["spacetime-shortcut-plus-sampled-circular-fillet", 0, null],
+    ["spacetime-shortcut-plus-local-quintic-bspline", 0, null],
   ])("rejects inconsistent shortcut method/corners/radius %s %s %s", (method, corners, radius) => {
     const bundle = losOnlyBundle();
     const smoothing = bundle.scenarios[0].runs[0].smoothing;
     smoothing.method = method;
     smoothing.roundedCornerCount = corners;
     smoothing.appliedTurnRadiusM = radius;
-    expect(() => validatePredictiveBundle(bundle)).toThrow(/shortcut method|shortcut-plus-fillet method/);
+    expect(() => validatePredictiveBundle(bundle)).toThrow(/shortcut method|shortcut-plus-curve method/);
   });
 
-  it("allows differently sampled turn-angle diagnostics in v2 without weakening the v1 gate", () => {
-    const bundle = legacyV2Bundle();
-    // A 120-segment arc can report 1.5 degrees per raw segment, while its safe shortened fillet
-    // samples report 4.7368 degrees. These fields describe different sampling, not curvature limits.
+  it("rejects a retired circular-fillet method on the current XYZ protocol", () => {
+    const bundle = cityBundle();
+    bundle.scenarios[0].runs[0].smoothing.method = "spacetime-shortcut-plus-sampled-circular-fillet";
+    expect(() => validatePredictiveBundle(bundle)).toThrow(/method is unsupported/);
+  });
+
+  it("allows differently sampled turn-angle diagnostics for the current spatial curves", () => {
+    const bundle = cityBundle();
+    // Segment angles depend on sampling density, rather than just curvature.
     const smoothing = bundle.scenarios[0].runs[0].smoothing;
     smoothing.maxTurnAngleBeforeDeg = 1.5;
     smoothing.maxTurnAngleAfterDeg = 4.7368;
     expect(validatePredictiveBundle(bundle).scenarios[0]!.runs[0]!.smoothing.maxTurnAngleAfterDeg)
       .toBe(4.7368);
-
-    bundle.protocol.id = "manhattan-space-time-v1";
-    bundle.protocol.trajectoryPostprocessor = "certified-fillet-plus-discrete-execution-envelope-v2";
-    delete bundle.protocol.spaceTimeConnectivity;
-    delete bundle.protocol.trajectoryShortcut;
-    for (const scenario of bundle.scenarios) {
-      for (const run of scenario.runs) {
-        delete run.parameters.trajectoryShortcut;
-        delete run.parameters.spaceTimeConnectivity;
-        run.smoothing.method = "sampled-circular-fillet";
-      }
-    }
-    // Schema-only v1 fillet fixture: modern LOS-only fallbacks have no radius.
-    // Give this deliberate angle violation a valid fillet declaration so that
-    // it reaches the legacy angle gate, independently of current demo routes.
-    Object.assign(smoothing, { applied: true, appliedTurnRadiusM: 24, roundedCornerCount: 1 });
-    expect(() => validatePredictiveBundle(bundle)).toThrow(/cannot increase the maximum turn angle/);
   });
 
-  it.each([181, Number.NaN])("still rejects an invalid v2 turn angle %s", (angle) => {
-    const bundle = legacyV2Bundle();
+  it.each([181, Number.NaN])("still rejects an invalid v4 turn angle %s", (angle) => {
+    const bundle = cityBundle();
     bundle.scenarios[0].runs[0].smoothing.maxTurnAngleAfterDeg = angle;
     expect(() => validatePredictiveBundle(bundle)).toThrow(/maxTurnAngleAfterDeg/);
   });

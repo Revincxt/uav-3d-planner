@@ -31,7 +31,7 @@ describe("static route playback", () => {
   });
 
   it.each(bundle.planners)("passes every required point without dwell for $id", planner => {
-    const routes = staticRoutes(bundle.scenarios, planner.id, "smoothed");
+    const routes = staticRoutes(bundle.scenarios, planner.id);
     expect(routes).toHaveLength(8);
     routes.forEach((route, index) => {
       expect(route.playbackKind).toBe("fixed");
@@ -51,7 +51,7 @@ describe("static route playback", () => {
       expect(playbackAction(path, 0, route.mission)).toBe("Ready");
       expect(playbackAction(path, path.at(-1)!.timeS, route.mission)).toBe("Arrived");
     });
-    expect(staticRoutes(bundle.scenarios, planner.id, "smoothed")[0]).toBe(routes[0]);
+    expect(staticRoutes(bundle.scenarios, planner.id)[0]).toBe(routes[0]);
   });
 
   it("refuses to invent movement through a missing task point", () => {

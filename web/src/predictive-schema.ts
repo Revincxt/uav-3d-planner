@@ -43,8 +43,10 @@ export interface PredictiveProtocol {
   trajectoryPostprocessor: string;
   spaceTimeConnectivity?: 26;
   trajectoryShortcut?: true;
-  trajectoryPreserveAltitude?: true;
+  trajectoryPreserveAltitude?: boolean;
   trajectoryCurveDegree?: 5;
+  trajectoryCurveDimensions?: 3;
+  trajectoryAltitudeDeviationLimitM?: number;
   trajectoryDynamicScheduling?: "certified-move-block-departures";
   executionEnvelope: PredictiveExecutionEnvelope;
   continuousDynamicsCertified: false;
@@ -93,8 +95,9 @@ export interface PredictiveFrame {
 
 export interface PredictiveSmoothing {
   method: string;
-  optimizationAxes?: ["x", "y"];
-  altitudePolicy?: "preserve-raw-z-time-profile";
+  optimizationAxes?: ["x", "y", "z"];
+  altitudePolicy?: "bounded-spatial-spline-v1";
+  altitudeDeviationLimitM?: number;
   applied: boolean;
   certified: boolean;
   collisionCertified: boolean;
@@ -264,4 +267,3 @@ export interface PredictiveBundleV3 {
   };
 }
 
-export type PredictivePathMode = "raw" | "geometry" | "execution";

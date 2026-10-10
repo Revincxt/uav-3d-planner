@@ -11,7 +11,7 @@ from uav3d.dynamic import DynamicScenario, dynamic_scenario_fingerprint, snapsho
 from uav3d.dynamic_collision import spacetime_segment_is_free
 from uav3d.flight_cost import segment_flight_time, validate_vertical_scale, with_turn_clearance
 from uav3d.geometry import Point3, almost_equal, distance, lerp, polyline_length
-from uav3d.horizontal_curves import smooth_horizontal_curves
+from uav3d.horizontal_curves import cast_vector, smooth_curves, smooth_horizontal_curves
 from uav3d.planners import (
     AStar3D,
     AStarConfig,
@@ -242,7 +242,7 @@ def _horizontal_escape(
     time_s: float,
     duration: float,
     cruise_speed: float,
-    start_heading: tuple[float, float] | None = None,
+    start_heading: tuple[float, ...] | None = None,
 ) -> tuple[Point3, ...]:
     """Locally observed traffic can require movement instead of an unsafe hover.
 
@@ -318,8 +318,9 @@ def simulate_replanning(
     smooth_turns: bool = False,
     turn_scale_m: float = 60.0,
     curve_sample_spacing_m: float = 2.0,
-    initial_heading: tuple[float, float] | None = None,
-    arrival_heading: tuple[float, float] | None = None,
+    initial_heading: tuple[float, ...] | None = None,
+    arrival_heading: tuple[float, ...] | None = None,
+    spatial_curves: bool = False,
     allow_horizontal_escape: bool = False,
     vertical_cost_scale: float = 1.0,
     altitude_levels: tuple[float, ...] = (),
@@ -341,6 +342,8 @@ def simulate_replanning(
         raise ValueError("planning_guard_s must be finite and non-negative")
     if smooth_turns and not preserve_altitude:
         raise ValueError("horizontal turn smoothing requires altitude preservation")
+    if spatial_curves and not smooth_turns:
+        raise ValueError("spatial curves require smooth_turns")
     if not all(
         math.isfinite(value) and value > 0 for value in (turn_scale_m, curve_sample_spacing_m)
     ):
@@ -387,6 +390,8 @@ def simulate_replanning(
             turn_scale_m=turn_scale_m,
             curve_sample_spacing_m=curve_sample_spacing_m,
         )
+        if spatial_curves:
+            parameters["curve_dimensions"] = 3
     if allow_horizontal_escape:
         parameters["horizontal_escape"] = 1
     if vertical_cost_scale != 1:
@@ -422,18 +427,22 @@ def simulate_replanning(
             )
             heading = initial_heading
             for a, b in reversed(list(pairwise(executed))):
-                if math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-8:
-                    heading = (b[0] - a[0], b[1] - a[1])
+                vector = tuple(b[i] - a[i] for i in range(3 if spatial_curves else 2))
+                if math.hypot(*vector) > 1e-8:
+                    heading = vector
                     break
-            return smooth_horizontal_curves(
+            return smooth_curves(
                 base.path,
                 base.altitude_progress,
                 lambda a, b, _u, _v: segment_is_free(snapshot, a, b),
                 turn_scale_m=turn_scale_m,
                 sample_spacing_m=curve_sample_spacing_m,
-                start_direction=heading,
-                end_direction=arrival_heading,
+                start_direction=cast_vector(heading) if heading is not None else None,
+                end_direction=cast_vector(arrival_heading) if arrival_heading is not None else None,
                 round_reversals=vertical_cost_scale > 1,
+                preserve_altitude=not spatial_curves,
+                max_altitude_deviation_m=12,
+                boundary_height_excursion=spatial_curves,
             ).points
         return (
             tuple(farthest_visible_shortcut(snapshot, path, preserve_altitude=preserve_altitude))

@@ -41,16 +41,8 @@ const FROZEN_EXECUTION_ENVELOPE = {
   allowReversals: false,
   maxExecutionTimeS: 90,
 } as const;
-const MANHATTAN_V2_PROTOCOL_ID = "manhattan-space-time-v2";
-const MANHATTAN_V3_PROTOCOL_ID = "manhattan-space-time-v3";
-const MANHATTAN_SHORTCUT_PROTOCOL_IDS = new Set([MANHATTAN_V2_PROTOCOL_ID, MANHATTAN_V3_PROTOCOL_ID]);
-const MANHATTAN_PROTOCOL_IDS = new Set(["manhattan-space-time-v1", ...MANHATTAN_SHORTCUT_PROTOCOL_IDS]);
-const MANHATTAN_V2_POSTPROCESSOR =
-  "spacetime-shortcut-fillet-plus-sampling-stable-discrete-envelope-v3";
-const MANHATTAN_V3_POSTPROCESSOR =
-  "horizontal-spacetime-shortcut-fillet-altitude-preserving-envelope-v4";
-const MANHATTAN_CURVE_POSTPROCESSOR =
-  "horizontal-local-quintic-bspline-altitude-preserving-envelope-v5";
+const MANHATTAN_V4_PROTOCOL_ID = "manhattan-space-time-v4";
+const MANHATTAN_SPATIAL_POSTPROCESSOR = "spatial-local-quintic-bspline-bounded-altitude-envelope-v6";
 const MANHATTAN_EXECUTION_ENVELOPE = {
   ...FROZEN_EXECUTION_ENVELOPE,
   maxSpeedMps: 15,
@@ -238,8 +230,8 @@ function executionEnvelope(value: unknown, label: string): PredictiveExecutionEn
 
 function protocol(value: unknown): PredictiveProtocol {
   const item = record(value, "protocol");
-  if (item.id !== "predictive-space-time-v4" && !MANHATTAN_PROTOCOL_IDS.has(String(item.id))) {
-    fail("protocol.id must be predictive-space-time-v4 or manhattan-space-time-v1/v2/v3");
+  if (item.id !== "predictive-space-time-v4" && item.id !== MANHATTAN_V4_PROTOCOL_ID) {
+    fail("protocol.id must be predictive-space-time-v4 or manhattan-space-time-v4");
   }
   if (item.continuousDynamicsCertified !== false) {
     fail("protocol.continuousDynamicsCertified must remain false");
@@ -285,35 +277,30 @@ function protocol(value: unknown): PredictiveProtocol {
     continuousDynamicsCertified: false,
     metricDomains,
   };
-  if (MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(parsed.id)) {
+  if ((parsed.id === MANHATTAN_V4_PROTOCOL_ID)) {
     if (item.spaceTimeConnectivity !== 26) {
-      fail("protocol.spaceTimeConnectivity must be 26 for Manhattan v2/v3");
+      fail("protocol.spaceTimeConnectivity must be 26 for current Manhattan v4");
     }
     if (item.trajectoryShortcut !== true) {
-      fail("protocol.trajectoryShortcut must be true for Manhattan v2/v3");
+      fail("protocol.trajectoryShortcut must be true for current Manhattan v4");
     }
-    const expectedPostprocessor = parsed.id === MANHATTAN_V3_PROTOCOL_ID
-      ? MANHATTAN_V3_POSTPROCESSOR : MANHATTAN_V2_POSTPROCESSOR;
-    if (parsed.trajectoryPostprocessor !== expectedPostprocessor &&
-        !(parsed.id === MANHATTAN_V3_PROTOCOL_ID && parsed.trajectoryPostprocessor === MANHATTAN_CURVE_POSTPROCESSOR)) {
+    if (parsed.trajectoryPostprocessor !== MANHATTAN_SPATIAL_POSTPROCESSOR) {
       fail("protocol.trajectoryPostprocessor disagrees with the declared Manhattan postprocessor");
     }
     parsed.spaceTimeConnectivity = 26;
     parsed.trajectoryShortcut = true;
   }
-  if (parsed.id === MANHATTAN_V3_PROTOCOL_ID) {
-    if (item.trajectoryPreserveAltitude !== true) {
-      fail("protocol.trajectoryPreserveAltitude must be true for Manhattan v3");
-    }
-    parsed.trajectoryPreserveAltitude = true;
-    if (item.trajectoryDynamicScheduling !== undefined) {
-      if (item.trajectoryDynamicScheduling !== "certified-move-block-departures") fail("Unsupported dynamic execution scheduling");
-      parsed.trajectoryDynamicScheduling = item.trajectoryDynamicScheduling;
-    }
-    if (parsed.trajectoryPostprocessor === MANHATTAN_CURVE_POSTPROCESSOR) {
-      if (item.trajectoryCurveDegree !== 5) fail("protocol.trajectoryCurveDegree must be 5 for local B-spline curves");
-      parsed.trajectoryCurveDegree = 5;
-    }
+  if (parsed.id === MANHATTAN_V4_PROTOCOL_ID) {
+    if (item.trajectoryPreserveAltitude !== false) fail("protocol.trajectoryPreserveAltitude must be false for Manhattan v4");
+    if (item.trajectoryCurveDegree !== 5) fail("protocol.trajectoryCurveDegree must be 5");
+    if (item.trajectoryCurveDimensions !== 3) fail("protocol.trajectoryCurveDimensions must be 3");
+    if (item.trajectoryAltitudeDeviationLimitM !== 12) fail("protocol.trajectoryAltitudeDeviationLimitM must be 12");
+    if (item.trajectoryDynamicScheduling !== "certified-move-block-departures") fail("Unsupported dynamic execution scheduling");
+    parsed.trajectoryPreserveAltitude = false;
+    parsed.trajectoryCurveDegree = 5;
+    parsed.trajectoryCurveDimensions = 3;
+    parsed.trajectoryAltitudeDeviationLimitM = 12;
+    parsed.trajectoryDynamicScheduling = item.trajectoryDynamicScheduling;
   }
   if (parsed.timeResolutionS > parsed.planningHorizonS) {
     fail("protocol.timeResolutionS cannot exceed planningHorizonS");
@@ -330,7 +317,7 @@ function protocol(value: unknown): PredictiveProtocol {
   if (!sameNumber(parsed.maxTimeS, parsed.executionEnvelope.maxExecutionTimeS)) {
     fail("protocol.maxTimeS must agree with executionEnvelope.maxExecutionTimeS");
   }
-  const expectedEnvelope = MANHATTAN_PROTOCOL_IDS.has(parsed.id)
+  const expectedEnvelope = (parsed.id === MANHATTAN_V4_PROTOCOL_ID)
     ? MANHATTAN_EXECUTION_ENVELOPE : FROZEN_EXECUTION_ENVELOPE;
   if (!matchesEnvelope(parsed.executionEnvelope, expectedEnvelope)) {
     fail("protocol.executionEnvelope disagrees with the declared protocol");
@@ -488,7 +475,7 @@ function timedPosition(waypoints: TimedWaypoint[], timeS: number): Vec3 {
   return last.position;
 }
 
-function validateAltitudeProfile(raw: TimedWaypoint[], geometry: TimedWaypoint[], label: string): void {
+function validateAltitudeProfile(raw: TimedWaypoint[], geometry: TimedWaypoint[], label: string, maxDeviationM: number): void {
   if (Math.abs(raw.at(-1)!.timeS - geometry.at(-1)!.timeS) > TOLERANCE) {
     fail(`${label} altitude preservation requires the same absolute-time domain`);
   }
@@ -497,8 +484,8 @@ function validateAltitudeProfile(raw: TimedWaypoint[], geometry: TimedWaypoint[]
   // This is an absolute metre tolerance, not sameNumber's coordinate-relative tolerance.
   const times = new Set([...raw, ...geometry].map((waypoint) => waypoint.timeS));
   for (const timeS of times) {
-    if (Math.abs(timedPosition(raw, timeS)[2] - timedPosition(geometry, timeS)[2]) > TOLERANCE) {
-      fail(`${label} geometry must preserve raw z(t) at every altitude profile knot`);
+    if (Math.abs(timedPosition(raw, timeS)[2] - timedPosition(geometry, timeS)[2]) > maxDeviationM + TOLERANCE) {
+      fail(`${label} geometry exceeds its declared altitude deviation at a profile knot`);
     }
   }
 }
@@ -972,7 +959,7 @@ function executionEvidence(value: unknown, label: string): PredictiveExecutionEv
 }
 
 function smoothing(
-  value: unknown, label: string, allowShortcut: boolean, preserveAltitude: boolean,
+  value: unknown, label: string, allowShortcut: boolean, spatialCurves: boolean,
 ): PredictiveSmoothing {
   const item = record(value, label);
   const parsed: PredictiveSmoothing = {
@@ -1000,6 +987,11 @@ function smoothing(
     appliedTurnRadiusM:
       item.appliedTurnRadiusM === null
         ? null
+        // This legacy field is a trim/tan(theta/2) scale, not a quintic's
+        // physical curvature radius. At a 180-degree reversal it tends to zero
+        // and the export's eleven-decimal canonicalization can round it to 0.
+        : spatialCurves && item.method === "spacetime-shortcut-plus-local-quintic-bspline"
+          ? nonNegative(item.appliedTurnRadiusM, `${label}.appliedTurnRadiusM`)
         : positive(item.appliedTurnRadiusM, `${label}.appliedTurnRadiusM`),
     sampleSpacingM: positive(item.sampleSpacingM, `${label}.sampleSpacingM`),
     maxTurnAngleBeforeDeg: turnAngle(
@@ -1016,16 +1008,15 @@ function smoothing(
     ),
     execution: executionEvidence(item.execution, `${label}.execution`),
   };
-  if (preserveAltitude) {
+  if (spatialCurves) {
     const axes = array(item.optimizationAxes, `${label}.optimizationAxes`);
-    if (axes.length !== 2 || axes[0] !== "x" || axes[1] !== "y") {
-      fail(`${label}.optimizationAxes must be exactly ['x', 'y'] for Manhattan v3`);
-    }
-    if (item.altitudePolicy !== "preserve-raw-z-time-profile") {
-      fail(`${label}.altitudePolicy must preserve the raw z(t) profile for Manhattan v3`);
-    }
-    parsed.optimizationAxes = ["x", "y"];
-    parsed.altitudePolicy = "preserve-raw-z-time-profile";
+    if (axes.length !== 3 || axes[0] !== "x" || axes[1] !== "y" || axes[2] !== "z")
+      fail(`${label}.optimizationAxes must be exactly ['x', 'y', 'z']`);
+    if (item.altitudePolicy !== "bounded-spatial-spline-v1") fail(`${label}.altitudePolicy must declare bounded XYZ smoothing`);
+    if (item.altitudeDeviationLimitM !== 12) fail(`${label}.altitudeDeviationLimitM must be 12`);
+    parsed.optimizationAxes = ["x", "y", "z"];
+    parsed.altitudePolicy = "bounded-spatial-spline-v1";
+    parsed.altitudeDeviationLimitM = 12;
   }
   if (parsed.collisionCertified !== parsed.certified) {
     fail(`${label}.collisionCertified must agree with certified`);
@@ -1035,25 +1026,24 @@ function smoothing(
   }
   const shortcutOnly = parsed.method === "spacetime-shortcut" ||
     parsed.method === "spacetime-shortcut-fillet-fallback";
-  const shortcutFillet = parsed.method === "spacetime-shortcut-plus-sampled-circular-fillet" ||
-    parsed.method === "spacetime-shortcut-plus-local-quintic-bspline";
-  if (parsed.method === "spacetime-shortcut-plus-local-quintic-bspline" && !preserveAltitude) {
-    fail(`${label} local B-spline curves require altitude preservation`);
+  const shortcutCurve = parsed.method === "spacetime-shortcut-plus-local-quintic-bspline";
+  if (parsed.method === "spacetime-shortcut-plus-local-quintic-bspline" && !spatialCurves) {
+    fail(`${label} local B-spline curves require the XYZ protocol`);
   }
-  if ((shortcutOnly || shortcutFillet) && !allowShortcut) {
-    fail(`${label} shortcut methods require the Manhattan v2/v3 protocol`);
+  if ((shortcutOnly || shortcutCurve) && !allowShortcut) {
+    fail(`${label} shortcut methods require the current Manhattan v4 protocol`);
   }
-  if (allowShortcut && !shortcutOnly && !shortcutFillet &&
+  if (allowShortcut && !shortcutOnly && !shortcutCurve &&
       parsed.method !== "not-run-uncertified-raw-path") {
-    fail(`${label}.method is unsupported for the Manhattan v2/v3 postprocessor`);
+    fail(`${label}.method is unsupported for the current Manhattan v4 postprocessor`);
   }
   if (shortcutOnly) {
     if (parsed.appliedTurnRadiusM !== null || parsed.roundedCornerCount !== 0) {
       fail(`${label} LOS-only shortcut method requires no fillet radius or rounded corners`);
     }
-  } else if (shortcutFillet) {
+  } else if (shortcutCurve) {
     if (!parsed.applied || parsed.appliedTurnRadiusM === null || parsed.roundedCornerCount === 0) {
-      fail(`${label} shortcut-plus-fillet method requires applied fillets, a radius and rounded corners`);
+      fail(`${label} shortcut-plus-curve method requires an applied curve, trim scale and rounded corners`);
     }
   } else if (parsed.applied !== (parsed.appliedTurnRadiusM !== null)) {
     fail(`${label}.appliedTurnRadiusM must be present exactly when smoothing is applied`);
@@ -1068,7 +1058,7 @@ function smoothing(
     fail(`${label}.roundedCornerCount must be zero when smoothing is not applied`);
   }
   if (
-    !(allowShortcut && (shortcutOnly || shortcutFillet)) &&
+    !(allowShortcut && (shortcutOnly || shortcutCurve)) &&
     parsed.maxTurnAngleBeforeDeg !== null &&
     parsed.maxTurnAngleAfterDeg !== null &&
     parsed.maxTurnAngleAfterDeg > parsed.maxTurnAngleBeforeDeg + 1e-5
@@ -1388,8 +1378,8 @@ function run(
   scenario: PredictiveScenario,
   planner: PredictivePlanner,
   allowShortcut: boolean,
-  preserveAltitude: boolean,
   scheduled: boolean,
+  spatialCurves: boolean,
 ): PredictiveRun {
   const item = record(value, label);
   const statuses = new Set<PredictiveRun["status"]>([
@@ -1421,11 +1411,9 @@ function run(
     `${label}.geometryTimedPath`,
     scenario.bounds,
   );
-  if (preserveAltitude) {
-    if (parameters.trajectoryPreserveAltitude !== 1) {
-      fail(`${label}.parameters.trajectoryPreserveAltitude must be 1 for Manhattan v3`);
-    }
-    validateAltitudeProfile(rawTimedPath, geometryTimedPath, label);
+  if (spatialCurves) {
+    if (parameters.trajectoryPreserveAltitude !== 0) fail(`${label}.parameters.trajectoryPreserveAltitude must be 0 for XYZ smoothing`);
+    validateAltitudeProfile(rawTimedPath, geometryTimedPath, label, 12);
   }
   const executionTimedPath =
     item.executionTimedPath === null
@@ -1436,7 +1424,7 @@ function run(
     fail(`${label} paths must start at the scenario start`);
   }
 
-  const parsedSmoothing = smoothing(item.smoothing, `${label}.smoothing`, allowShortcut, preserveAltitude);
+  const parsedSmoothing = smoothing(item.smoothing, `${label}.smoothing`, allowShortcut, spatialCurves);
   if (
     parsedSmoothing.rawWaypointCount !== rawTimedPath.length ||
     parsedSmoothing.outputWaypointCount !== geometryTimedPath.length
@@ -1611,8 +1599,8 @@ function scenario(
   label: string,
   planners: Map<string, PredictivePlanner>,
   allowShortcut: boolean,
-  preserveAltitude: boolean,
   scheduled: boolean,
+  spatialCurves: boolean,
 ): PredictiveScenario {
   const item = record(value, label);
   const sceneBounds = parseBounds(item.bounds, `${label}.bounds`);
@@ -1731,7 +1719,7 @@ function scenario(
     if (!planner) fail(`${label}.runs[${index}].plannerId is not declared`);
     if (seenPlannerIds.has(plannerId)) fail(`${label} contains duplicate run for ${plannerId}`);
     seenPlannerIds.add(plannerId);
-    return run(rawRun, `${label}.runs[${index}]`, parsed, planner, allowShortcut, preserveAltitude, scheduled);
+    return run(rawRun, `${label}.runs[${index}]`, parsed, planner, allowShortcut, scheduled, spatialCurves);
   });
   if (
     parsed.runs.length !== planners.size ||
@@ -1762,7 +1750,7 @@ function parsePredictiveBundle(value: unknown): PredictiveBundleV3 {
   if (!Number.isFinite(Date.parse(generatedAt))) fail("generatedAt must be an ISO timestamp");
   const parsedProtocol = protocol(item.protocol);
   const sourceCommit = text(item.sourceCommit, "sourceCommit");
-  if (MANHATTAN_PROTOCOL_IDS.has(parsedProtocol.id)) {
+  if ((parsedProtocol.id === MANHATTAN_V4_PROTOCOL_ID)) {
     if (!/^local-snapshot:sha256:[0-9a-f]{64}$/.test(sourceCommit)) {
       fail("Manhattan sourceCommit must explicitly identify a local SHA-256 snapshot");
     }
@@ -1797,9 +1785,10 @@ function parsePredictiveBundle(value: unknown): PredictiveBundleV3 {
   const scenarios = array(item.scenarios, "scenarios").map((entry, index) =>
     scenario(
       entry, `scenarios[${index}]`, plannerMap,
-      MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(parsedProtocol.id),
-      parsedProtocol.id === MANHATTAN_V3_PROTOCOL_ID,
+      (parsedProtocol.id === MANHATTAN_V4_PROTOCOL_ID),
+
       parsedProtocol.trajectoryDynamicScheduling === "certified-move-block-departures",
+      parsedProtocol.id === MANHATTAN_V4_PROTOCOL_ID,
     ),
   );
   if (scenarios.length === 0) fail("at least one scenario is required");
@@ -1813,7 +1802,7 @@ function parsePredictiveBundle(value: unknown): PredictiveBundleV3 {
   if (new Set(runIds).size !== runIds.length) fail("runId values must be unique across the bundle");
   for (const entry of scenarios) {
     for (const runRecord of entry.runs) {
-      const expectedEnvelope = MANHATTAN_PROTOCOL_IDS.has(parsedProtocol.id)
+      const expectedEnvelope = (parsedProtocol.id === MANHATTAN_V4_PROTOCOL_ID)
         ? MANHATTAN_EXECUTION_ENVELOPE : FROZEN_EXECUTION_ENVELOPE;
       if (!matchesEnvelope(runRecord.smoothing.execution.envelope, expectedEnvelope)) {
         fail(`${entry.id}: execution envelope disagrees with the declared protocol`);
@@ -1821,13 +1810,13 @@ function parsePredictiveBundle(value: unknown): PredictiveBundleV3 {
       if (parsedProtocol.trajectoryCurveDegree === 5 && runRecord.parameters.trajectoryCurveDegree !== 5) {
         fail(`${entry.id}/${runRecord.plannerId}.parameters.trajectoryCurveDegree must be 5 for local B-spline curves`);
       }
-      if (MANHATTAN_SHORTCUT_PROTOCOL_IDS.has(parsedProtocol.id)) {
+      if ((parsedProtocol.id === MANHATTAN_V4_PROTOCOL_ID)) {
         if (runRecord.parameters.trajectoryShortcut !== 1) {
-          fail(`${entry.id}/${runRecord.plannerId}: parameters.trajectoryShortcut must be 1 for Manhattan v2/v3`);
+          fail(`${entry.id}/${runRecord.plannerId}: parameters.trajectoryShortcut must be 1 for current Manhattan v4`);
         }
         if (runRecord.plannerId === "space-time-astar-4d") {
           if (runRecord.parameters.spaceTimeConnectivity !== 26) {
-            fail(`${entry.id}/${runRecord.plannerId}: parameters.spaceTimeConnectivity must be 26 for Manhattan v2/v3`);
+            fail(`${entry.id}/${runRecord.plannerId}: parameters.spaceTimeConnectivity must be 26 for current Manhattan v4`);
           }
         } else if (runRecord.parameters.spaceTimeConnectivity !== undefined) {
           fail(`${entry.id}/${runRecord.plannerId}: spaceTimeConnectivity is only valid for the 4D planner`);
@@ -1835,7 +1824,7 @@ function parsePredictiveBundle(value: unknown): PredictiveBundleV3 {
       }
     }
   }
-  if (MANHATTAN_PROTOCOL_IDS.has(parsedProtocol.id)) {
+  if ((parsedProtocol.id === MANHATTAN_V4_PROTOCOL_ID)) {
     const expectedIds = ["manhattan-westside-delivery", "manhattan-medical-transfer", "manhattan-midtown-rooftops", "manhattan-riverfront-logistics", "manhattan-westside-backhaul", "manhattan-medical-return", "manhattan-eastside-backhaul", "manhattan-riverfront-return"];
     const expectedPlanners = ["repeated-astar-3d", "dstar-lite-reset-3d", "dstar-lite-reuse-3d", "space-time-astar-4d"];
     if (scenarios.length !== 8 || expectedIds.some((id) => !scenarios.some((entry) => entry.id === id)) || runIds.length !== 32) {

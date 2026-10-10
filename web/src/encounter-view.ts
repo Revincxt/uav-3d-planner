@@ -4,7 +4,6 @@ import { positionWesternOverview } from "./map-navigation";
 import { enuToThree } from "./coordinates";
 import { timedPosition } from "./route-overview";
 import type { OverviewRoute } from "./route-overview";
-import type { CityMission } from "./city-schema";
 import type { MovingSphereDefinition, TemporaryNoFlyZone, Vec3 } from "./dynamic-schema";
 
 /** Explicit local view; overview and chase framing remain unchanged. */
@@ -62,9 +61,3 @@ export function mountEncounterControl(get: () => EncounterView | null, observe: 
   host.append(button);
 }
 
-export function showChallenge(host: HTMLElement | null, mission?: CityMission): void {
-  if (!host) return;
-  const title = mission?.challenge?.title ?? "";
-  if (host.textContent !== title) host.textContent = title;
-  if (host.hidden !== !mission?.challenge) host.hidden = !mission?.challenge;
-}

@@ -8,12 +8,18 @@ from itertools import pairwise
 
 from uav3d.dynamic import DynamicScenario
 from uav3d.dynamic_collision import spacetime_segment_is_free
-from uav3d.geometry import distance
-from uav3d.kinematics import DiscreteExecutionEnvelope
+from uav3d.geometry import Point3, distance
+from uav3d.kinematics import DiscreteExecutionEnvelope, diagnose_timed_path_kinematics
+from uav3d.manhattan_missions import audit_task_visits
 from uav3d.planners.grid import GridIndex, VoxelGrid
 from uav3d.planners.space_time_astar import SpaceTimeAStar3D, SpaceTimeState
 from uav3d.predictive import TimedPath, TimedWaypoint
-from uav3d.predictive_smoothing import PredictiveSmoothingResult, smooth_predictive_timed_path
+from uav3d.predictive_smoothing import (
+    PredictiveSmoothingResult,
+    _max_turn_degrees,
+    shortcut_timed_path,
+    smooth_predictive_timed_path,
+)
 
 
 class ContinuousAnchorSpaceTimeAStar(SpaceTimeAStar3D):
@@ -23,7 +29,16 @@ class ContinuousAnchorSpaceTimeAStar(SpaceTimeAStar3D):
     moves slightly more slowly to the same aligned timestamp, but only when its
     entire space-time segment is safe. If slower motion would hit traffic, retain
     the original safe connector and hover. Real forecast waits are never removed.
+    Mandatory fly-through gates disallow hovering in the search itself: source
+    departure, clock alignment, and lattice wait actions obey the same policy.
+    Waiting elsewhere remains available for genuine forecast conflicts.
     """
+
+    def _can_wait(self, scenario: DynamicScenario, point: Point3) -> bool:
+        return not any(
+            task.get("visitMode") == "fly-through" and distance(point, task["position"]) <= 1e-5
+            for task in scenario.static_scene.metadata.get("missionTaskPoints", [])
+        )
 
     def _initial_states(
         self,
@@ -72,32 +87,59 @@ def refine_mission_trajectory(
 ) -> PredictiveSmoothingResult:
     """Compare safe local curves instead of accepting the first qualified radius.
 
-    Height knots, ordered fly-through anchors and real waits remain constraints.
+    Ordered fly-through anchors and real waits remain exact constraints. XYZ turns
+    are smoothed jointly within 12 metres of the shortcut's altitude profile.
     Only independently collision/kinematic-qualified results can win. Minimize
     execution duration with a five-second cost per meaningful reversal, then length.
     This is bounded local refinement, not an optimal-control certificate.
     """
+    # Coarsen already-dense online curves before fitting a spatial spline again.
+    # Both stages get half the total height budget; union-of-knots checks bound
+    # their combined deviation. Task anchors and real waits are hard boundaries.
+    geometry = shortcut_timed_path(scenario, raw, max_altitude_deviation_m=6)
     candidates = []
     for factor in (1.0, 0.75, 0.5, 0.25):
         candidate = smooth_predictive_timed_path(
             scenario,
-            raw,
+            geometry,
             requested_radius_m=turn_scale_m * factor,
             sample_spacing_m=sample_spacing_m,
             max_speed_mps=envelope.max_speed_mps,
             execution_envelope=envelope,
-            shortcut=True,
-            preserve_altitude=True,
+            shortcut=False,
+            preserve_altitude=False,
             curve_method="bspline",
             schedule_dynamic_waits=True,
             round_reversals=True,
+            max_altitude_deviation_m=6,
         )
         # The public protocol declares the upper bound, not the winning local radius.
-        candidates.append(replace(candidate, requested_radius_m=turn_scale_m))
+        candidates.append(
+            replace(
+                candidate,
+                requested_radius_m=turn_scale_m,
+                raw_waypoint_count=len(raw.waypoints),
+                raw_kinematics=diagnose_timed_path_kinematics(raw),
+                max_turn_before_deg=_max_turn_degrees(raw),
+                applied=candidate.applied or geometry != raw,
+                method=(candidate.method if candidate.rounded_corners else "spacetime-shortcut"),
+                altitude_deviation_limit_m=12,
+            )
+        )
 
     def cost(candidate: PredictiveSmoothingResult) -> tuple[float, float, float]:
         path = candidate.execution_candidate
         if path is None:
+            return (math.inf, math.inf, math.inf)
+        tasks = scenario.static_scene.metadata.get("missionTaskPoints", [])
+        try:
+            for audited in (candidate.timed_path, path):
+                audit_task_visits(
+                    audited.positions,
+                    tasks,
+                    times=[p.time_s for p in audited.waypoints],
+                )
+        except ValueError:
             return (math.inf, math.inf, math.inf)
         return (
             path.duration_s + 5 * horizontal_reversals(path),

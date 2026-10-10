@@ -36,7 +36,7 @@ from uav3d.dynamic_study import (
 )
 from uav3d.flight_cost import mission_altitude_levels, with_turn_clearance
 from uav3d.geometry import Point3, distance, polyline_length
-from uav3d.horizontal_curves import smooth_horizontal_curves
+from uav3d.horizontal_curves import smooth_spatial_curves
 from uav3d.manhattan_challenges import select_encounter, static_reference
 from uav3d.manhattan_missions import (
     audit_task_visits,
@@ -55,17 +55,18 @@ from uav3d.validation import audit_path
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOL = {
-    "id": "manhattan-reactive-demo-v3",
+    "id": "manhattan-reactive-demo-v5",
     "timeStepS": 2,
     "replanIntervalS": 10,
     "cruiseSpeedMps": 14,
-    "maxTimeS": 600,
+    "maxTimeS": 900,
     "resolutionM": 50,
     "maxExpansions": 20_000,
     "pathShortcut": 1,
     "preserveAltitude": 1,
     "planningGuardS": 10,
     "smoothTurns": 1,
+    "curveDimensions": 3,
     "turnScaleM": 60,
     "curveSampleSpacingM": 2,
     "horizontalEscape": 1,
@@ -77,89 +78,89 @@ STATIC_PLANNERS = ("astar-3d", "lazy-theta-star", "rrt-star")
 MISSIONS = (
     {
         "id": "midtown-medical-link",
-        "name": "Chelsea → NYU medical district",
-        "origin": "South Chelsea dispatch roof",
-        "destination": "NYU medical district receiving roof",
+        "name": "Financial District → Plaza medical relay",
+        "origin": "Financial District dispatch roof",
+        "destination": "Plaza district receiving roof",
         "purpose": "Simulated cross-district cold-chain medical parcel transfer",
-        "start": (-74.0057, 40.7403),
-        "goal": (-73.9738, 40.7431),
+        "start": (-74.0084, 40.7046),
+        "goal": (-73.9762, 40.7644),
         "zone": True,
         "route": "medical-cross",
     },
     {
         "id": "chelsea-midtown-delivery",
-        "name": "South Chelsea → Columbus Circle",
-        "origin": "South Chelsea dispatch roof",
-        "destination": "Columbus Circle district roof",
+        "name": "Financial west → Hell's Kitchen delivery",
+        "origin": "Financial west dispatch roof",
+        "destination": "North Hell's Kitchen receiving roof",
         "purpose": "Simulated northbound express parcel transfer across multiple neighborhoods",
-        "start": (-74.0058, 40.7388),
-        "goal": (-73.9847, 40.7665),
+        "start": (-74.0141, 40.7060),
+        "goal": (-73.9920, 40.7658),
         "zone": False,
         "route": "west-delivery",
     },
     {
         "id": "hudson-inspection",
-        "name": "Chelsea Piers → North Hell's Kitchen",
-        "origin": "Chelsea Piers district roof",
+        "name": "Battery Park → Hudson inspection corridor",
+        "origin": "Battery Park district roof",
         "destination": "North Hell's Kitchen service roof",
         "purpose": "Simulated western-corridor inspection team equipment transit",
-        "start": (-74.0073, 40.7448),
-        "goal": (-73.9920, 40.7658),
+        "start": (-74.0161, 40.7032),
+        "goal": (-73.9960, 40.7650),
         "zone": True,
         "route": "hudson-inspection",
     },
     {
         "id": "flatiron-eastside-logistics",
-        "name": "Flatiron → Midtown East",
-        "origin": "South Flatiron supply roof",
+        "name": "Seaport → Midtown East logistics",
+        "origin": "Seaport supply roof",
         "destination": "Midtown East receiving roof",
         "purpose": "Simulated diagonal urban supply transfer through the central business district",
-        "start": (-73.9915, 40.7386),
+        "start": (-74.0012, 40.7070),
         "goal": (-73.9692, 40.7596),
         "zone": False,
         "route": "east-logistics",
     },
     {
         "id": "midtown-west-backhaul",
-        "name": "Central Park South → Chelsea depot",
+        "name": "Central Park South → Financial west backhaul",
         "origin": "Central Park South return-parcel roof",
-        "destination": "Chelsea interior consolidation roof",
+        "destination": "Financial west consolidation roof",
         "purpose": "Simulated southbound return-parcel collection and depot backhaul",
         "start": (-73.9815, 40.7658),
-        "goal": (-74.0040, 40.7389),
+        "goal": (-74.0140, 40.7042),
         "zone": False,
         "route": "west-backhaul",
     },
     {
         "id": "eastside-medical-return",
-        "name": "Plaza district → Bellevue district",
+        "name": "Plaza district → Lower East Side medical return",
         "origin": "Plaza district medical dispatch roof",
-        "destination": "Bellevue district medical receiving roof",
+        "destination": "Lower East Side medical receiving roof",
         "purpose": "Simulated hospital-network return of temperature-controlled equipment",
         "start": (-73.9752, 40.7661),
-        "goal": (-73.9722, 40.7417),
+        "goal": (-73.9970, 40.7108),
         "zone": False,
         "route": "medical-south",
     },
     {
         "id": "midtown-supply-backhaul",
-        "name": "Rockefeller district → Chelsea east depot",
+        "name": "Rockefeller district → Seaport supply backhaul",
         "origin": "Rockefeller district collection roof",
-        "destination": "Chelsea east supply consolidation roof",
+        "destination": "Seaport supply consolidation roof",
         "purpose": "Simulated reusable supply collection along Fifth Avenue and Broadway",
         "start": (-73.9771, 40.7601),
-        "goal": (-73.9961, 40.7385),
+        "goal": (-74.0054, 40.7044),
         "zone": False,
         "route": "east-backhaul",
     },
     {
         "id": "east-to-hudson-priority",
-        "name": "Sutton district → West Chelsea",
+        "name": "Sutton district → Battery Park priority relay",
         "origin": "Sutton district priority dispatch roof",
-        "destination": "West Chelsea priority receiving roof",
+        "destination": "Battery Park priority receiving roof",
         "purpose": "Simulated westbound priority spare-parts relay across Manhattan",
         "start": (-73.9718, 40.7614),
-        "goal": (-74.0063, 40.7470),
+        "goal": (-74.0168, 40.7033),
         "zone": False,
         "route": "riverfront-backhaul",
     },
@@ -234,17 +235,17 @@ def mission_scenes(city: Any) -> list[tuple[dict[str, Any], Scene]]:
             "Eastside reverse logistics",
             "Cross-city priority return",
         )
-        if index == 0:
+        if index not in (2, 5):
             zones = (
                 Cylinder(
                     f"{mission['id']}-fixed-work-airspace",
                     encounter.position[:2],
-                    85,
+                    70 + index % 3 * 10,
                     0,
                     city.bounds.maximum[2],
                 ),
             )
-        elif index == 2:
+        else:
             # Two fixed stand-off areas leave a 50 m horizontal passage. Actual NYC
             # buildings still decide whether that passage is usable at each height.
             dx = encounter.exit[0] - encounter.entry[0]
@@ -290,7 +291,7 @@ def mission_scenes(city: Any) -> list[tuple[dict[str, Any], Scene]]:
         scenes.append((mission, scene))
     shared_zones = tuple(zone for _, scene in scenes for zone in scene.no_fly_zones)
     common = replace(scenes[0][1], no_fly_zones=shared_zones)
-    world = world_record("manhattan-static-shared-v1", common, len(scenes))
+    world = world_record("manhattan-static-shared-v2", common, len(scenes))
     shared = []
     for mission, scene in scenes:
         scene = replace(scene, no_fly_zones=shared_zones)
@@ -390,7 +391,7 @@ def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
     protected = frozenset(
         value for point, value in zip(smooth_path_points, progress, strict=True) if point in targets
     )
-    curves = smooth_horizontal_curves(
+    curves = smooth_spatial_curves(
         smooth_path_points,
         progress,
         lambda a, b, _u, _v: segment_is_free(scene, a, b),
@@ -417,13 +418,12 @@ def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
     )
     smoothing = replace(
         smoothings[0],
-        method="local-quintic-bspline",
+        method="local-spatial-quintic-bspline",
         path=smooth_path_points,
         altitude_progress=tuple(progress),
         collision_free=all(result.collision_free for result in smoothings),
-        altitude_profile_max_error=max(
-            result.altitude_profile_max_error or 0 for result in smoothings
-        ),
+        altitude_policy="bounded-spatial-spline-v1",
+        altitude_profile_max_error=curves.max_altitude_deviation_m,
     )
     audit_task_visits(raw_path, tasks)
     audit_task_visits(smooth_path_points, tasks)
@@ -480,7 +480,8 @@ def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
             "collisionFree": True,
             "shortcutPolicy": "shortest-xy-visible-preserved-altitude-dag",
             "sampleSpacingM": 2,
-            "optimizationAxes": ["x", "y"],
+            "optimizationAxes": ["x", "y", "z"],
+            "altitudeDeviationLimitM": 12,
             "altitudePolicy": smoothing.altitude_policy,
             "altitudeProfileMaxErrorM": smoothing.altitude_profile_max_error,
             "altitudeProfileProgress": list(smoothing.altitude_progress),
@@ -577,23 +578,20 @@ def dynamic_scenario(
         fraction=0.28,
         speed=PROTOCOL["cruiseSpeedMps"],
         kind=modes[index],
+        anchor_clearance_m=180,
         protected_anchors=protected_anchors,
-        continuous_patrol=index != 6,
+        continuous_patrol=True,
         patrol_centres=patrol_centres,
     )
     traffic = (
-        (
-            encounter.aircraft(
-                f"{scene.scene_id}-{modes[index]}-cargo",
-                horizon=600,
-                duration_s=48 if index == 2 else 28,
-            ),
-        )
-        if index != 6
-        else ()
+        encounter.aircraft(
+            f"{scene.scene_id}-{modes[index]}-cargo",
+            horizon=PROTOCOL["maxTimeS"],
+            duration_s=48 if index == 2 else 28,
+        ),
     )
     temporary: tuple[TemporaryCylinder, ...] = ()
-    if index == 3:
+    if index in (1, 3, 5, 7):
         second = select_encounter(
             scene,
             path,
@@ -651,7 +649,32 @@ def shared_dynamic_scenarios(
         private.append(scenario)
         if scenario.metadata["patrolCentre"] is not None:
             centres.append(scenario.metadata["patrolCentre"])
-    return share_dynamic_airspace(tuple(private), "manhattan-dynamic-shared-v2")
+    # Four additional cargo patrols occupy the later legs across the expanded
+    # island, rather than duplicating aircraft near the old Midtown center.
+    for index in range(min(4, len(private))):
+        mission, scene = missions[index]
+        encounter = select_encounter(
+            scene,
+            [tuple(p) for p in baselines[index]],
+            mission["taskPoints"],
+            fraction=0.66,
+            speed=PROTOCOL["cruiseSpeedMps"],
+            anchor_clearance_m=180,
+            protected_anchors=anchors,
+            continuous_patrol=True,
+            patrol_centres=tuple(centres),
+        )
+        centres.append(encounter.position)
+        private[index] = replace(
+            private[index],
+            moving_spheres=(
+                *private[index].moving_spheres,
+                encounter.aircraft(
+                    f"{scene.scene_id}-secondary-cargo", horizon=PROTOCOL["maxTimeS"]
+                ),
+            ),
+        )
+    return share_dynamic_airspace(tuple(private), "manhattan-dynamic-shared-v3")
 
 
 def dynamic_record(city: Any, mission: dict[str, Any], scenario: DynamicScenario) -> dict[str, Any]:
@@ -678,6 +701,7 @@ def dynamic_record(city: Any, mission: dict[str, Any], scenario: DynamicScenario
             preserve_altitude=True,
             planning_guard_s=PROTOCOL["planningGuardS"],
             smooth_turns=True,
+            spatial_curves=True,
             turn_scale_m=PROTOCOL["turnScaleM"],
             curve_sample_spacing_m=PROTOCOL["curveSampleSpacingM"],
             allow_horizontal_escape=True,
@@ -914,7 +938,7 @@ def main() -> None:
             manifest_path,
             {
                 "schemaVersion": 1,
-                "datasetId": "manhattan-reactive-demo-v3",
+                "datasetId": PROTOCOL["id"],
                 "sourceCommit": source,
                 "sourceProvenance": provenance,
                 "generatedAt": timestamp,

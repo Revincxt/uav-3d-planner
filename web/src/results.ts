@@ -6,8 +6,6 @@ import { loadDemoBundle } from "./data";
 import { SceneViewer } from "./scene-viewer";
 import { staticRoutes } from "./route-overview";
 import { mountPageLifecycle } from "./page-lifecycle";
-export { renderStudy } from "./benchmark-panel";
-export { analysesFromBundles, observedMedian, predictiveObservation, summarizeObservedMissions, type MissionObservation } from "./results-data";
 
 async function start(): Promise<void> {
   const host = document.querySelector<HTMLElement>("#benchmark-host")!;
@@ -17,8 +15,8 @@ async function start(): Promise<void> {
   try {
     const bundle = await loadDemoBundle(); viewer = new SceneViewer(document.querySelector<HTMLElement>("#benchmark-map")!);
     const planner = "lazy-theta-star" as const;
-    viewer.setScenario(bundle.scenarios[0]!, new Set([planner]), "smoothed");
-    viewer.setRoutes(staticRoutes(bundle.scenarios, planner, "smoothed"), bundle.scenarios[0]!.id);
+    viewer.setScenario(bundle.scenarios[0]!);
+    viewer.setRoutes(staticRoutes(bundle.scenarios, planner), bundle.scenarios[0]!.id);
   } catch (error) { console.warn("Benchmark background map unavailable", error); }
   mountPageLifecycle({ pause: () => {}, restore: () => viewer?.setTime(0), dispose: () => viewer?.dispose() });
   await summary;

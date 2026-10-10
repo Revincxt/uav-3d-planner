@@ -8,6 +8,14 @@ import type { MapBounds } from "./map-background";
 const RADIUS = 6378137, HALF_WORLD = Math.PI * RADIUS;
 const MAX_CONTEXT_DISTANCE_M = 25_000;
 
+class ImageryRequestError extends Error {
+  constructor(readonly status: number) { super(`Map request failed (${status})`); }
+}
+function retryableRequest(error: unknown): boolean {
+  return !(error instanceof SyntaxError) && (!(error instanceof ImageryRequestError)
+    || error.status === 408 || error.status === 429 || error.status >= 500);
+}
+
 export interface TerrainTile { z: number; x: number; y: number; key: string }
 
 interface ImageryMetadata {
@@ -194,6 +202,8 @@ interface TileVisual {
   texture: THREE.Texture;
   state: "queued" | "loading" | "ready" | "failed";
   lastUsed: number;
+  attempts: number;
+  retry?: ReturnType<typeof setTimeout>;
 }
 
 function overlaps(a: TerrainTile, b: TerrainTile): boolean {
@@ -204,6 +214,11 @@ function overlaps(a: TerrainTile, b: TerrainTile): boolean {
 
 export class TerrainMapLayer extends THREE.Group {
   private signature = "";
+  private viewCamera?: THREE.Camera;
+  private readonly viewMatrix = new THREE.Matrix4();
+  private readonly viewProjection = new THREE.Matrix4();
+  private viewWidth = 0;
+  private viewHeight = 0;
   private readonly tiles = new Map<string, TileVisual>();
   private queue: TileVisual[] = [];
   private pending = 0;
@@ -216,6 +231,8 @@ export class TerrainMapLayer extends THREE.Group {
   private template?: string;
   private loadingSource = false;
   private sourceFailed = false;
+  private sourceAttempts = 0;
+  private sourceRetry?: ReturnType<typeof setTimeout>;
   private sourceAbort?: AbortController;
   private launchTimer?: ReturnType<typeof setTimeout>;
 
@@ -226,6 +243,14 @@ export class TerrainMapLayer extends THREE.Group {
   }
 
   update(camera: THREE.Camera, width: number, height: number, maxAnisotropy = 8): void {
+    // Aircraft playback does not move the overview camera. In that common case
+    // retain the exact tile decision, without repeating ground/frustum projection.
+    // Camera identity matters when entering/leaving the perspective follow view.
+    camera.updateMatrixWorld(true);
+    if (camera === this.viewCamera && width === this.viewWidth && height === this.viewHeight
+      && this.viewMatrix.equals(camera.matrixWorld) && this.viewProjection.equals(camera.projectionMatrix)) return;
+    this.viewCamera = camera; this.viewWidth = width; this.viewHeight = height;
+    this.viewMatrix.copy(camera.matrixWorld); this.viewProjection.copy(camera.projectionMatrix);
     const visible = visibleTerrainTiles(camera, width, height, this.bounds, this.wantedZoom);
     const signature = visible.map(tile => tile.key).sort().join(",");
     if (signature === this.signature) return;
@@ -238,14 +263,15 @@ export class TerrainMapLayer extends THREE.Group {
       if (visual.state === "ready") continue;
       this.remove(visual.mesh); disposeRenderObject(visual.mesh); this.tiles.delete(key);
     }
-    this.queue = this.queue.filter(visual => !visual.texture.userData.viewerDisposed);
     for (const tile of visible) {
       if (this.tiles.has(tile.key)) continue;
       const texture = new THREE.Texture();
       texture.userData.viewerOwned = true;
       texture.addEventListener("dispose", () => {
+        clearTimeout(visual.retry); visual.retry = undefined;
         if ([...this.tiles.values()].every(item => item.texture.userData.viewerDisposed)) {
           clearTimeout(this.launchTimer); this.launchTimer = undefined; this.sourceAbort?.abort();
+          clearTimeout(this.sourceRetry); this.sourceRetry = undefined;
           if (this.decodeFrame !== undefined) cancelAnimationFrame(this.decodeFrame);
           this.decodeFrame = undefined; this.decodeQueue.length = 0;
         }
@@ -264,9 +290,10 @@ export class TerrainMapLayer extends THREE.Group {
       mesh.position.y = (this.bounds.min[2] ?? 0) - 0.001;
       mesh.receiveShadow = true;
       mesh.visible = false;
-      const visual: TileVisual = { tile, mesh, texture, state: "queued", lastUsed: this.clock };
-      this.tiles.set(tile.key, visual); this.add(mesh); this.queue.push(visual);
+      const visual: TileVisual = { tile, mesh, texture, state: "queued", lastUsed: this.clock, attempts: 0 };
+      this.tiles.set(tile.key, visual); this.add(mesh);
     }
+    this.prioritizeQueue();
     this.refreshVisibility(); this.trimCache();
     // Camera fitting fires several synchronous renders. Request only the settled view,
     // not transient initialization frames or every intermediate pan position.
@@ -274,6 +301,13 @@ export class TerrainMapLayer extends THREE.Group {
     if (typeof document !== "undefined") {
       this.launchTimer = setTimeout(() => { this.launchTimer = undefined; this.pump(); }, MAP_SURROUND.updateDelayMs);
     }
+  }
+
+  private prioritizeQueue(): void {
+    // The wanted set follows the latest center-first tile order. Retained queued
+    // edge tiles must not delay the center of a newly panned or zoomed view.
+    this.queue = [...this.wanted].map(key => this.tiles.get(key)).filter((item): item is TileVisual =>
+      item?.state === "queued" && !item.texture.userData.viewerDisposed);
   }
 
   private refreshVisibility(): void {
@@ -320,21 +354,28 @@ export class TerrainMapLayer extends THREE.Group {
   }
 
   private pump(): void {
-    if (typeof document === "undefined" || this.launchTimer !== undefined || this.sourceFailed
+    if (typeof document === "undefined" || this.launchTimer !== undefined || this.sourceFailed || this.sourceRetry !== undefined
       || !this.queue.some(item => !item.texture.userData.viewerDisposed)) return;
     if (!this.template) {
       if (this.loadingSource) return;
       this.loadingSource = true;
+      this.sourceAttempts++;
       const abort = new AbortController(); this.sourceAbort = abort;
       let timedOut = false;
       const deadline = setTimeout(() => { timedOut = true; abort.abort(); }, 20_000);
       fetch(MAP_SURROUND.source.url, { signal: abort.signal, credentials: "omit" })
-        .then(response => { if (!response.ok) throw new Error("Map source unavailable"); return response.json(); })
-        .then(payload => { this.template = terrainTileTemplate(payload); })
-        .catch(() => {
-          // Aborted removed views may retry for newly visible tiles; real service errors
-          // fail closed and leave the independent offline ground/replay available.
-          if (!abort.signal.aborted || timedOut) this.sourceFailed = true;
+        .then(response => { if (!response.ok) throw new ImageryRequestError(response.status); return response.json(); })
+        .then(payload => {
+          // Invalid service/projection metadata is never a retry or alternate-host hint.
+          try { this.template = terrainTileTemplate(payload); } catch { this.sourceFailed = true; }
+        })
+        .catch(error => {
+          if (abort.signal.aborted && !timedOut) { this.sourceAttempts--; return; }
+          if (!timedOut && retryableRequest(error) && this.sourceAttempts < MAP_SURROUND.maxRequestAttempts) {
+            this.sourceRetry = setTimeout(() => {
+              this.sourceRetry = undefined; this.pump();
+            }, MAP_SURROUND.retryDelayMs);
+          } else this.sourceFailed = true;
         })
         .finally(() => {
           clearTimeout(deadline); this.loadingSource = false; this.sourceAbort = undefined;
@@ -345,7 +386,7 @@ export class TerrainMapLayer extends THREE.Group {
     while (this.pending < MAP_SURROUND.maxConcurrentRequests && this.queue.length) {
       const visual = this.queue.shift()!;
       if (visual.texture.userData.viewerDisposed) continue;
-      visual.state = "loading";
+      visual.state = "loading"; visual.attempts++;
       this.pending++;
       let finished = false;
       let deadline: ReturnType<typeof setTimeout>;
@@ -357,7 +398,7 @@ export class TerrainMapLayer extends THREE.Group {
         // finishes so a removed scene cannot start requests for its formerly queued tiles.
         queueMicrotask(() => this.pump());
       };
-      const finish = (image?: HTMLImageElement, resume = true) => {
+      const finish = (image?: HTMLImageElement, resume = true, retryable = false) => {
         if (finished) return;
         finished = true; this.pending--;
         clearTimeout(deadline);
@@ -368,6 +409,13 @@ export class TerrainMapLayer extends THREE.Group {
             visual.state = "ready"; this.userData.basemapReady = true;
           } else {
             visual.state = "failed";
+            if (retryable && this.wanted.has(visual.tile.key) && visual.attempts < MAP_SURROUND.maxRequestAttempts) {
+              visual.retry = setTimeout(() => {
+                visual.retry = undefined;
+                if (visual.texture.userData.viewerDisposed || !this.wanted.has(visual.tile.key)) return;
+                visual.state = "queued"; this.prioritizeQueue(); this.pump();
+              }, MAP_SURROUND.retryDelayMs);
+            }
           }
           this.refreshVisibility(); this.trimCache();
           this.onReady?.(image ? visual.texture : undefined);
@@ -378,11 +426,14 @@ export class TerrainMapLayer extends THREE.Group {
       visual.texture.addEventListener("dispose", disposed);
       // Normal browser CORS/caching. Disposing a tile also cancels its actual request.
       fetch(terrainTileURL(visual.tile, this.template), { signal: abort.signal, credentials: "omit" })
-        .then(response => { if (!response.ok) throw new Error("Map tile unavailable"); return response.blob(); })
-        .then(blob => finished ? undefined : decodeImageryTile(blob))
+        .then(response => { if (!response.ok) throw new ImageryRequestError(response.status); return response.blob(); })
+        .then(blob => finished ? undefined : decodeImageryTile(blob).catch(() => undefined))
         // Decode asynchronously, then commit/upload at most one texture per frame.
-        .then(image => { if (image && !finished) this.decodeNextFrame(() => finish(image)); })
-        .catch(() => finish());
+        .then(image => {
+          if (image && !finished) this.decodeNextFrame(() => finish(image));
+          else finish();
+        })
+        .catch(error => finish(undefined, true, !abort.signal.aborted && retryableRequest(error)));
     }
   }
 }

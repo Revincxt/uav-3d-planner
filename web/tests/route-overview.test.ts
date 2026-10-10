@@ -7,19 +7,17 @@ import { validateDynamicBundle } from "../src/dynamic-data";
 import { validatePredictiveBundle } from "../src/predictive-data";
 import { RetainedCity } from "../src/retained-city";
 import {
-  RouteOverview, dynamicRoutes, overviewDuration, pathPrefix, predictivePath, predictiveRoutes,
+  RouteOverview, dynamicRoutes, overviewDuration, predictiveRoutes,
   flightHeading, reactiveTrace, routeColor, routeColorCSS, staticRoutes, timedPosition, waypointIndex,
   type OverviewRoute, type RouteWaypoint,
 } from "../src/route-overview";
 import type { DynamicRun } from "../src/dynamic-schema";
-import type { PredictiveRun } from "../src/predictive-schema";
+import { readStudyData } from '../scripts/study-reader.mjs';
 
-const filesystemModule = "node:fs";
-const { readFileSync } = await import(filesystemModule);
-const read = (file: string) => JSON.parse(readFileSync(new URL(`../public/${file}`, import.meta.url), "utf8"));
-const staticBundle = validateBundle(read("demo-data.json"));
-const dynamicBundle = validateDynamicBundle(read("dynamic-data.json"));
-const predictiveBundle = validatePredictiveBundle(read("predictive-data.json"));
+const read = (file: string) => readStudyData(new URL(`../public/${file}`, import.meta.url));
+const staticBundle = validateBundle(await read("demo-data.json"));
+const dynamicBundle = validateDynamicBundle(await read("dynamic-data.json"));
+const predictiveBundle = validatePredictiveBundle(await read("predictive-data.json"));
 
 function fixtureRoutes(): OverviewRoute[] {
   return Array.from({ length: 4 }, (_, index) => {
@@ -60,10 +58,6 @@ describe("shared mission clock", () => {
     expect(waypointIndex([], 10)).toBe(-1);
     expect(() => timedPosition([], 10)).toThrow("empty");
   });
-  it("keeps every stop knot in a replay prefix and rewinds deterministically", () => {
-    expect(pathPrefix(path, 9)).toEqual([[0, 0, 30], [10, 0, 40], [10, 0, 40], [10, 5, 45]]);
-    expect(pathPrefix(path, 0)).toEqual([[0, 0, 30]]);
-  });
   it("derives forward headings from records and keeps arrival heading during service stops", () => {
     expect(flightHeading(path, 0).toArray()).toEqual([1, 0, 0]);
     expect(flightHeading(path, 6).toArray()).toEqual([1, 0, 0]);
@@ -97,12 +91,12 @@ describe("shared mission clock", () => {
 });
 
 describe("four routes, one world", () => {
-  it("reuses predictive route and point arrays for unchanged planner/mode without mixing algorithms", () => {
+  it("reuses predictive final-flight arrays for an unchanged planner without mixing algorithms", () => {
     const planner = predictiveBundle.planners[0]!.id;
-    const first = predictiveRoutes(predictiveBundle.scenarios, planner, "execution");
-    const second = predictiveRoutes(predictiveBundle.scenarios, planner, "execution");
+    const first = predictiveRoutes(predictiveBundle.scenarios, planner);
+    const second = predictiveRoutes(predictiveBundle.scenarios, planner);
     first.forEach((route, index) => expect(second[index]).toBe(route));
-    const other = predictiveRoutes(predictiveBundle.scenarios, predictiveBundle.planners[1]!.id, "execution");
+    const other = predictiveRoutes(predictiveBundle.scenarios, predictiveBundle.planners[1]!.id);
     first.forEach((route, index) => expect(other[index]).not.toBe(route));
   });
   it("creates exactly four depth-tested trajectories with separate mission colors", () => {
@@ -192,9 +186,9 @@ describe("four routes, one world", () => {
 describe("real eight-route records", () => {
   it("loads every selected algorithm's eight complete results, including predictive-page reactive baselines", () => {
     const cohorts = [
-      staticBundle.planners.map(planner => staticRoutes(staticBundle.scenarios, planner.id, "smoothed")),
+      staticBundle.planners.map(planner => staticRoutes(staticBundle.scenarios, planner.id)),
       dynamicBundle.planners.map(planner => dynamicRoutes(dynamicBundle.scenarios, planner.id)),
-      predictiveBundle.planners.map(planner => predictiveRoutes(predictiveBundle.scenarios, planner.id, "execution")),
+      predictiveBundle.planners.map(planner => predictiveRoutes(predictiveBundle.scenarios, planner.id)),
     ];
     let flights = 0;
     for (const choices of cohorts) {
@@ -221,9 +215,9 @@ describe("real eight-route records", () => {
   });
   it("uses the same rounded racing gates for original and added missions on every page", () => {
     const cohorts = [
-      staticRoutes(staticBundle.scenarios, "lazy-theta-star", "smoothed"),
+      staticRoutes(staticBundle.scenarios, "lazy-theta-star"),
       dynamicRoutes(dynamicBundle.scenarios, "repeated-astar-3d"),
-      predictiveRoutes(predictiveBundle.scenarios, "space-time-astar-4d", "execution"),
+      predictiveRoutes(predictiveBundle.scenarios, "space-time-astar-4d"),
     ];
     for (const routes of cohorts) {
       const overview = new RouteOverview();
@@ -243,14 +237,12 @@ describe("real eight-route records", () => {
     }
   });
   it.each(staticBundle.planners)("retains all static stops and original data for $id", planner => {
-    for (const mode of ["raw", "smoothed"] as const) {
-      const routes = staticRoutes(staticBundle.scenarios, planner.id, mode);
-      expect(routes).toHaveLength(8);
-      routes.forEach((route, i) => {
-        expect(route.points === staticBundle.scenarios[i]!.results.find(r => r.plannerId === planner.id)!.paths![mode]).toBe(true);
-        auditMissionTaskVisits(route.points, route.mission);
-      });
-    }
+    const routes = staticRoutes(staticBundle.scenarios, planner.id);
+    expect(routes).toHaveLength(8);
+    routes.forEach((route, i) => {
+      expect(route.points).toBe(staticBundle.scenarios[i]!.results.find(r => r.plannerId === planner.id)!.paths!.smoothed);
+      auditMissionTaskVisits(route.points, route.mission);
+    });
   });
   it.each(dynamicBundle.planners)("retains actual reactive execution and service intervals for $id", planner => {
     const routes = dynamicRoutes(dynamicBundle.scenarios, planner.id);
@@ -267,17 +259,21 @@ describe("real eight-route records", () => {
     });
     expect(dynamicRoutes(dynamicBundle.scenarios, planner.id)[0] === routes[0]).toBe(true);
   });
-  it.each(predictiveBundle.planners)("keeps raw/geometry/execution separate for $id", planner => {
-    for (const mode of ["raw", "geometry", "execution"] as const) {
-      const routes = predictiveRoutes(predictiveBundle.scenarios, planner.id, mode);
-      expect(routes).toHaveLength(8);
-      routes.forEach(route => auditMissionTaskVisits(route.timedPath!.map(w => w.position), route.mission, route.timedPath!.map(w => w.timeS)));
-    }
+  it.each(predictiveBundle.planners)("shows only the validated final flight for $id", planner => {
+    const routes = predictiveRoutes(predictiveBundle.scenarios, planner.id);
+    expect(routes).toHaveLength(8);
+    routes.forEach((route, index) => {
+      const run = predictiveBundle.scenarios[index]!.runs.find(r => r.plannerId === planner.id)!;
+      expect(route.timedPath).toBe(run.executionTimedPath);
+      expect(route.waits).toBe(run.executionWaitIntervals);
+      auditMissionTaskVisits(route.timedPath!.map(w => w.position), route.mission, route.timedPath!.map(w => w.timeS));
+    });
   });
-  it("fails closed when the requested predictive evidence is missing", () => {
-    const run = predictiveBundle.scenarios[0]!.runs[0]!;
-    expect(() => predictivePath({ ...run, executionTimedPath: null }, "execution")).toThrow("qualified");
-    expect(() => predictivePath({ ...run, smoothing: { ...run.smoothing, certified: false } } as PredictiveRun, "geometry")).toThrow("certified");
+  it("does not render intermediate geometry when the final predictive flight is missing or unqualified", () => {
+    const scenario = predictiveBundle.scenarios[0]!, run = scenario.runs[0]!;
+    expect(() => predictiveRoutes([{ ...scenario, runs: [{ ...run, executionTimedPath: null }] }], run.plannerId)).toThrow("validated flight");
+    const unqualified = { ...run, smoothing: { ...run.smoothing, execution: { ...run.smoothing.execution, qualified: false } } };
+    expect(() => predictiveRoutes([{ ...scenario, runs: [unqualified] }], run.plannerId)).toThrow("validated flight");
   });
 });
 

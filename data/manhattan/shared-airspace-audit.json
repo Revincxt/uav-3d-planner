@@ -2,53 +2,53 @@
   "contract": "one-physical-world-one-clock-per-study",
   "missionCountPerWorld": 8,
   "control": "remove-aircraft-only-retain-city-fixed-zones-and-all-reservation-windows",
-  "sourceCommit": "local-snapshot:sha256:000c1d39fd6abbcdfcc467a33ce534e582e7218c5ee17b4b4d2c6bccce72ab3c",
+  "sourceCommit": "local-snapshot:sha256:81165180ae91d765487e203fde4d832d390dc3083347d862f57e0bd66e3470b4",
   "jointMissionDeconfliction": false,
   "rows": [
     {
       "study": "dynamic",
       "mission": "midtown-medical-link-reactive",
       "planner": "repeated-astar-3d",
-      "counterfactualUnsafeSegments": 5,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 42.247,
-      "arrivalDifferenceS": 2.89
+      "maxHorizontalReplayDifferenceM": 260.427,
+      "arrivalDifferenceS": 18.602
     },
     {
       "study": "dynamic",
       "mission": "midtown-medical-link-reactive",
       "planner": "repeated-lazy-theta-star",
-      "counterfactualUnsafeSegments": 5,
+      "counterfactualUnsafeSegments": 6,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 42.405,
-      "arrivalDifferenceS": 2.937
+      "maxHorizontalReplayDifferenceM": 248.977,
+      "arrivalDifferenceS": 16.905
     },
     {
       "study": "dynamic",
       "mission": "midtown-medical-link-reactive",
       "planner": "dstar-lite-3d",
-      "counterfactualUnsafeSegments": 5,
+      "counterfactualUnsafeSegments": 0,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 43.055,
-      "arrivalDifferenceS": 2.947
+      "maxHorizontalReplayDifferenceM": 41.993,
+      "arrivalDifferenceS": 1.96
     },
     {
       "study": "dynamic",
       "mission": "chelsea-midtown-delivery-reactive",
       "planner": "repeated-astar-3d",
-      "counterfactualUnsafeSegments": 3,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 73.133,
-      "arrivalDifferenceS": 1.543
+      "maxHorizontalReplayDifferenceM": 79.667,
+      "arrivalDifferenceS": 4.076
     },
     {
       "study": "dynamic",
       "mission": "chelsea-midtown-delivery-reactive",
       "planner": "repeated-lazy-theta-star",
-      "counterfactualUnsafeSegments": 3,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 72.462,
-      "arrivalDifferenceS": 1.543
+      "maxHorizontalReplayDifferenceM": 90.805,
+      "arrivalDifferenceS": 5.336
     },
     {
       "study": "dynamic",
@@ -56,125 +56,125 @@
       "planner": "dstar-lite-3d",
       "counterfactualUnsafeSegments": 3,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 71.693,
-      "arrivalDifferenceS": 1.543
+      "maxHorizontalReplayDifferenceM": 108.367,
+      "arrivalDifferenceS": 6.132
     },
     {
       "study": "dynamic",
       "mission": "hudson-inspection-reactive",
       "planner": "repeated-astar-3d",
-      "counterfactualUnsafeSegments": 25,
+      "counterfactualUnsafeSegments": 0,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 87.587,
-      "arrivalDifferenceS": 1.542
+      "maxHorizontalReplayDifferenceM": 180.79,
+      "arrivalDifferenceS": 11.462
     },
     {
       "study": "dynamic",
       "mission": "hudson-inspection-reactive",
       "planner": "repeated-lazy-theta-star",
-      "counterfactualUnsafeSegments": 5,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 111.74,
-      "arrivalDifferenceS": 0.539
+      "maxHorizontalReplayDifferenceM": 200.932,
+      "arrivalDifferenceS": 12.212
     },
     {
       "study": "dynamic",
       "mission": "hudson-inspection-reactive",
       "planner": "dstar-lite-3d",
-      "counterfactualUnsafeSegments": 25,
+      "counterfactualUnsafeSegments": 0,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 28.737,
-      "arrivalDifferenceS": 1.121
+      "maxHorizontalReplayDifferenceM": 211.745,
+      "arrivalDifferenceS": 14.248
     },
     {
       "study": "dynamic",
       "mission": "flatiron-eastside-logistics-reactive",
       "planner": "repeated-astar-3d",
-      "counterfactualUnsafeSegments": 5,
+      "counterfactualUnsafeSegments": 4,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 81.073,
-      "arrivalDifferenceS": 5.669
+      "maxHorizontalReplayDifferenceM": 340.029,
+      "arrivalDifferenceS": 24.288
     },
     {
       "study": "dynamic",
       "mission": "flatiron-eastside-logistics-reactive",
       "planner": "repeated-lazy-theta-star",
-      "counterfactualUnsafeSegments": 5,
+      "counterfactualUnsafeSegments": 4,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 83.622,
-      "arrivalDifferenceS": 5.841
+      "maxHorizontalReplayDifferenceM": 290.362,
+      "arrivalDifferenceS": 20.74
     },
     {
       "study": "dynamic",
       "mission": "flatiron-eastside-logistics-reactive",
       "planner": "dstar-lite-3d",
-      "counterfactualUnsafeSegments": 5,
+      "counterfactualUnsafeSegments": 4,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 86.59,
-      "arrivalDifferenceS": 5.654
+      "maxHorizontalReplayDifferenceM": 337.405,
+      "arrivalDifferenceS": 24.1
     },
     {
       "study": "dynamic",
       "mission": "midtown-west-backhaul-reactive",
       "planner": "repeated-astar-3d",
-      "counterfactualUnsafeSegments": 7,
+      "counterfactualUnsafeSegments": 3,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 107.075,
-      "arrivalDifferenceS": 5.976
+      "maxHorizontalReplayDifferenceM": 116.852,
+      "arrivalDifferenceS": 4.997
     },
     {
       "study": "dynamic",
       "mission": "midtown-west-backhaul-reactive",
       "planner": "repeated-lazy-theta-star",
-      "counterfactualUnsafeSegments": 8,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 51.018,
-      "arrivalDifferenceS": 3.515
+      "maxHorizontalReplayDifferenceM": 97.962,
+      "arrivalDifferenceS": 3.947
     },
     {
       "study": "dynamic",
       "mission": "midtown-west-backhaul-reactive",
       "planner": "dstar-lite-3d",
-      "counterfactualUnsafeSegments": 7,
+      "counterfactualUnsafeSegments": 18,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 70.437,
-      "arrivalDifferenceS": 4.937
+      "maxHorizontalReplayDifferenceM": 151.598,
+      "arrivalDifferenceS": 6.475
     },
     {
       "study": "dynamic",
       "mission": "eastside-medical-return-reactive",
       "planner": "repeated-astar-3d",
-      "counterfactualUnsafeSegments": 0,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 61.606,
-      "arrivalDifferenceS": 4.316
+      "maxHorizontalReplayDifferenceM": 199.574,
+      "arrivalDifferenceS": 8.557
     },
     {
       "study": "dynamic",
       "mission": "eastside-medical-return-reactive",
       "planner": "repeated-lazy-theta-star",
-      "counterfactualUnsafeSegments": 0,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 182.869,
-      "arrivalDifferenceS": 12.965
+      "maxHorizontalReplayDifferenceM": 264.454,
+      "arrivalDifferenceS": 14.417
     },
     {
       "study": "dynamic",
       "mission": "eastside-medical-return-reactive",
       "planner": "dstar-lite-3d",
-      "counterfactualUnsafeSegments": 0,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 96.409,
-      "arrivalDifferenceS": 6.815
+      "maxHorizontalReplayDifferenceM": 209.529,
+      "arrivalDifferenceS": 9.76
     },
     {
       "study": "dynamic",
       "mission": "midtown-supply-backhaul-reactive",
       "planner": "repeated-astar-3d",
-      "counterfactualUnsafeSegments": 0,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 1.831,
-      "arrivalDifferenceS": 0.0
+      "maxHorizontalReplayDifferenceM": 179.322,
+      "arrivalDifferenceS": 8.646
     },
     {
       "study": "dynamic",
@@ -182,26 +182,26 @@
       "planner": "repeated-lazy-theta-star",
       "counterfactualUnsafeSegments": 0,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 1.797,
-      "arrivalDifferenceS": 0.0
+      "maxHorizontalReplayDifferenceM": 75.528,
+      "arrivalDifferenceS": 2.683
     },
     {
       "study": "dynamic",
       "mission": "midtown-supply-backhaul-reactive",
       "planner": "dstar-lite-3d",
-      "counterfactualUnsafeSegments": 0,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 1.806,
-      "arrivalDifferenceS": 0.0
+      "maxHorizontalReplayDifferenceM": 144.469,
+      "arrivalDifferenceS": 5.436
     },
     {
       "study": "dynamic",
       "mission": "east-to-hudson-priority-reactive",
       "planner": "repeated-astar-3d",
-      "counterfactualUnsafeSegments": 0,
+      "counterfactualUnsafeSegments": 2,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 126.477,
-      "arrivalDifferenceS": 6.303
+      "maxHorizontalReplayDifferenceM": 153.77,
+      "arrivalDifferenceS": 8.047
     },
     {
       "study": "dynamic",
@@ -209,35 +209,35 @@
       "planner": "repeated-lazy-theta-star",
       "counterfactualUnsafeSegments": 0,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 113.297,
-      "arrivalDifferenceS": 5.729
+      "maxHorizontalReplayDifferenceM": 101.38,
+      "arrivalDifferenceS": 5.956
     },
     {
       "study": "dynamic",
       "mission": "east-to-hudson-priority-reactive",
       "planner": "dstar-lite-3d",
-      "counterfactualUnsafeSegments": 0,
+      "counterfactualUnsafeSegments": 1,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 133.168,
-      "arrivalDifferenceS": 7.661
+      "maxHorizontalReplayDifferenceM": 79.981,
+      "arrivalDifferenceS": 3.679
     },
     {
       "study": "predictive",
       "mission": "manhattan-westside-delivery",
       "planner": "space-time-astar-4d",
-      "counterfactualUnsafeSegments": 1,
+      "counterfactualUnsafeSegments": 0,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 169.058,
-      "arrivalDifferenceS": 11.271
+      "maxHorizontalReplayDifferenceM": 67.082,
+      "arrivalDifferenceS": 0.0
     },
     {
       "study": "predictive",
       "mission": "manhattan-medical-transfer",
       "planner": "space-time-astar-4d",
-      "counterfactualUnsafeSegments": 2,
+      "counterfactualUnsafeSegments": 3,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 67.082,
-      "arrivalDifferenceS": 0.0
+      "maxHorizontalReplayDifferenceM": 154.997,
+      "arrivalDifferenceS": 10.333
     },
     {
       "study": "predictive",
@@ -252,10 +252,10 @@
       "study": "predictive",
       "mission": "manhattan-riverfront-logistics",
       "planner": "space-time-astar-4d",
-      "counterfactualUnsafeSegments": 1,
+      "counterfactualUnsafeSegments": 0,
       "actualSharedWorldSafe": true,
-      "maxHorizontalReplayDifferenceM": 71.888,
-      "arrivalDifferenceS": 4.793
+      "maxHorizontalReplayDifferenceM": 0.0,
+      "arrivalDifferenceS": 0.0
     },
     {
       "study": "predictive",
@@ -273,7 +273,7 @@
       "counterfactualUnsafeSegments": 0,
       "actualSharedWorldSafe": true,
       "maxHorizontalReplayDifferenceM": 0.0,
-      "arrivalDifferenceS": 0.0
+      "arrivalDifferenceS": -0.0
     },
     {
       "study": "predictive",

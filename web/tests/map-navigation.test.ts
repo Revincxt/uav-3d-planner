@@ -22,11 +22,9 @@ function controlledCamera() {
 }
 
 describe("above-ground map navigation", () => {
-  it("adds river context only to the city panorama, preserving focused mission and top-view framing", () => {
-    expect(mapFramingPadding("city", true)).toBe(1.5);
-    expect(mapFramingPadding("mission", true)).toBe(1.12);
-    expect(mapFramingPadding("city", false)).toBe(1.12);
-    expect(mapFramingPadding("mission", false)).toBe(1.12);
+  it("adds river context to the city panorama while preserving tight top-view framing", () => {
+    expect(mapFramingPadding(true)).toBe(1.5);
+    expect(mapFramingPadding(false)).toBe(1.12);
   });
   it.each([0, -1, -300, -30_000])("clamps a forbidden relative camera height of %s to 15 degrees", height => {
     const { camera, controls } = controlledCamera();
@@ -64,7 +62,7 @@ describe("above-ground map navigation", () => {
       const { camera, controls } = controlledCamera();
       Object.assign(viewer, { camera, controls, scenario: {}, currentView: "isometric", resize: vi.fn(),
         sceneBounds: () => new THREE.Box3(new THREE.Vector3(-300, 0, -3800), new THREE.Vector3(3300, 480, 0)) });
-      for (const preset of name === "predictive" ? ["isometric", "fit", "yz"] : ["isometric", "reset"]) {
+      for (const preset of name === "predictive" ? ["isometric"] : ["isometric", "reset"]) {
         viewer.setView(preset);
         // ENU east is world +X: a western observer must sit on the target's -X side.
         expect(camera.position.x, preset).toBeLessThan(controls.target.x);
@@ -72,7 +70,7 @@ describe("above-ground map navigation", () => {
         expect(lookingEast.x, preset).toBeGreaterThan(0);
         expect(elevation(camera, controls.target), preset).toBeGreaterThanOrEqual(15 - 1e-8);
         expect(camera.up.toArray(), preset).toEqual([0, 1, 0]);
-        if (preset !== "yz") {
+        {
           expect(elevation(camera, controls.target), preset).toBeCloseTo(MAP_OVERVIEW_ELEVATION_DEG, 8);
           // The real Manhattan street axis runs NNE; the reference places its northern end upper-left.
           const center = controls.target.clone().project(camera);

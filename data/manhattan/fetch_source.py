@@ -51,7 +51,9 @@ def main() -> None:
     )
     destination = parser.parse_args().output_dir
     selection: dict[str, object] = {
-        "where": "1=1",
+        # Borough 1 tax lots only: the wider southern envelope crosses the East
+        # River, but Brooklyn buildings must not become Manhattan obstacles.
+        "where": "BASE_BBL LIKE '1%'",
         "geometry": ",".join(str(value) for value in ROI_WGS84),
         "geometryType": "esriGeometryEnvelope",
         "inSR": 4326,
@@ -101,7 +103,7 @@ def main() -> None:
         "requestedBoundsWgs84": list(ROI_WGS84),
         "sourceFeatureCount": count,
         "selection": (
-            "All source footprints intersecting the requested bounding box; "
+            "All Manhattan source footprints intersecting the requested bounding box; "
             "complete polygons retained, no simplification or clipping."
         ),
         "heightSourceField": "HEIGHT_ROOF",

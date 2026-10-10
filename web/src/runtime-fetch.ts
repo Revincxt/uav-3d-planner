@@ -19,15 +19,11 @@ async function compressedJSON(response: Response): Promise<unknown> {
   return new Response(magic[0] === 0x1f && magic[1] === 0x8b
     ? stream.pipeThrough(new DecompressionStream("gzip")) : stream).json();
 }
-/** Only absent optional assets fall back; corrupt data always fails closed. */
+/** Only absent gzip falls back to compact JSON; native audit records stay offline. */
 export async function fetchRuntimeData(kind: DatasetKind, base: string, fetcher: typeof fetch = fetch): Promise<unknown> {
   const name = names[kind], compressed = typeof DecompressionStream !== "undefined";
-  const response = await fetcher(`${base}${name}.runtime.json${compressed ? ".gz" : ""}`);
-  if (response.status === 404) {
-    const original = await fetcher(`${base}${name}.json`);
-    if (!original.ok) throw new Error(`Could not load ${kind} data (${original.status})`);
-    return original.json();
-  }
+  let response = await fetcher(`${base}${name}.runtime.json${compressed ? ".gz" : ""}`);
+  if (compressed && response.status === 404) response = await fetcher(`${base}${name}.runtime.json`);
   if (!response.ok) throw new Error(`Could not load ${kind} data (${response.status})`);
   return unpackRuntimeData(await (compressed ? compressedJSON(response) : response.json()));
 }

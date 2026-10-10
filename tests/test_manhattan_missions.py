@@ -322,7 +322,7 @@ class CityMissionStopEvidenceTests(unittest.TestCase):
                 self.assertIn(len(tasks), (6, 7, 8))
                 self.assertEqual(tasks, scene.metadata["missionTaskPoints"])
                 self.assertEqual(len({tuple(task["position"]) for task in tasks}), len(tasks))
-                self.assertGreaterEqual(mission["planningScale"]["horizontalDistanceM"], 2400)
+                self.assertGreaterEqual(mission["planningScale"]["horizontalDistanceM"], 4500)
                 self.assertGreaterEqual(mission["planningScale"]["cityAxisCoverage"], 0.55)
                 for index, task in enumerate(tasks):
                     self.assertEqual(task["order"], index + 1)
@@ -373,7 +373,7 @@ class CityMissionStopEvidenceTests(unittest.TestCase):
                     time_step=2,
                     replan_interval=10,
                     cruise_speed=14,
-                    max_time=600,
+                    max_time=900,
                     resolution=50,
                     max_expansions=20000,
                     shortcut_paths=True,

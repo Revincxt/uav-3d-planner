@@ -180,11 +180,14 @@ export function addCityBuildings(host: THREE.Group, buildings: readonly CityBox[
 }
 
 /** Route-focused bounds are independent of the full metropolitan map. */
-export function cityMissionBounds(scenario: CityScenario, points: readonly CityPoint[]): THREE.Box3 {
-  const bounds = new THREE.Box3();
-  for (const point of [...points, ...(scenario.start ? [scenario.start] : []), ...(scenario.goal ? [scenario.goal] : [])]) {
-    bounds.expandByPoint(new THREE.Vector3(point[0]!, point[2]!, -point[1]!));
-  }
+export function cityMissionBounds(scenario: CityScenario, points: Iterable<CityPoint>): THREE.Box3 {
+  const bounds = new THREE.Box3(), scratch = new THREE.Vector3();
+  const expand = (point: CityPoint) => bounds.expandByPoint(scratch.set(point[0]!, point[2]!, -point[1]!));
+  // Long replay histories must not become a second multi-million-element array
+  // or allocate a Vector3 for each historical point during camera framing.
+  for (const point of points) expand(point);
+  if (scenario.start) expand(scenario.start);
+  if (scenario.goal) expand(scenario.goal);
   if (bounds.isEmpty()) {
     return new THREE.Box3(new THREE.Vector3(scenario.bounds.min[0]!, scenario.bounds.min[2]!, -scenario.bounds.max[1]!),
       new THREE.Vector3(scenario.bounds.max[0]!, scenario.bounds.max[2]!, -scenario.bounds.min[1]!));

@@ -27,7 +27,7 @@ export function validateBenchmarkSummary(value: unknown): Analysis[] {
   }
   return data.analyses;
 }
-/** Only a missing summary can fall back to legacy native datasets; corruption fails closed. */
+/** A missing summary can be rebuilt from validated runtime data; corruption fails closed. */
 export async function fetchBenchmarkSummary(base: string): Promise<Analysis[] | null> {
   const response = await fetch(new URL("benchmark-summary.json", base));
   if (response.status === 404) return null;

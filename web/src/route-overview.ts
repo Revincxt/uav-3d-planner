@@ -6,7 +6,8 @@ import { enuToThree } from "./coordinates";
 import type { CityMission } from "./city-schema";
 import type { DemoScenario, PlannerId } from "./schema";
 import type { DynamicRun, DynamicScenario } from "./dynamic-schema";
-import type { PredictivePathMode, PredictiveRun, PredictiveScenario } from "./predictive-schema";
+import type { PredictiveScenario } from "./predictive-schema";
+import { finalFlight } from "./final-flight";
 import { createEndpointMarker } from "./scene-style";
 import { createDrone, orientDrone, sizeDrone } from "./drone-model";
 import { disposeRenderObject } from "./render-resources";
@@ -70,22 +71,36 @@ export function timedPosition(path: readonly RouteWaypoint[], timeS: number, tar
 
 /** A recorded local plan is consumed by actual travel, not by time spent hovering. */
 function flightDuration(a: RoutePoint, b: RoutePoint, speed: number, climb?: number): number {
-  return Math.max(Math.hypot(...b.map((v, axis) => v - a[axis]!)) / speed,
+  return Math.max(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / speed,
     climb ? Math.abs(b[2] - a[2]) / climb : 0);
 }
+
+type MotionRoute = Pick<OverviewRoute, "timedPath" | "cruiseSpeedMps" | "maxClimbRateMps">;
+interface MotionIndex {
+  path: RouteWaypoint[]; speed: number; climb?: number; cumulative: Float64Array;
+}
+// Routes are retained immutable replay inputs. A changed path or flight envelope
+// replaces the index; WeakMap ownership releases it with the route, not the page.
+const motionIndices = new WeakMap<MotionRoute, MotionIndex>();
 
 export function localPlanClock(route: Pick<OverviewRoute, "timedPath" | "cruiseSpeedMps" | "maxClimbRateMps">, fromS: number, timeS: number): number {
   const path = route.timedPath;
   if (!path?.length || timeS <= fromS) return fromS;
-  let previous = timedPosition(path, fromS), travelled = 0;
-  for (let i = waypointIndex(path, fromS) + 1; i < path.length && path[i]!.timeS <= timeS; i++) {
-    const position = path[i]!.position;
-    travelled += flightDuration(previous, position, route.cruiseSpeedMps || 15, route.maxClimbRateMps);
-    previous = position;
+  const speed = route.cruiseSpeedMps || 15, climb = route.maxClimbRateMps;
+  let index = motionIndices.get(route);
+  if (!index || index.path !== path || index.cumulative.length !== path.length || index.speed !== speed || index.climb !== climb) {
+    const cumulative = new Float64Array(path.length);
+    for (let i = 1; i < path.length; i++) {
+      cumulative[i] = cumulative[i - 1]! + flightDuration(path[i - 1]!.position, path[i]!.position, speed, climb);
+    }
+    index = { path, speed, climb, cumulative }; motionIndices.set(route, index);
   }
-  const position = timedPosition(path, timeS);
-  travelled += flightDuration(previous, position, route.cruiseSpeedMps || 15, route.maxClimbRateMps);
-  return fromS + travelled;
+  const progressAt = (clock: number): number => {
+    const knot = waypointIndex(path, clock), left = path[knot]!, right = path[knot + 1];
+    const fraction = !right || clock <= left.timeS ? 0 : (clock - left.timeS) / (right.timeS - left.timeS);
+    return index.cumulative[knot]! + (right ? fraction * (index.cumulative[knot + 1]! - index.cumulative[knot]!) : 0);
+  };
+  return fromS + Math.max(0, progressAt(timeS) - progressAt(fromS));
 }
 
 /** Deterministic horizontal flight heading, including seeks into a wait, climb or finished goal. */
@@ -131,37 +146,19 @@ export function displayHeading(path: readonly RouteWaypoint[], timeS: number): T
   return flightHeading(path, timeS);
 }
 
-export function pathPrefix(path: readonly RouteWaypoint[], timeS: number): RoutePoint[] {
-  if (!path.length) return [];
-  const index = waypointIndex(path, timeS);
-  const points = path.slice(0, index + 1).map(waypoint => waypoint.position);
-  if (timeS > path[index]!.timeS && index + 1 < path.length) points.push(timedPosition(path, timeS));
-  return points;
-}
-
-export function predictivePath(run: PredictiveRun, mode: PredictivePathMode): RouteWaypoint[] {
-  if (mode === "raw") return run.rawTimedPath;
-  if (mode === "execution") {
-    if (!run.executionTimedPath) throw new Error(`No qualified execution trace for ${run.plannerId}`);
-    return run.executionTimedPath;
-  }
-  if (!run.smoothing.certified) throw new Error(`No certified geometry for ${run.plannerId}`);
-  return run.geometryTimedPath;
-}
-
 const staticRouteCache = new WeakMap<DemoScenario, Map<string, OverviewRoute>>();
-export function staticRoutes(scenarios: DemoScenario[], planner: PlannerId, mode: "raw" | "smoothed"): OverviewRoute[] {
+export function staticRoutes(scenarios: DemoScenario[], planner: PlannerId): OverviewRoute[] {
   return scenarios.map(s => {
     let cache = staticRouteCache.get(s);
     if (!cache) { cache = new Map(); staticRouteCache.set(s, cache); }
-    const key = `${planner}/${mode}`, cached = cache.get(key);
+    const cached = cache.get(planner);
     if (cached) return cached;
     const result = s.results.find(r => r.plannerId === planner);
     if (!result?.paths || result.status !== "success") throw new Error(`Missing successful ${planner} route in ${s.id}`);
-    const points = result.paths[mode];
+    const points = result.paths.smoothed;
     const route: OverviewRoute = { id: s.id, plannerId: planner, label: s.label, mission: s.mission, points,
       timedPath: staticPlaybackPath(points, s.mission, 15, 3), playbackKind: "fixed" };
-    cache.set(key, route);
+    cache.set(planner, route);
     return route;
   });
 }
@@ -206,18 +203,18 @@ export function dynamicRoutes(scenarios: DynamicScenario[], planner: string): Ov
 }
 
 const predictiveRouteCache = new WeakMap<PredictiveScenario, Map<string, OverviewRoute>>();
-export function predictiveRoutes(scenarios: PredictiveScenario[], planner: string, mode: PredictivePathMode): OverviewRoute[] {
+export function predictiveRoutes(scenarios: PredictiveScenario[], planner: string): OverviewRoute[] {
   return scenarios.map(s => {
     let cache = predictiveRouteCache.get(s);
     if (!cache) { cache = new Map(); predictiveRouteCache.set(s, cache); }
-    const key = `${planner}/${mode}`, cached = cache.get(key);
+    const cached = cache.get(planner);
     if (cached) return cached;
     const run = s.runs.find(r => r.plannerId === planner);
     if (!run) throw new Error(`Missing ${planner} trace in ${s.id}`);
-    const timedPath = predictivePath(run, mode);
+    const flight = finalFlight(run), timedPath = flight.path;
     const route: OverviewRoute = { id: s.id, plannerId: planner, label: s.label, mission: s.mission, points: timedPath.map(w => w.position), timedPath,
-      playbackKind: run.predictive ? "predictive" : "reactive", waits: mode === "execution" ? run.executionWaitIntervals ?? undefined : undefined };
-    cache.set(key, route);
+      playbackKind: run.predictive ? "predictive" : "reactive", waits: flight.waits };
+    cache.set(planner, route);
     return route;
   });
 }
@@ -230,6 +227,7 @@ interface RouteVisual {
   route: OverviewRoute; group: THREE.Group; line: Line2; halo: Line2; vehicle?: THREE.Group;
   clock?: { value: number }; pending?: Line2; planFrame?: DynamicFrame;
   window?: ReturnType<typeof revealReplayWindow>; hold?: THREE.Group;
+  tasks?: THREE.InstancedMesh; start: THREE.Object3D; goal: THREE.Object3D;
 }
 
 /** Mission queries in one obstacle world. Geometry is retained during playback. */
@@ -241,6 +239,8 @@ export class RouteOverview {
   private playing = false;
   private selectedId: string | null = null;
   private readonly position: RoutePoint = [0, 0, 0];
+  private readonly point = new THREE.Vector3();
+  private readonly screenUp = new THREE.Vector3();
   constructor() { this.group.name = "mission-route-overview"; this.group.userData.presentation = "result-preview"; }
 
   setRoutes(routes: OverviewRoute[], activeId: string, width: number, height: number): void {
@@ -297,19 +297,22 @@ export class RouteOverview {
         window = revealReplayWindow(pendingGeometry, route.plannedFrames ? [0, 1] : route.timedPath!.map(w => w.timeS), pendingMaterial);
         group.add(pending);
       }
+      const endpoints = {} as { start: THREE.Object3D; goal: THREE.Object3D };
       for (const role of ["start", "goal"] as const) {
         const point = role === "start" ? route.points[0]! : route.points.at(-1)!;
         const marker = createEndpointMarker(role, true, color);
         marker.position.fromArray(enuToThree(point)); marker.name = `overview-${role}-${route.id}`;
-        if (role === "goal") marker.rotation.y = missionGateYaw(route.points, point);
+        marker.rotation.y = missionGateYaw(route.points, point);
         group.add(marker);
+        endpoints[role] = marker;
       }
       const tasks = route.mission?.taskPoints ?? [];
+      let markers: THREE.InstancedMesh | undefined;
       if (tasks.length) {
-        const markers = new THREE.InstancedMesh(missionGateGeometry(), missionGateMaterial(color), tasks.length);
+        markers = new THREE.InstancedMesh(missionGateGeometry(), missionGateMaterial(color), tasks.length);
         markers.name = `overview-tasks-${route.id}`;
         tasks.forEach((task, index) => {
-          markers.setMatrixAt(index, missionGateMatrix(route.points, task.position));
+          markers!.setMatrixAt(index, missionGateMatrix(route.points, task.position));
         });
         markers.computeBoundingSphere();
         group.add(markers);
@@ -330,9 +333,9 @@ export class RouteOverview {
         }
         group.add(hold);
       }
-      this.visuals.push({ route, group, line, halo, vehicle, clock, pending, window, hold });
+      this.visuals.push({ route, group, line, halo, vehicle, clock, pending, window, hold, tasks: markers, ...endpoints });
       this.group.add(group);
-      for (const point of route.points) this.bounds.expandByPoint(new THREE.Vector3(...enuToThree(point)));
+      for (const point of route.points) this.bounds.expandByPoint(this.point.set(point[0], point[2], -point[1]));
     });
     this.setFocus(activeId);
     this.setTime(this.timeS);
@@ -343,7 +346,7 @@ export class RouteOverview {
       const focused = visual.route.id === activeId;
       visual.group.userData.focused = focused;
       this.styleSelection(visual);
-      const tasks = visual.group.getObjectByName(`overview-tasks-${visual.route.id}`);
+      const tasks = visual.tasks;
       if (tasks) tasks.visible = !focused; // The focused mission already has numbered markers.
     }
   }
@@ -429,24 +432,21 @@ export class RouteOverview {
     return displayHeading(this.visuals.find(v => v.route.id === id)?.route.timedPath ?? [], timeS);
   }
   updateSymbols(camera: DisplayCamera, height: number, followedId: string | null = null): void {
-    for (const { vehicle, group, route } of this.visuals) if (vehicle) {
+    this.screenUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+    for (const { vehicle, group, route, hold, tasks, start, goal } of this.visuals) if (vehicle) {
       const followed = route.id === followedId;
       vehicle.visible = true;
       sizeDrone(vehicle, camera, height, followed ? Math.min(88, Math.max(24, height * 0.18)) : group.userData.focused ? 32 : 24,
         followed ? 0 : 0.8);
-      const hold = group.getObjectByName(`overview-hold-${route.id}`);
       if (hold?.visible) {
         const scale = metresPerPixelAt(camera, vehicle.position, height) * 11;
         hold.scale.setScalar(scale); hold.quaternion.copy(camera.quaternion);
-        hold.position.copy(vehicle.position).addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion), scale * 2.7);
+        hold.position.copy(vehicle.position).addScaledVector(this.screenUp, scale * 2.7);
       }
-      const tasks = group.getObjectByName(`overview-tasks-${route.id}`);
       if (tasks) tasks.visible = !group.userData.focused && route.id !== followedId;
-      for (const role of ["start", "goal"]) {
-        const marker = group.getObjectByName(`overview-${role}-${route.id}`);
-        // The hollow finish target never occupies the body; keep the flag visible on arrival.
-        if (marker) marker.visible = role === "goal" || marker.position.distanceTo(vehicle.position) > Math.max(15, vehicle.scale.x);
-      }
+      // The hollow finish stays visible; only the start marker yields to the body.
+      start.visible = start.position.distanceTo(vehicle.position) > Math.max(15, vehicle.scale.x);
+      goal.visible = true;
     }
   }
 

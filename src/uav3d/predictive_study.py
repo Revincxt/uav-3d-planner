@@ -1037,6 +1037,16 @@ def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[s
                 "altitudePolicy": "preserve-raw-z-time-profile",
             }
         )
+    elif smoothing.altitude_deviation_limit_m is not None:
+        smoothing_record = exported["smoothing"]
+        assert isinstance(smoothing_record, dict)
+        smoothing_record.update(
+            {
+                "optimizationAxes": ["x", "y", "z"],
+                "altitudePolicy": "bounded-spatial-spline-v1",
+                "altitudeDeviationLimitM": smoothing.altitude_deviation_limit_m,
+            }
+        )
     return exported
 
 

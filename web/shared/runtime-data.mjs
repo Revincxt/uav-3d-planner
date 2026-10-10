@@ -36,6 +36,7 @@ export function packRuntimeData(bundle) {
 }
 export function unpackRuntimeData(value) {
   if (!value || value.runtimeVersion !== 1 || !Array.isArray(value.pool) || !value.bundle || typeof value.bundle !== 'object') throw new Error('Unsupported runtime delivery format');
+  const prefixes = new Map();
   const decode = item => {
     if (!item || typeof item !== 'object') return item;
     if (Object.hasOwn(item, '$runtimeRef')) {
@@ -44,7 +45,13 @@ export function unpackRuntimeData(value) {
       const entry = value.pool[index];
       if (!Object.hasOwn(item, 'prefix')) return entry;
       if (!Array.isArray(entry) || !Number.isInteger(item.prefix) || item.prefix < 0 || item.prefix > entry.length) throw new Error('Invalid runtime path prefix');
-      return entry.slice(0, item.prefix);
+      // Different frames/identical planner traces may borrow the same prefix.
+      // Decode it once instead of copying an ever-growing history repeatedly.
+      // The cache belongs only to this decode, never to future edited datasets.
+      let slices = prefixes.get(index);
+      if (!slices) { slices = new Map(); prefixes.set(index, slices); }
+      if (!slices.has(item.prefix)) slices.set(item.prefix, entry.slice(0, item.prefix));
+      return slices.get(item.prefix);
     }
     if (Array.isArray(item)) return item.map(decode);
     return Object.fromEntries(Object.entries(item).map(([key, entry]) => [key, decode(entry)]));

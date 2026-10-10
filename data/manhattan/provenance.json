@@ -5,25 +5,25 @@
   "publisher": "New York City Office of Technology and Innovation",
   "serviceItemId": "870bf69e8a8044aea4488e564c0b4010",
   "sourcePath": "data/manhattan/building-footprints.geojson",
-  "sourceSha256": "6980d52abc2b03773bc175576c9b0fac8bfc4c70bd5bfbc57bc61dce334eeb9d",
-  "fetchedAt": "2026-10-05T11:26:25+00:00",
+  "sourceSha256": "20dfc89b60122c7c4092e441c67046517885d858e7f9a0af47cc2c46b16a6168",
+  "fetchedAt": "2026-10-10T05:07:12+00:00",
   "requestedBoundsWgs84": [
-    -74.0078,
-    40.7368,
+    -74.02,
+    40.7,
     -73.967,
     40.7676
   ],
-  "sourceFeatureCount": 9516,
-  "selection": "All source footprints intersecting the requested bounding box; complete polygons retained, no simplification or clipping.",
+  "sourceFeatureCount": 20757,
+  "selection": "All Manhattan source footprints intersecting the requested bounding box; complete polygons retained, no simplification or clipping.",
   "heightSourceField": "HEIGHT_ROOF",
   "heightSourceUnit": "ft",
   "heightMeaning": "Roof height above local ground, not elevation above sea level.",
   "heightUnitEvidence": "NYC source Empire State Building BIN 1015862 has HEIGHT_ROOF 1238.79032716: converting feet to metres gives 377.58329 m, consistent with the building owner's published roof height of approximately 1250 feet / 380 m. Source value is retained unchanged.",
   "heightUnitReferenceUrl": "https://www.esbnyc.com/about/facts-figures",
   "id": "nyc-manhattan-midtown-official",
-  "name": "Manhattan \u00b7 Midtown",
+  "name": "Manhattan \u00b7 Midtown to Battery Park",
   "collisionModel": "conservative-aabb",
-  "buildingCount": 9516,
+  "buildingCount": 20757,
   "coordinateSystem": {
     "frame": "ENU",
     "unit": "m",
@@ -35,20 +35,26 @@
     "groundModel": "Flattened ground at z=0; HEIGHT_ROOF is height above each source building's local ground."
   },
   "heightAssumptions": {
-    "missingHeightCount": 23,
+    "missingHeightCount": 35,
     "fallbackHeightM": 40.0,
     "rule": "Source HEIGHT_ROOF zero, null or non-finite is unknown; retained obstacles use an explicitly assumed 40 m height.",
     "buildingIds": [
       "nyc-1272398-part-1",
+      "nyc-1286246-part-1",
       "nyc-1284550-part-1",
       "nyc-1284576-part-1",
       "nyc-1284721-part-1",
+      "nyc-1273232-part-1",
+      "nyc-1273170-part-1",
       "nyc-1283719-part-1",
+      "nyc-1284006-part-1",
+      "nyc-1284008-part-1",
       "nyc-1283795-part-1",
       "nyc-1271104-part-1",
       "nyc-1262490-part-1",
       "nyc-1273023-part-1",
       "nyc-478053-part-1",
+      "nyc-1282932-part-1",
       "nyc-1290940-part-1",
       "nyc-1287486-part-1",
       "nyc-1290698-part-1",
@@ -57,19 +63,25 @@
       "nyc-1294196-part-1",
       "nyc-1296496-part-1",
       "nyc-1297380-part-1",
+      "nyc-1296599-part-1",
       "nyc-1297767-part-1",
       "nyc-1300375-part-1",
+      "nyc-1300995-part-1",
+      "nyc-1302267-part-1",
+      "nyc-1305599-part-1",
       "nyc-1305905-part-1",
       "nyc-1306213-part-1",
+      "nyc-1306342-part-1",
+      "nyc-1306429-part-1",
       "nyc-1306632-part-1"
     ]
   },
-  "sourcePlaceholderCount": 4,
+  "sourcePlaceholderCount": 5,
   "collisionApproximation": "Each physical polygon part uses its enclosing axis-aligned box; concavities and courtyards are conservatively blocked. All buildings participate in planning.",
   "bounds": {
     "min": [
-      -328.24036,
-      -713.88319,
+      -1214.11806,
+      -4640.21941,
       0.0
     ],
     "max": [
@@ -81,20 +93,20 @@
   "geometrySimplified": false,
   "maxSourceRoofHeightM": 472.44,
   "planningRegion": {
-    "id": "midtown-expanded-v3",
+    "id": "manhattan-south-expanded-v4",
     "requestedBoundsWgs84": [
+      -74.02,
+      40.7,
+      -73.967,
+      40.7676
+    ],
+    "selectionPurpose": "Extend the existing northern district south to Battery Park, including Financial District, Tribeca, SoHo and Greenwich Village; retain complete Manhattan polygons without clipping or simplification.",
+    "fixedProjectionOrigin": true,
+    "previousRegionWgs84": [
       -74.0078,
       40.7368,
       -73.967,
       40.7676
-    ],
-    "selectionPurpose": "Keep the 3.6 km cross-Manhattan width and expand north/south coverage to about 3.8 km; all intersecting source polygons retained whole.",
-    "fixedProjectionOrigin": true,
-    "previousRegionWgs84": [
-      -74.0078,
-      40.745,
-      -73.967,
-      40.7605
     ]
   }
 }

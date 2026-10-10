@@ -124,16 +124,12 @@ export function parseCityMission(value: unknown, bounds: { min: readonly number[
   return mission;
 }
 
-/** Preserve legacy city checks while explicitly recognizing the redesigned physical ROI. */
+/** The demo uses the complete Midtown-to-Battery-Park planning region. */
 export function hasCompleteCityExtent(city: CityMetadata | undefined, bounds: { min: readonly number[]; max: readonly number[] }): boolean {
   const width = bounds.max[0]! - bounds.min[0]!, depth = bounds.max[1]! - bounds.min[1]!;
   const region = city?.planningRegion as { id?: unknown } | undefined;
-  if (region?.id === "midtown-expanded-v3") {
-    return width >= 3500 && width <= 3700 && depth >= 3700 && depth <= 3900;
-  }
-  return region?.id === "midtown-landscape-v2"
-    ? width >= 3500 && depth >= 1800 && width / depth >= 1.7 && width / depth <= 2
-    : width >= 2000 && depth >= 2000;
+  return region?.id === "manhattan-south-expanded-v4" &&
+    width >= 4400 && width <= 4800 && depth >= 7400 && depth <= 8000;
 }
 
 export function parseCityMetadata(value: unknown, label = "city"): CityMetadata | undefined {

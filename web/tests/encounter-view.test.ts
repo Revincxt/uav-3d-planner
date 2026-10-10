@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { OrthographicCamera, PerspectiveCamera, Vector3 } from "three";
 import { encounterBounds, encounterView } from "../src/encounter-view";
-import { createTrafficAircraft, sizeTrafficAircraft, trafficForecast, updateTrafficAircraft } from "../src/traffic-aircraft";
+import { createTrafficAircraft, sizeTrafficAircraft, updateTrafficAircraft } from "../src/traffic-aircraft";
 import { playbackAction } from "../src/playback-state";
 import { validateExecutionSequence } from "../shared/execution-sequence.mjs";
 import { parseCityMission } from "../src/city-schema";
@@ -50,11 +50,6 @@ describe("Physical traffic and event-local observation", () => {
   });
   it("has no invented observation for legacy tasks without a challenge", () => {
     expect(encounterView({ ...route, mission: undefined })).toBeNull();
-  });
-  it("clips known traffic to twenty seconds and preserves intermediate motion knots", () => {
-    expect(trafficForecast(aircraft, 25)).toEqual([[50, -40, 100], [50, 80, 100], [50, 80, 115]]);
-    expect(trafficForecast(aircraft, 0)).toEqual([[50, -80, 100]]);
-    expect(trafficForecast(aircraft, 100)).toEqual([]);
   });
   it("rejects malformed/out-of-bounds scene challenges", () => {
     expect(() => parseCityMission({ origin: "A", destination: "B", purpose: "P", challenge: {

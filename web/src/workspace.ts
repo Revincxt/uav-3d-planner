@@ -1,17 +1,10 @@
-import type { CityMetadata, CityMission } from "./city-schema";
+import type { CityMission } from "./city-schema";
 import { routeColorCSS } from "./route-overview";
 
 interface LibraryScenario {
   id: string;
   label: string;
-  group?: string;
-  summary?: string;
-  city?: CityMetadata;
   mission?: CityMission;
-  bounds?: { min: readonly number[]; max: readonly number[] };
-  buildings?: readonly unknown[];
-  start?: readonly number[];
-  goal?: readonly number[];
 }
 interface WorkspaceOptions {
   scenarios: LibraryScenario[];
@@ -29,9 +22,6 @@ export function mountWorkspace({ scenarios, select }: WorkspaceOptions): void {
   const legend = document.querySelector<HTMLElement>("#legend, .scene-legend, .canvas-legend");
   const legendButtons: HTMLButtonElement[] = [];
   if (legend) {
-    const challenge = document.createElement("span");
-    challenge.id = "scene-challenge"; challenge.className = "scene-challenge"; challenge.hidden = true;
-    legend.parentElement?.append(challenge);
     legend.replaceChildren();
     legend.classList.add("route-legend");
     const header = document.querySelector(".app-header");
@@ -72,15 +62,6 @@ export function mountWorkspace({ scenarios, select }: WorkspaceOptions): void {
   };
   select.addEventListener("change", synchronize);
   synchronize();
-}
-
-export function missionCaption(scenario: LibraryScenario, scope: "city" | "mission"): string {
-  if (!scenario.city || !scenario.bounds) return scenario.summary ?? scenario.label;
-  const width = (scenario.bounds.max[0]! - scenario.bounds.min[0]!) / 1000;
-  const depth = (scenario.bounds.max[1]! - scenario.bounds.min[1]!) / 1000;
-  return scope === "city"
-    ? `${width.toFixed(1)} × ${depth.toFixed(1)} km · ${scenario.buildings?.length.toLocaleString("en")} buildings · ${scenario.mission?.sharedWorld?.missionCount ?? 1} routes`
-    : `${scenario.mission?.origin ?? "Origin"} → ${scenario.mission?.destination ?? "Destination"} · ${scenario.mission?.taskPoints?.length ?? 0} stops`;
 }
 
 export function mountInspector(): void {

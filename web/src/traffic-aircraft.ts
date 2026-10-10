@@ -10,7 +10,7 @@ import { metresPerPixelAt, type DisplayCamera } from "./camera-scale";
 export function createTrafficAircraft(definition: MovingSphereDefinition): THREE.Group {
   const aircraft = new THREE.Group();
   // A camera-sized glyph must not cast an enlarged physical shadow or refresh
-  // the entire 9,516-building shadow map on every playback tick.
+  // the entire city shadow map on every playback tick.
   aircraft.castShadow = false;
   aircraft.name = `traffic-aircraft:${definition.id}`;
   aircraft.userData = { kind: "cargo-drone", airframeSpanM: 18, separationRadiusM: definition.radiusM };
@@ -65,12 +65,3 @@ export function updateTrafficAircraft(aircraft: THREE.Object3D, definition: Movi
     .sub(new THREE.Vector3().fromArray(enuToThree(frames[segment]!.position))));
 }
 
-/** Only known keyframes, clipped to a short future window; never extrapolate motion. */
-export function trafficForecast(definition: MovingSphereDefinition, timeS: number, horizonS = 20): Array<[number, number, number]> {
-  const end = Math.min(timeS + horizonS, definition.keyframes.at(-1)!.timeS);
-  if (end <= timeS) return [];
-  const samples = [timedPosition(definition.keyframes, timeS),
-    ...definition.keyframes.filter(point => point.timeS > timeS && point.timeS < end).map(point => point.position),
-    timedPosition(definition.keyframes, end)];
-  return samples.filter((point, i) => i === 0 || Math.hypot(...point.map((v, axis) => v - samples[i - 1]![axis]!)) > 1e-8);
-}

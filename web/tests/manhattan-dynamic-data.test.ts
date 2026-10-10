@@ -1,20 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { validateDynamicBundle } from "../src/dynamic-data";
+import { readStudyData } from '../scripts/study-reader.mjs';
 
-// Runtime-only Node helper; the browser project does not require Node type declarations.
-const filesystemModule = "node:fs";
-const { readFileSync } = await import(filesystemModule);
-const source = JSON.parse(readFileSync(new URL("../public/dynamic-data.json", import.meta.url), "utf8"));
+const source = await readStudyData(new URL("../public/dynamic-data.json", import.meta.url));
 
-// These integration tests clone and validate the complete 126 MB native cohort.
+// Copy only the mutable schema declarations. Hundreds of MB of read-only city
+// polygons and replay samples must not be cloned for each negative test.
+const copyDeclarations = () => ({ ...source, protocol: { ...source.protocol },
+  scenarios: source.scenarios.map((scenario: typeof source.scenarios[number]) => ({ ...scenario,
+    runs: scenario.runs.map((run: typeof scenario.runs[number]) => ({ ...run, parameters: { ...run.parameters } })),
+  })),
+});
+
+// These integration tests validate the complete native cohort.
 // Runner contention must not turn data-integrity checks into 5-second speed tests.
 describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
   it("retains the complete real city, footprints, mission identity and actual replay", () => {
     const bundle = validateDynamicBundle(source);
-    expect(bundle.protocol.id).toBe("manhattan-reactive-demo-v3");
+    expect(bundle.protocol.id).toBe("manhattan-reactive-demo-v5");
     expect(bundle.protocol.pathShortcut).toBe(1);
     expect(bundle.protocol.preserveAltitude).toBe(1);
     expect(bundle.protocol.smoothTurns).toBe(1);
+    expect(bundle.protocol.curveDimensions).toBe(3);
     expect(bundle.protocol.turnScaleM).toBe(60);
     expect(bundle.protocol.curveSampleSpacingM).toBe(2);
     expect(bundle.protocol.verticalCostScale).toBe(5);
@@ -27,7 +34,7 @@ describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
       expect(scenario.buildings.length).toBeGreaterThan(1000);
       expect(scenario.buildings.every((building) => building.footprint && building.footprint.length > 0)).toBe(true);
       expect(scenario.mission?.origin).toBeTruthy();
-      expect(scenario.movingSpheres).toHaveLength(7);
+      expect(scenario.movingSpheres).toHaveLength(12);
       expect(scenario.runs).toHaveLength(3);
       for (const run of scenario.runs) {
         expect(run.status).toBe("success");
@@ -36,6 +43,7 @@ describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
         expect(run.parameters.pathShortcut).toBe(1);
         expect(run.parameters.preserveAltitude).toBe(1);
         expect(run.parameters.smoothTurns).toBe(1);
+        expect(run.parameters.curveDimensions).toBe(3);
         expect(run.parameters.turnScaleM).toBe(bundle.protocol.turnScaleM);
         expect(run.parameters.curveSampleSpacingM).toBe(bundle.protocol.curveSampleSpacingM);
         expect(run.parameters.verticalCostScale).toBe(5);
@@ -70,50 +78,32 @@ describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
       .toThrow(/collision envelope/);
   });
 
-  it("retains compatibility with the legacy Manhattan v1 replay shape", () => {
-    const bundle = structuredClone(source);
-    bundle.protocol.id = "manhattan-reactive-demo-v1";
-    delete bundle.protocol.pathShortcut;
-    delete bundle.protocol.preserveAltitude;
-    for (const scenario of bundle.scenarios) {
-      for (const run of scenario.runs) {
-        delete run.parameters.pathShortcut;
-        delete run.parameters.preserveAltitude;
-      }
-    }
-    expect(validateDynamicBundle(bundle).protocol.id).toBe("manhattan-reactive-demo-v1");
+  it.each([1, 2, 3, 4])("rejects retired Manhattan replay protocol v%s", (version) => {
+    const bundle = copyDeclarations();
+    bundle.protocol.id = `manhattan-reactive-demo-v${version}`;
+    expect(() => validateDynamicBundle(bundle)).toThrow(/protocol/);
   });
 
-  it("retains compatibility with the legacy Manhattan v2 unconstrained-height replay", () => {
-    const bundle = structuredClone(source);
-    bundle.protocol.id = "manhattan-reactive-demo-v2";
-    delete bundle.protocol.preserveAltitude;
-    for (const scenario of bundle.scenarios) {
-      for (const run of scenario.runs) delete run.parameters.preserveAltitude;
-    }
-    expect(validateDynamicBundle(bundle).protocol.id).toBe("manhattan-reactive-demo-v2");
-  });
-
-  it.each([undefined, true, 0, 2])("rejects v2 protocol.pathShortcut=%s", (value) => {
+  it.each([undefined, true, 0, 2])("rejects v5 protocol.pathShortcut=%s", (value) => {
     expect(() => validateDynamicBundle({ ...source, protocol: {
-      ...source.protocol, id: "manhattan-reactive-demo-v2", pathShortcut: value,
+      ...source.protocol, pathShortcut: value,
     } }))
       .toThrow(/protocol\.pathShortcut/);
   });
 
-  it.each([undefined, true, 0, 2])("rejects v3 protocol.preserveAltitude=%s", (value) => {
+  it.each([undefined, true, 0, 2])("rejects v5 protocol.preserveAltitude=%s", (value) => {
     expect(() => validateDynamicBundle({ ...source, protocol: { ...source.protocol, preserveAltitude: value } }))
       .toThrow(/protocol\.preserveAltitude/);
   });
 
-  it.each([undefined, 0, true])("requires numeric preserveAltitude on every v3 replay run: %s", (value) => {
-    const bundle = structuredClone(source);
+  it.each([undefined, 0, true])("requires numeric preserveAltitude on every v5 replay run: %s", (value) => {
+    const bundle = copyDeclarations();
     bundle.scenarios[0].runs[0].parameters.preserveAltitude = value;
     expect(() => validateDynamicBundle(bundle)).toThrow(/parameters\.preserveAltitude/);
   });
 
   it("requires a shortcut declaration on every replay run", () => {
-    const bundle = structuredClone(source);
+    const bundle = copyDeclarations();
     delete bundle.scenarios[0].runs[0].parameters.pathShortcut;
     expect(() => validateDynamicBundle(bundle)).toThrow(/parameters\.pathShortcut/);
   });
@@ -123,12 +113,18 @@ describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
       .toThrow(/protocol\.smoothTurns/);
   });
 
+  it.each([undefined, 2, true])("requires declared XYZ curve dimensions: %s", (value) => {
+    expect(() => validateDynamicBundle({ ...source, protocol: { ...source.protocol, curveDimensions: value } }))
+      .toThrow(/protocol\.curveDimensions/);
+  });
+
   it.each([
     ["smoothTurns", 0],
+    ["curveDimensions", 2],
     ["turnScaleM", 30],
     ["curveSampleSpacingM", 10],
   ])("requires matching per-run curve configuration: %s", (field, value) => {
-    const bundle = structuredClone(source);
+    const bundle = copyDeclarations();
     bundle.scenarios[0].runs[0].parameters[field] = value;
     expect(() => validateDynamicBundle(bundle)).toThrow(/curve.*protocol/);
   });

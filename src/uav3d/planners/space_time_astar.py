@@ -327,6 +327,10 @@ class SpaceTimeAStar3D:
             point, goal, self.config.cruise_speed, self.config.max_climb_rate
         )
 
+    def _can_wait(self, scenario: DynamicScenario, point: Point3) -> bool:
+        """Policy hook; the research planner's original wait graph is unchanged."""
+        return True
+
     def _earliest_direct_path(
         self,
         scenario: DynamicScenario,
@@ -335,7 +339,12 @@ class SpaceTimeAStar3D:
     ) -> TimedPath | None:
         scene = scenario.static_scene
         travel_time = self._travel_time(scene.start, scene.goal)
-        for wait_step in range(self.config.horizon_steps + 1):
+        departures = (
+            range(self.config.horizon_steps + 1)
+            if self._can_wait(scenario, scene.start)
+            else range(1)
+        )
+        for wait_step in departures:
             departure = self._time(start_time, wait_step)
             arrival = departure + travel_time
             if arrival > horizon_time + 1e-9:
@@ -381,7 +390,12 @@ class SpaceTimeAStar3D:
                 candidates.append(((anchor, 0), (TimedWaypoint(start_time, start, "start"),)))
                 continue
             travel_time = self._travel_time(start, point)
-            for wait_step in range(self.config.horizon_steps + 1):
+            departures = (
+                range(self.config.horizon_steps + 1)
+                if self._can_wait(scenario, start)
+                else range(1)
+            )
+            for wait_step in departures:
                 departure = self._time(start_time, wait_step)
                 arrival = departure + travel_time
                 if arrival > horizon_time + 1e-9:
@@ -406,12 +420,9 @@ class SpaceTimeAStar3D:
                 aligned_time = self._time(start_time, aligned_step)
                 if aligned_step > self.config.horizon_steps:
                     break
-                if aligned_time > arrival + 1e-12 and not _spacetime_segment_is_free(
-                    scenario,
-                    point,
-                    point,
-                    arrival,
-                    aligned_time,
+                if aligned_time > arrival + 1e-12 and (
+                    not self._can_wait(scenario, point)
+                    or not _spacetime_segment_is_free(scenario, point, point, arrival, aligned_time)
                 ):
                     continue
                 prefix = [TimedWaypoint(start_time, start, "start")]
@@ -466,12 +477,16 @@ class SpaceTimeAStar3D:
         successors: list[SpaceTimeState] = []
 
         wait_step = step + 1
-        if wait_step <= self.config.horizon_steps and _spacetime_segment_is_free(
-            scenario,
-            point,
-            point,
-            self._time(start_time, step),
-            self._time(start_time, wait_step),
+        if (
+            self._can_wait(scenario, point)
+            and wait_step <= self.config.horizon_steps
+            and _spacetime_segment_is_free(
+                scenario,
+                point,
+                point,
+                self._time(start_time, step),
+                self._time(start_time, wait_step),
+            )
         ):
             successors.append((index, wait_step))
 

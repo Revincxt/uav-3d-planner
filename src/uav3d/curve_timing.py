@@ -1,4 +1,4 @@
-"""Lift local horizontal curves onto the unchanged motion/hold clock."""
+"""Fit local XYZ/XY splines on the original motion clock, retaining exact holds."""
 
 from __future__ import annotations
 
@@ -7,19 +7,21 @@ from bisect import bisect_left, bisect_right
 from uav3d.dynamic import DynamicScenario
 from uav3d.dynamic_collision import spacetime_segment_is_free
 from uav3d.geometry import Point3, almost_equal
-from uav3d.horizontal_curves import smooth_horizontal_curves
+from uav3d.horizontal_curves import smooth_curves
 from uav3d.predictive import TimedAction, TimedPath, TimedWaypoint
 
 
-def smooth_timed_horizontal_curves(
+def smooth_timed_curves(
     scenario: DynamicScenario,
     path: TimedPath,
     turn_scale_m: float,
     sample_spacing_m: float,
     *,
     round_reversals: bool = False,
+    preserve_altitude: bool = False,
+    max_altitude_deviation_m: float = 12.0,
 ) -> tuple[TimedPath, int, float | None]:
-    """Interpolate service positions and preserve every original Z/time and hold boundary."""
+    """Interpolate exact task positions and preserve every original hold boundary."""
     clocks: list[float] = []
     holds = 0.0
     for index, waypoint in enumerate(path.waypoints):
@@ -64,7 +66,7 @@ def smooth_timed_horizontal_curves(
             scenario, a, b, time_at(u, departure=True), time_at(v, departure=False)
         )
 
-    curves = smooth_horizontal_curves(
+    curves = smooth_curves(
         points,
         parameters,
         check,
@@ -72,6 +74,8 @@ def smooth_timed_horizontal_curves(
         turn_scale_m=turn_scale_m,
         sample_spacing_m=sample_spacing_m,
         round_reversals=round_reversals,
+        preserve_altitude=preserve_altitude,
+        max_altitude_deviation_m=max_altitude_deviation_m,
     )
     output: list[TimedWaypoint] = []
     for point, clock in zip(curves.points, curves.parameters, strict=True):
@@ -88,5 +92,24 @@ def smooth_timed_horizontal_curves(
             output.append(TimedWaypoint(time_s, point, action))
     candidate = TimedPath(tuple(output))
     if not candidate.is_safe(scenario):
-        raise ValueError("horizontal curve failed its complete time-domain collision audit")
+        raise ValueError("spline curve failed its complete time-domain collision audit")
     return candidate, curves.rounded_corners, curves.turn_scale_m
+
+
+def smooth_timed_horizontal_curves(
+    scenario: DynamicScenario,
+    path: TimedPath,
+    turn_scale_m: float,
+    sample_spacing_m: float,
+    *,
+    round_reversals: bool = False,
+) -> tuple[TimedPath, int, float | None]:
+    """Explicit altitude-locked mode for callers requiring unchanged z(t)."""
+    return smooth_timed_curves(
+        scenario,
+        path,
+        turn_scale_m,
+        sample_spacing_m,
+        round_reversals=round_reversals,
+        preserve_altitude=True,
+    )

@@ -9,7 +9,7 @@ import { addZoneVisual, fitMapCamera, ringPoints, type ZoneVisual } from "./view
 import { cityMissionBounds } from "./city-scene";
 import { enuToThree } from "./coordinates";
 import { RetainedCity } from "./retained-city";
-import { RouteOverview, pathPrefix, routeColor, timedPosition, type OverviewRoute } from "./route-overview";
+import { RouteOverview, routeColor, timedPosition, type OverviewRoute } from "./route-overview";
 import { DroneFollow } from "./drone-follow";
 import { positionEncounterCamera } from "./encounter-view";
 import { createTrafficAircraft, sizeTrafficAircraft, updateTrafficAircraft } from "./traffic-aircraft";
@@ -17,23 +17,21 @@ import { revealReplayWindow } from "./replay-line";
 import { sameSharedWorld } from "./shared-world";
 import { finalFlight, type FinalFlight } from "./final-flight";
 import { disposeRenderObject } from "./render-resources";
-import { createEndpointMarker, sceneLineStyle, vehicleGeometry } from "./scene-style";
+import { sceneLineStyle } from "./scene-style";
 import { addMissionTaskMarkers, avoidDroneMarkerOverlap, orientMissionTaskGates, sizeMissionTaskMarkers } from "./mission-tasks";
 import { updateMapSurround } from "./map-surround";
-import { configureMapNavigation, FrameRenderer, mapFramingPadding, MIN_MAP_ELEVATION_RAD, positionTopOverview, positionWesternOverview } from "./map-navigation";
+import { configureMapNavigation, FrameRenderer, mapFramingPadding, positionTopOverview, positionWesternOverview } from "./map-navigation";
 
 import type {
   MovingSphereDefinition,
   PredictiveMinimumSeparationWitness,
-  PredictivePathMode,
   PredictiveRun,
   PredictiveScenario,
   StaticNoFlyZone,
-  TimedWaypoint,
   Vec3,
 } from "./predictive-schema";
 
-export type ViewPreset = "isometric" | "xy" | "xz" | "yz" | "fit";
+export type ViewPreset = "isometric" | "xy";
 export type ViewerLayer = "buildings" | "zones" | "dynamic";
 
 const WITNESS_TIME_TOLERANCE_S = 1e-7;
@@ -46,16 +44,9 @@ export interface MinimumSeparationEvidence {
 
 export function minimumSeparationEvidence(
   scenario: Pick<PredictiveScenario, "constraints">,
-  run: Pick<PredictiveRun, "plannerMetrics" | "geometryMetrics" | "executionMetrics">,
-  mode: PredictivePathMode,
+  run: Pick<PredictiveRun, "executionMetrics">,
 ): MinimumSeparationEvidence | null {
-  const metrics =
-    mode === "raw"
-      ? run.plannerMetrics
-      : mode === "geometry"
-        ? run.geometryMetrics
-        : run.executionMetrics;
-  const witness = metrics?.minimumSeparationWitness ?? null;
+  const witness = run.executionMetrics?.minimumSeparationWitness ?? null;
   if (witness === null) return null;
   return {
     witness,
@@ -76,43 +67,14 @@ export function isMinimumSeparationEvidenceTime(
 }
 
 
-interface ThemePalette {
-  background: number;
-  foreground: number;
-  movingSphere: number;
-  witnessVehicle: number;
-  witnessSurface: number;
-  witnessConnector: number;
-  safetyEnvelope: number;
-  plannedPath: number;
-  executedPath: number;
-  goal: number;
-}
-
-const LIGHT_PALETTE: ThemePalette = {
+const SCENE_PALETTE = {
   background: 0xffffff,
-  foreground: 0x313b35,
   movingSphere: 0x98535b,
   witnessVehicle: 0x12722e,
   witnessSurface: 0xcc4545,
   witnessConnector: 0xb67d3f,
   safetyEnvelope: 0xd79445,
-  plannedPath: 0x28a745,
-  executedPath: 0x12722e,
-  goal: 0x3f4540,
 };
-
-function disposeObject(object: THREE.Object3D): void {
-  disposeRenderObject(object);
-}
-
-function movingPosition(definition: MovingSphereDefinition, timeS: number): Vec3 {
-  return timedPosition(definition.keyframes, timeS);
-}
-
-function flattenPoints(points: Vec3[]): number[] {
-  return points.flatMap((point) => enuToThree(point));
-}
 
 
 export class PredictiveViewer {
@@ -126,7 +88,6 @@ export class PredictiveViewer {
   private readonly buildingsGroup = new THREE.Group();
   private readonly zonesGroup = new THREE.Group();
   private readonly dynamicGroup = new THREE.Group();
-  private readonly primaryPathGroup = new THREE.Group();
   private readonly evidenceGroup = new THREE.Group();
   private readonly resizeObserver: ResizeObserver;
   private readonly layerVisibility: Record<ViewerLayer, boolean> = {
@@ -139,17 +100,14 @@ export class PredictiveViewer {
   private flight: FinalFlight | null = null;
   private currentTimeS = 0;
   private currentView: ViewPreset = "isometric";
-  private mapScope: "city" | "mission" = "city";
   private cityBounds = new THREE.Box3();
+  private readonly routeBounds = new WeakMap<PredictiveScenario, THREE.Box3>();
   private temporaryZones = new Map<string, ZoneVisual>();
   private movingSpheres = new Map<string, THREE.Object3D>();
   private trafficForecasts = new Map<string, Line2>();
   private forecastWindows = new Map<string, ReturnType<typeof revealReplayWindow>>();
   private observationBounds?: THREE.Box3;
   private lineMaterials = new Set<LineMaterial>();
-  private vehicle: THREE.Mesh | null = null;
-  private primaryPath: Line2 | null = null;
-  private executedPath: Line2 | null = null;
   private cityLayer?: RetainedCity;
   private overview?: RouteOverview;
   private follow?: DroneFollow;
@@ -169,7 +127,6 @@ export class PredictiveViewer {
       this.buildingsGroup,
       this.zonesGroup,
       this.dynamicGroup,
-      this.primaryPathGroup,
       this.evidenceGroup,
     );
     this.scene.add(this.content);
@@ -191,7 +148,7 @@ export class PredictiveViewer {
     this.currentTimeS = 0;
     if (shared) {
       const tasks = this.content.getObjectByName("mission-task-points");
-      if (tasks) { tasks.removeFromParent(); disposeObject(tasks); }
+      if (tasks) { tasks.removeFromParent(); disposeRenderObject(tasks); }
       addMissionTaskMarkers(this.content, scenario.mission);
     } else this.buildScene();
     if (first) this.setView("isometric");
@@ -203,10 +160,6 @@ export class PredictiveViewer {
     this.scene.add(this.overview.group);
     this.overview.setRoutes(routes, activeId, this.container.clientWidth, this.container.clientHeight);
     orientMissionTaskGates(this.content, routes.find(route => route.id === activeId)?.points ?? [], routeColor(routes.findIndex(route => route.id === activeId)));
-    if (this.primaryPath) this.primaryPath.visible = false;
-    if (this.executedPath) this.executedPath.visible = false;
-    if (this.vehicle) this.vehicle.visible = false;
-    this.content.traverse(object => { if (object.name.startsWith("endpoint-")) object.visible = false; });
     this.render();
   }
 
@@ -237,7 +190,6 @@ export class PredictiveViewer {
     const flight = finalFlight(run);
     this.run = run;
     this.flight = flight;
-    this.replacePathLines();
     this.replaceMinimumSeparationEvidence();
     this.setTime(0);
   }
@@ -252,16 +204,11 @@ export class PredictiveViewer {
     if (!this.scenario || !this.run) return;
     this.playbackTimeS = timeS;
     this.overview?.setTime(timeS);
-    let animatedShadows = Boolean(
-      this.vehicle?.castShadow && this.vehicle.visible && this.primaryPathGroup.visible,
-    );
+    let animatedShadows = false;
     const path = this.activePath;
     const duration = path.at(-1)!.timeS;
     this.currentTimeS = Math.max(0, Math.min(timeS, duration));
     const hazardTime = this.scenario.mission?.sharedWorld ? Math.max(0, timeS) : this.currentTimeS;
-    const vehiclePosition = timedPosition(path, this.currentTimeS);
-    this.vehicle?.position.fromArray(enuToThree(vehiclePosition));
-    this.orientVehicle(path, this.currentTimeS);
 
     for (const zone of this.scenario.temporaryNoFlyZones) {
       const visual = this.temporaryZones.get(zone.id);
@@ -287,7 +234,7 @@ export class PredictiveViewer {
       }
       const mesh = this.movingSpheres.get(definition.id);
       if (mesh) {
-        mesh.position.fromArray(enuToThree(movingPosition(definition, hazardTime)));
+        mesh.position.fromArray(enuToThree(timedPosition(definition.keyframes, hazardTime)));
         if (this.scenario.city) updateTrafficAircraft(mesh, definition, hazardTime);
         if (this.dynamicGroup.visible) {
           mesh.traverseVisible((child) => { animatedShadows ||= child.castShadow; });
@@ -295,18 +242,8 @@ export class PredictiveViewer {
       }
     }
 
-    if (!this.overview) this.executedPath = this.replaceLine(
-      this.primaryPathGroup,
-      this.executedPath,
-      pathPrefix(path, this.currentTimeS),
-      this.palette.executedPath,
-      3.7,
-      false,
-      1,
-      1,
-    );
     this.evidenceGroup.visible = isMinimumSeparationEvidenceTime(
-      minimumSeparationEvidence(this.scenario, this.run, "execution"),
+      minimumSeparationEvidence(this.scenario, this.run),
       this.currentTimeS,
     );
     if (animatedShadows) this.renderer.shadowMap.needsUpdate = true;
@@ -317,7 +254,7 @@ export class PredictiveViewer {
     if (!this.scenario) return;
     this.observationBounds = undefined;
     this.follow?.stop();
-    if (preset !== "fit") this.currentView = preset;
+    this.currentView = preset;
     const move = (): void => {
     const bounds = this.sceneBounds();
     const center = bounds.getCenter(new THREE.Vector3());
@@ -325,12 +262,6 @@ export class PredictiveViewer {
     const span = Math.max(extent.x, extent.y, extent.z);
     if (this.currentView === "xy") {
       positionTopOverview(this.camera, center, span, 2.2);
-    } else if (this.currentView === "xz") {
-      this.camera.position.set(center.x, center.y + Math.tan(MIN_MAP_ELEVATION_RAD) * span * 2.2, center.z + span * 2.2);
-      this.camera.up.set(0, 1, 0);
-    } else if (this.currentView === "yz") {
-      this.camera.position.set(center.x - span * 2.2, center.y + Math.tan(MIN_MAP_ELEVATION_RAD) * span * 2.2, center.z);
-      this.camera.up.set(0, 1, 0);
     } else {
       positionWesternOverview(this.camera, center, span);
     }
@@ -340,12 +271,6 @@ export class PredictiveViewer {
     this.resize();
     };
     if (this.motion) this.motion.transition(move); else move();
-  }
-
-  setMapScope(scope: "city" | "mission"): void {
-    if (scope === this.mapScope && !this.follow?.routeId) return;
-    this.mapScope = scope;
-    this.setView("fit");
   }
 
   observeEncounter(position: Vec3): void {
@@ -368,18 +293,14 @@ export class PredictiveViewer {
     this.renderer.domElement.remove();
   }
 
-  private get palette(): ThemePalette {
-    return LIGHT_PALETTE;
-  }
-
-  private get activePath(): TimedWaypoint[] {
+  private get activePath() {
     return this.flight?.path ?? [];
   }
 
   private buildScene(): void {
     if (!this.scenario) return;
     this.clearContent();
-    const palette = this.palette;
+    const palette = SCENE_PALETTE;
     this.scene.background = new THREE.Color(palette.background);
     this.cityLayer ??= new RetainedCity();
     this.cityBounds = this.cityLayer.mount(this.content, this.scenario, texture => {
@@ -419,25 +340,7 @@ export class PredictiveViewer {
     }
     for (const definition of this.scenario.movingSpheres) this.addMovingSphere(definition);
 
-    this.addEndpoint(this.scenario.start, "start");
-    this.addEndpoint(this.scenario.goal, "goal");
     addMissionTaskMarkers(this.content, this.scenario.mission);
-    this.vehicle = new THREE.Mesh(
-      vehicleGeometry(Boolean(this.scenario.city)),
-      new THREE.MeshStandardMaterial({
-        color: palette.foreground,
-        emissive: palette.background,
-        emissiveIntensity: 0.12,
-        depthTest: true,
-        depthWrite: true,
-      }),
-    );
-    this.vehicle.position.fromArray(enuToThree(this.scenario.start));
-    this.vehicle.name = "vehicle";
-    this.vehicle.visible = !this.overview;
-    this.vehicle.receiveShadow = true;
-    this.vehicle.castShadow = true;
-    this.primaryPathGroup.add(this.vehicle);
     this.updateLayerVisibility();
     this.renderer.shadowMap.needsUpdate = true;
   }
@@ -448,19 +351,15 @@ export class PredictiveViewer {
     this.temporaryZones.clear();
     this.movingSpheres.clear();
     this.lineMaterials.clear();
-    this.vehicle = null;
-    this.primaryPath = null;
-    this.executedPath = null;
     for (const group of [
       this.buildingsGroup,
       this.zonesGroup,
       this.dynamicGroup,
-      this.primaryPathGroup,
       this.evidenceGroup,
     ]) {
       for (const child of [...group.children]) {
         group.remove(child);
-        disposeObject(child);
+        disposeRenderObject(child);
       }
     }
     for (const child of [...this.content.children]) {
@@ -469,11 +368,10 @@ export class PredictiveViewer {
         this.buildingsGroup,
         this.zonesGroup,
         this.dynamicGroup,
-        this.primaryPathGroup,
         this.evidenceGroup,
       ].includes(child as THREE.Group)) {
         this.content.remove(child);
-        disposeObject(child);
+        disposeRenderObject(child);
       }
     }
   }
@@ -488,7 +386,7 @@ export class PredictiveViewer {
       updateTrafficAircraft(aircraft, definition, 0);
       this.movingSpheres.set(definition.id, aircraft);
       this.dynamicGroup.add(aircraft);
-      const forecast = this.replaceLine(this.dynamicGroup, null,
+      const forecast = this.addLine(this.dynamicGroup,
         definition.keyframes.map(point => point.position),
         0xb56d32, 2.2, true, 0.55)!;
       forecast.name = `traffic-forecast:${definition.id}`;
@@ -498,7 +396,7 @@ export class PredictiveViewer {
       (this.trafficForecasts ??= new Map()).set(definition.id, forecast);
       return;
     }
-    const palette = this.palette;
+    const palette = SCENE_PALETTE;
     const visual = new THREE.Group();
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(definition.radiusM, 24, 16),
@@ -525,9 +423,8 @@ export class PredictiveViewer {
     visual.position.fromArray(enuToThree(definition.keyframes[0]!.position));
     this.movingSpheres.set(definition.id, visual);
     this.dynamicGroup.add(visual);
-    this.replaceLine(
+    this.addLine(
       this.dynamicGroup,
-      null,
       definition.keyframes.map((keyframe) => keyframe.position),
       palette.movingSphere,
       1.15,
@@ -536,17 +433,6 @@ export class PredictiveViewer {
     );
   }
 
-  private addEndpoint(point: Vec3, role: "start" | "goal"): void {
-    if (this.overview) return;
-    const palette = this.palette;
-    const marker = createEndpointMarker(role, Boolean(this.scenario?.city),
-      role === "start" ? palette.executedPath : palette.goal,
-      role === "start" ? palette.executedPath : palette.foreground, role === "start" ? 0.08 : 0.04);
-    marker.position.fromArray(enuToThree(point));
-    marker.name = `endpoint-${role}`;
-    marker.receiveShadow = true;
-    this.primaryPathGroup.add(marker);
-  }
 
   private clearMinimumSeparationEvidence(): void {
     this.evidenceGroup.traverse((child) => {
@@ -556,18 +442,18 @@ export class PredictiveViewer {
     });
     for (const child of [...this.evidenceGroup.children]) {
       this.evidenceGroup.remove(child);
-      disposeObject(child);
+      disposeRenderObject(child);
     }
   }
 
   private replaceMinimumSeparationEvidence(): void {
     this.clearMinimumSeparationEvidence();
     if (!this.scenario || !this.run) return;
-    const evidence = minimumSeparationEvidence(this.scenario, this.run, "execution");
+    const evidence = minimumSeparationEvidence(this.scenario, this.run);
     if (evidence === null) return;
 
     const { witness } = evidence;
-    const palette = this.palette;
+    const palette = SCENE_PALETTE;
     const markerRadius = Math.max(
       0.22,
       Math.min(0.72, evidence.safetyEnvelopeRadiusM * 0.28),
@@ -603,9 +489,8 @@ export class PredictiveViewer {
     envelope.name = "declared-safety-margin-envelope";
     envelope.position.copy(vehiclePoint.position);
 
-    const connector = this.replaceLine(
+    const connector = this.addLine(
       this.evidenceGroup,
-      null,
       [witness.vehiclePosition, witness.obstaclePosition],
       palette.witnessConnector,
       2.8,
@@ -622,50 +507,18 @@ export class PredictiveViewer {
     this.evidenceGroup.visible = false;
   }
 
-  private replacePathLines(): void {
-    if (!this.run) return;
-    const path = this.activePath;
-    if (!this.overview) this.primaryPath = this.replaceLine(
-      this.primaryPathGroup,
-      this.primaryPath,
-      path.map((waypoint) => waypoint.position),
-      this.palette.plannedPath,
-      3.1,
-      false,
-      0.92,
-    );
-    this.updateLayerVisibility();
-  }
 
-  private replaceLine(
+  private addLine(
     group: THREE.Group,
-    previous: Line2 | null,
     points: Vec3[],
     color: number,
     weight: number,
     dashed: boolean,
     opacity: number,
-    coincidentOrder = 0,
   ): Line2 | null {
-    if (previous) {
-      if (points.length < 2) {
-        previous.visible = false;
-        return previous;
-      }
-      const geometry = previous.geometry as LineGeometry;
-      const material = previous.material as LineMaterial;
-      geometry.setPositions(flattenPoints(points));
-      material.color.setHex(color);
-      Object.assign(material, sceneLineStyle(Boolean(this.scenario?.city), weight, dashed, opacity));
-      material.needsUpdate = true;
-      previous.visible = true;
-      previous.renderOrder = coincidentOrder;
-      if (dashed) previous.computeLineDistances();
-      return previous;
-    }
     if (points.length < 2) return null;
     const geometry = new LineGeometry();
-    geometry.setPositions(flattenPoints(points));
+    geometry.setPositions(points.flatMap(enuToThree));
     const material = new LineMaterial({
       ...sceneLineStyle(Boolean(this.scenario?.city), weight, dashed, opacity),
       color,
@@ -677,23 +530,10 @@ export class PredictiveViewer {
     this.lineMaterials.add(material);
     const line = new Line2(geometry, material);
     if (dashed) line.computeLineDistances();
-    line.renderOrder = coincidentOrder;
     group.add(line);
     return line;
   }
 
-  private orientVehicle(path: TimedWaypoint[], timeS: number): void {
-    if (!this.vehicle || path.length < 2) return;
-    const duration = path.at(-1)!.timeS;
-    const before = timedPosition(path, Math.max(0, timeS - 0.03));
-    const after = timedPosition(path, Math.min(duration, timeS + 0.03));
-    const direction = new THREE.Vector3(...enuToThree(after)).sub(
-      new THREE.Vector3(...enuToThree(before)),
-    );
-    if (direction.lengthSq() <= 1e-10) return;
-    direction.normalize();
-    this.vehicle.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-  }
 
   private updateLayerVisibility(): void {
     if (this.buildingsGroup.visible !== this.layerVisibility.buildings
@@ -714,7 +554,7 @@ export class PredictiveViewer {
     this.overview?.resize(width, height);
     if (!this.follow?.resize(width, height))
       fitMapCamera(this.camera, this.sceneBounds(), width, height,
-        this.observationBounds ? 1.12 : mapFramingPadding(this.mapScope, this.currentView === "isometric"));
+        this.observationBounds ? 1.12 : mapFramingPadding(this.currentView === "isometric"));
     this.render();
   }
 
@@ -722,10 +562,17 @@ export class PredictiveViewer {
     if (this.observationBounds) return this.observationBounds.clone();
     if (!this.scenario) return new THREE.Box3(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 50, 50));
     if (this.scenario.city) {
-      const bounds = cityMissionBounds(this.scenario, this.scenario.runs.flatMap((run) =>
-        (run.executionTimedPath ?? []).map((waypoint) => waypoint.position)));
-      if (this.mapScope === "city") bounds.union(this.cityBounds);
-      if (this.mapScope === "city" && this.overview) bounds.union(this.overview.bounds);
+      let retained = this.routeBounds.get(this.scenario);
+      if (!retained) {
+        const scenario = this.scenario;
+        function* points() {
+          for (const run of scenario.runs) for (const waypoint of run.executionTimedPath ?? []) yield waypoint.position;
+        }
+        retained = cityMissionBounds(scenario, points()); this.routeBounds.set(scenario, retained);
+      }
+      const bounds = retained.clone();
+      bounds.union(this.cityBounds);
+      if (this.overview) bounds.union(this.overview.bounds);
       return bounds;
     }
     const { min, max } = this.scenario.bounds;
@@ -751,7 +598,7 @@ export class PredictiveViewer {
     for (const run of this.scenario.runs) {
       for (const waypoint of run.executionTimedPath ?? []) bounds.expandByPoint(new THREE.Vector3(...enuToThree(waypoint.position)));
     }
-    if (this.mapScope === "city") bounds.union(this.cityBounds);
+    bounds.union(this.cityBounds);
     return bounds;
   }
 

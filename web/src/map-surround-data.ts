@@ -13,6 +13,8 @@ export const MAP_SURROUND = {
   maxResidentTiles: 72,
   updateDelayMs: 100,
   maxConcurrentRequests: 4,
+  maxRequestAttempts: 2,
+  retryDelayMs: 1500,
   tileSize: 512,
   maxAnisotropy: 16,
   source: {

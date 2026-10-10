@@ -102,6 +102,45 @@ describe("flight semantics", () => {
     expect(localPlanClock(reactive, 6, 7)).toBe(6.5);
     expect(localPlanClock(reactive, 6, 6)).toBe(6);
   });
+  it("retains the indexed motion clock across arbitrary seeks and envelope/path replacements", () => {
+    const indexed = { ...route, cruiseSpeedMps: 10, maxClimbRateMps: 2 };
+    const reference = (from: number, to: number) => {
+      if (to <= from) return from;
+      const sample = (clock: number) => {
+        const path = indexed.timedPath!;
+        if (clock <= path[0]!.timeS) return path[0]!.position;
+        for (let i = 1; i < path.length; i++) if (clock < path[i]!.timeS) {
+          const a = path[i - 1]!, b = path[i]!, f = (clock - a.timeS) / (b.timeS - a.timeS);
+          return a.position.map((p, axis) => p + (b.position[axis]! - p) * f);
+        }
+        return path.at(-1)!.position;
+      };
+      const clocks = [from, ...indexed.timedPath!.filter(p => p.timeS > from && p.timeS <= to).map(p => p.timeS), to];
+      let result = from;
+      for (let i = 1; i < clocks.length; i++) {
+        const a = sample(clocks[i - 1]!), b = sample(clocks[i]!);
+        result += Math.max(Math.hypot(...b.map((v, axis) => v - a[axis]!)) / indexed.cruiseSpeedMps,
+          Math.abs(b[2]! - a[2]!) / indexed.maxClimbRateMps);
+      }
+      return result;
+    };
+    for (const from of [-2, 0, 2.3, 4, 6.5, 9, 10, 20]) for (const to of [30, 10, 8.9, 7, 4, 1, -1])
+      expect(localPlanClock(indexed, from, to)).toBeCloseTo(reference(from, to), 10);
+    indexed.cruiseSpeedMps = 20; indexed.maxClimbRateMps = 3;
+    expect(localPlanClock(indexed, 3, 9)).toBeCloseTo(reference(3, 9), 10);
+    indexed.timedPath = indexed.timedPath!.slice(0, 3);
+    expect(localPlanClock(indexed, 0, 9)).toBeCloseTo(reference(0, 9), 10);
+  });
+  it("does not rescan earlier coordinates on every indexed playback sample", () => {
+    let reads = 0;
+    const path = Array.from({ length: 1000 }, (_, i) => ({ timeS: i,
+      get position(): [number, number, number] { reads++; return [i, 0, 20]; } }));
+    const indexed = { timedPath: path, cruiseSpeedMps: 10 };
+    expect(localPlanClock(indexed, 0, 900)).toBeCloseTo(90, 10);
+    reads = 0;
+    for (let i = 0; i < 120; i++) localPlanClock(indexed, 400, 900 + i / 120);
+    expect(reads).toBe(0);
+  });
   it("initializes mission status buttons even if the workspace mounts them later", () => {
     const buttons: { dataset: Record<string, string>; title: string }[] = [];
     const query = vi.fn(() => buttons);

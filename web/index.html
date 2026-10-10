@@ -22,10 +22,7 @@
       <div class="workspace-body">
         <select id="scene-select" aria-label="Route details" hidden></select>
 
-        <section class="workspace-content" aria-labelledby="scene-title">
-          <div class="content-heading">
-            <div><h1 id="scene-title">Manhattan</h1><p id="scene-caption" hidden></p></div>
-          </div>
+        <section class="workspace-content" aria-label="Static replay workspace">
 
           <div class="demo-grid">
             <section class="stage-card" aria-label="Scene and camera controls">
@@ -53,11 +50,10 @@
                 <label class="timeline-control" for="timeline"><span><output id="timeline-value" for="timeline">0.0 s</output></span><input id="timeline" type="range" min="0" max="0" step="any" value="0" title="Static route playback at 15 m/s · fly-through checkpoints" /></label>
                 <div class="speed-control" aria-label="Playback speed"><button type="button" data-speed="0.5" aria-pressed="false">0.5×</button><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-speed="2" aria-pressed="false">2×</button></div>
               </div>
-              <div hidden><strong id="start-coordinate"></strong><strong id="goal-coordinate"></strong></div>
             </section>
 
             <aside class="inspector-card" aria-labelledby="results-heading">
-              <div class="inspector-heading"><h2 id="results-heading">Inspector</h2><p id="comparison-caption" hidden></p></div>
+              <div class="inspector-heading"><h2 id="results-heading">Inspector</h2></div>
               <div id="planner-results" class="planner-results"></div>
               <div class="flight-envelope"><span class="eyebrow">MODEL ENVELOPE</span><div><span>Model ceiling</span><strong id="altitude-limit">—</strong></div><div><span>Safety margin</span><strong id="safety-margin">—</strong></div></div>
             </aside>

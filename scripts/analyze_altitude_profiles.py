@@ -1,4 +1,4 @@
-"""Independently inspect altitude preservation across the three Manhattan demo studies.
+"""Independently inspect altitude locks and bounded XYZ smoothing across all studies.
 
 Static normalized 3D arc-length alignment is an observation, not a preservation certificate:
 changing XY changes this parameterization. Static certificates instead use the exported original
@@ -153,7 +153,9 @@ def report(public_dir: Path) -> dict[str, object]:
                         ),
                     )
                     record.update(_invariants(record["raw"], record["geometry"]))
-                    explicit_progress = run.get("smoothing", {}).get("altitudeProfileProgress")
+                    smoothing = run.get("smoothing", {})
+                    record["altitudePolicy"] = smoothing.get("altitudePolicy")
+                    explicit_progress = smoothing.get("altitudeProfileProgress")
                     if explicit_progress is not None:
                         if len(explicit_progress) != len(output_points):
                             raise ValueError("static altitude progress must match output points")
@@ -170,6 +172,12 @@ def report(public_dir: Path) -> dict[str, object]:
                         record["explicitProgressAltitudePreserved"] = (
                             explicit_difference <= _EPSILON
                         )
+                        if smoothing.get("altitudePolicy") == "bounded-spatial-spline-v1":
+                            record["altitudeDeviationLimitM"] = smoothing["altitudeDeviationLimitM"]
+                            record["altitudeDeviationWithinBudget"] = (
+                                explicit_difference
+                                <= smoothing["altitudeDeviationLimitM"] + _EPSILON
+                            )
                 elif study == "predictive":
                     raw_timed, geometry_timed = run["rawTimedPath"], run["geometryTimedPath"]
                     execution_timed = run["executionTimedPath"]
@@ -210,6 +218,13 @@ def report(public_dir: Path) -> dict[str, object]:
                         else None,
                     )
                     record.update(_invariants(record["raw"], record["geometry"]))
+                    smoothing = run.get("smoothing", {})
+                    record["altitudePolicy"] = smoothing.get("altitudePolicy")
+                    if smoothing.get("altitudePolicy") == "bounded-spatial-spline-v1":
+                        record["altitudeDeviationLimitM"] = smoothing["altitudeDeviationLimitM"]
+                        record["altitudeDeviationWithinBudget"] = (
+                            max_difference <= smoothing["altitudeDeviationLimitM"] + _EPSILON
+                        )
                 else:
                     record["execution"] = altitude(run["frames"][-1]["executedPath"])
                     record["scope"] = "execution-only-no-serialized-raw-altitude-reference"
@@ -263,6 +278,13 @@ def report(public_dir: Path) -> dict[str, object]:
         if study == "static":
             summary["explicitProgressAltitudePreservedRuns"] = sum(
                 row.get("explicitProgressAltitudePreserved", False) for row in rows
+            )
+        if study != "reactive":
+            summary["spatialSmoothingRuns"] = sum(
+                row.get("altitudePolicy") == "bounded-spatial-spline-v1" for row in rows
+            )
+            summary["altitudeDeviationWithinBudgetRuns"] = sum(
+                row.get("altitudeDeviationWithinBudget", False) for row in rows
             )
         summaries.append(summary)
     return {

@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from uav3d.dynamic import DynamicScenario, MovingSphere
+from uav3d.dynamic import DynamicScenario, MovingSphere, TemporaryCylinder
 from uav3d.kinematics import DiscreteExecutionEnvelope
 from uav3d.mission_refinement import (
     ContinuousAnchorSpaceTimeAStar,
@@ -60,6 +60,45 @@ def test_alignment_is_retained_when_slow_motion_would_cross_traffic():
     assert old[0][1] == new[0][1]
     assert new[0][1][-1].action == "wait"
     assert TimedPath(new[0][1]).is_safe(scenario)
+
+
+def test_flythrough_gate_excludes_delayed_departure_but_keeps_safe_detours():
+    scenario, config, _ = fixture()
+    task = {
+        "id": "gate",
+        "position": list(scenario.static_scene.start),
+        "visitMode": "fly-through",
+        "serviceDurationS": 0,
+    }
+    scene = replace(scenario.static_scene, metadata={"missionTaskPoints": [task]})
+    scenario = replace(
+        scenario,
+        static_scene=scene,
+        temporary_cylinders=(TemporaryCylinder("crossing", (3, 3), 0.6, 0, 4, 0, 2),),
+    )
+    planner = ContinuousAnchorSpaceTimeAStar(config)
+    delayed = SpaceTimeAStar3D(config)._earliest_direct_path(scenario, 0, 5)
+    assert delayed is not None and delayed.wait_time_s > 0
+    assert planner._earliest_direct_path(scenario, 0, 5) is None
+    grid = VoxelGrid(scene, 1)
+    prefixes = planner._initial_states(scenario, grid, [(1, 2, 2)], 0, 5)
+    assert prefixes and all(prefix[1].action == "move" for _, prefix in prefixes)
+    result = planner.plan(scenario)
+    assert result.success and result.timed_path.is_safe(scenario)
+    assert result.timed_path.waypoints[1].position != scene.start
+
+
+def test_flythrough_policy_excludes_grid_hover_only_at_declared_gates():
+    scenario, config, _ = fixture()
+    task = {"position": [2, 2, 2], "visitMode": "fly-through"}
+    scene = replace(scenario.static_scene, metadata={"missionTaskPoints": [task]})
+    scenario = replace(scenario, static_scene=scene)
+    grid = VoxelGrid(scene, 1)
+    planner = ContinuousAnchorSpaceTimeAStar(config)
+    assert ((2, 2, 2), 1) not in planner._successors(scenario, grid, ((2, 2, 2), 0), 0)
+    assert ((1, 1, 2), 1) in planner._successors(scenario, grid, ((1, 1, 2), 0), 0)
+    service = replace(scene, metadata={"missionTaskPoints": [{**task, "visitMode": "service"}]})
+    assert planner._can_wait(replace(scenario, static_scene=service), (2, 2, 2))
 
 
 def test_refinement_keeps_safe_waits_height_knots_and_qualified_result():
