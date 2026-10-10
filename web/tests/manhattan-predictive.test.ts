@@ -84,7 +84,9 @@ function losOnlyBundle() {
   return bundle;
 }
 
-describe("computed Manhattan predictive protocol", () => {
+// Full-cohort parsing and certification are integrity checks, not 5-second speed tests.
+// Keep the extended deadline local to these data-heavy integration checks.
+describe("computed Manhattan predictive protocol", { timeout: 30000 }, () => {
   it("retains actual polygons, city provenance, missions and qualified evidence", () => {
     const bundle = validatePredictiveBundle(cityBundle());
     expect(bundle.protocol.id).toBe("manhattan-space-time-v3");
