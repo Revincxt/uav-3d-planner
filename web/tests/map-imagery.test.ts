@@ -53,4 +53,11 @@ describe("real-color imagery decoding", () => {
     await expect(decodeImageryTile(new Blob(["fixture"], { type: "image/jpeg" }))).rejects.toThrow("dimensions");
     expect(URL.revokeObjectURL).toHaveBeenCalledOnce();
   });
+
+  it("accepts the independently registered 256 px official cache without enlarging the bitmap", async () => {
+    dimensions = [256, 256];
+    const image = await decodeImageryTile(new Blob(["fixture"], { type: "image/jpeg" }), 256);
+    expect(image.naturalWidth).toBe(256); expect(image.naturalHeight).toBe(256);
+    expect(decode).toHaveBeenCalledOnce();
+  });
 });

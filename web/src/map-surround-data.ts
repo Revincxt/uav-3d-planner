@@ -15,11 +15,15 @@ export const MAP_SURROUND = {
   maxConcurrentRequests: 4,
   maxRequestAttempts: 2,
   retryDelayMs: 1500,
+  requestTimeoutMs: 8000,
+  fallbackTimeoutMs: 15_000,
+  recoveryDelayMs: 30_000,
   tileSize: 512,
   maxAnisotropy: 16,
   source: {
     url: `${imageryService}?f=json`,
     tileTemplate: `${imageryService}/exportImage`,
+    fallbackTileTemplate: "https://apps.geo.fpac.usda.gov/geo-imagery/rest/services/naip/conus_naip/ImageServer/exportImage",
     attributionUrl: "https://www.usgs.gov/the-national-map-data-delivery",
     licenseUrl: "https://www.usgs.gov/tools/download-data-maps-national-map",
     copyright: "USDA · USGS The National Map",
@@ -27,5 +31,12 @@ export const MAP_SURROUND = {
     backgroundOnly: true,
     modifiesPlanningGeometry: false,
     extentPolicy: "Exact Web Mercator tile bounds projected into the physical city's ENU coordinates",
+  },
+  // Independently hosted official cache. The actual native cache stops at L16;
+  // higher metadata levels are not evidence that those imagery tiles exist.
+  preview: {
+    tileTemplate: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}",
+    tileSize: 256,
+    maxZoom: 16,
   },
 };

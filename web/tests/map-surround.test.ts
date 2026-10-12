@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MAP_SURROUND } from "../src/map-surround-data";
 import { lonLatToMapENU, mapENUToLonLat } from "../src/map-basemap";
 import { addMapSurround, createTerrainTileGeometry, TerrainMapLayer, terrainTileBounds,
-  terrainTileTemplate, terrainTileURL, updateMapSurround, visibleTerrainTiles } from "../src/map-surround";
+  terrainPreviewURL, terrainTileURL, updateMapSurround, visibleTerrainTiles } from "../src/map-surround";
 import { addCityContext } from "../src/city-scene";
 import { disposeRenderObject } from "../src/render-resources";
 import { decodeImageryTile } from "../src/map-imagery";
@@ -15,11 +15,6 @@ vi.mock("../src/map-imagery", () => ({ decodeImageryTile: vi.fn(async () => ({} 
 const bounds = { min: [-240.46513, -186.36859, 0], max: [2542.36633, 2496.13957, 480] };
 const tile = { z: 15, x: 9648, y: 12315, key: "15/9648/12315" };
 const template = MAP_SURROUND.source.tileTemplate;
-const source = { capabilities: "Image,Metadata,Catalog", bandCount: 4,
-  maxImageWidth: 4000, maxImageHeight: 4000, rasterFunctionInfos: [{ name: "NaturalColor" }], extent: {
-  xmin: -Math.PI * 6378137, ymin: -Math.PI * 6378137, xmax: Math.PI * 6378137, ymax: Math.PI * 6378137,
-  spatialReference: { wkid: 102100, latestWkid: 3857 },
-} };
 type TileMesh = THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
 
 function camera(span = 4500, x = 1100): THREE.OrthographicCamera {
@@ -37,12 +32,15 @@ function mockTiles() {
   const requests: { url: string; signal: AbortSignal; succeed: () => Promise<void>; fail: (status?: number) => Promise<void> }[] = [];
   const fetcher = vi.fn((url: string, options: RequestInit) => {
     expect(options.credentials).toBe("omit");
-    if (url === MAP_SURROUND.source.url) return Promise.resolve({ ok: true, json: async () => source });
+    if (url === MAP_SURROUND.source.url) return Promise.reject(new Error("Metadata is deliberately unavailable"));
     return new Promise((resolve, reject) => {
+      const signal = options.signal as AbortSignal;
+      if (signal.aborted) { reject(new DOMException("Cancelled", "AbortError")); return; }
+      signal.addEventListener("abort", () => reject(new DOMException("Cancelled", "AbortError")), { once: true });
       requests.push({ url, signal: options.signal as AbortSignal,
         succeed: async () => { resolve({ ok: true, blob: async () => new Blob(["fixture"], { type: "image/jpeg" }) }); await settle(); },
         fail: async (status?: number) => {
-          if (status === undefined) reject(new Error("offline"));
+          if (status === undefined) reject(new TypeError("offline"));
           else resolve({ ok: false, status });
           await settle();
         } });
@@ -66,12 +64,11 @@ describe("continuous satellite-style imagery map", () => {
     expect(project).toHaveBeenCalled(); project.mockClear();
     view.zoom = 2; view.updateProjectionMatrix(); layer.update(view, 1200, 800);
     expect(project).toHaveBeenCalled(); project.mockClear();
-    layer.update(view, 2400, 1600); expect(project).toHaveBeenCalled(); project.mockClear();
+    layer.update(view, 2400, 1600); expect(project).not.toHaveBeenCalled(); project.mockClear();
     layer.update(view.clone(), 2400, 1600); expect(project).toHaveBeenCalled();
     disposeRenderObject(layer);
   });
   it("loads actual high-resolution public imagery without a key, with complete attribution", () => {
-    expect(terrainTileTemplate(source)).toBe(template);
     const url = new URL(terrainTileURL(tile, template)), extent = terrainTileBounds(tile);
     expect(url.origin).toBe("https://imagery.nationalmap.gov");
     expect(url.pathname).toBe("/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage");
@@ -88,15 +85,22 @@ describe("continuous satellite-style imagery map", () => {
     expect(MAP_SURROUND.source.modifiesPlanningGeometry).toBe(false);
   });
 
-  it.each([null, {}, { capabilities: "Image" }, { ...source, capabilities: "Catalog" },
-    { ...source, maxImageWidth: 256 }, { ...source, maxImageHeight: 256 },
-    { ...source, maxImageWidth: Infinity }, { ...source, maxImageHeight: NaN },
-    { ...source, extent: { ...source.extent, spatialReference: { wkid: 4326 } } },
-    { ...source, extent: { ...source.extent, xmin: NaN } },
-    { ...source, extent: { ...source.extent, xmax: source.extent.xmin } },
-    { ...source, rasterFunctionInfos: [] }, { ...source, bandCount: 1 },
-  ])("rejects missing or misregistered natural-color imagery services: %j", payload => {
-    expect(() => terrainTileTemplate(payload)).toThrow();
+  it.each(["https://example.com/exportImage", `${template}?token=untrusted`,
+    "http://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage",
+  ])("never accepts arbitrary or authenticated tile providers: %s", url => {
+    expect(() => terrainTileURL(tile, url)).toThrow(/Unsupported/);
+  });
+
+  it("registers the official cached overview and RGB high-resolution fallback without credentials", () => {
+    expect(terrainPreviewURL(tile)).toBe("https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/15/12315/9648");
+    expect(() => terrainPreviewURL({ ...tile, z: 17 })).toThrow(/Uncached/);
+    const fallback = new URL(terrainTileURL(tile, MAP_SURROUND.source.fallbackTileTemplate));
+    expect(fallback.hostname).toBe("apps.geo.fpac.usda.gov");
+    expect(fallback.searchParams.get("bandIds")).toBe("0,1,2");
+    expect(fallback.searchParams.get("bboxSR")).toBe("3857");
+    expect(fallback.searchParams.get("imageSR")).toBe("3857");
+    expect(fallback.searchParams.has("renderingRule")).toBe(false);
+    expect(fallback.searchParams.has("token")).toBe(false);
   });
 
   it("uses exact adjacent Mercator tile bounds without gaps or overlapping extents", () => {
@@ -122,6 +126,18 @@ describe("continuous satellite-style imagery map", () => {
       expect(uv.getX(index)).toBe(u); expect(uv.getY(index)).toBe(v);
     }
     geometry.dispose();
+  });
+
+  it("crops a north-up parent image correctly into all four child ground footprints", () => {
+    for (const dx of [0, 1]) for (const dy of [0, 1]) {
+      const child = { z: tile.z + 1, x: tile.x * 2 + dx, y: tile.y * 2 + dy, key: `child-${dx}-${dy}` };
+      const geometry = createTerrainTileGeometry(child, tile), own = createTerrainTileGeometry(child);
+      expect(Array.from(geometry.getAttribute("position").array)).toEqual(Array.from(own.getAttribute("position").array));
+      const uv = geometry.getAttribute("uv");
+      expect(uv.getX(0)).toBe(dx / 2); expect(uv.getX(8)).toBe((dx + 1) / 2);
+      expect(uv.getY(0)).toBe(1 - dy / 2); expect(uv.getY(72)).toBe((1 - dy) / 2);
+      geometry.dispose(); own.dispose();
+    }
   });
 
   it("uses flat opaque geometry with upward normals, without edge fade or invented elevation", () => {
@@ -314,50 +330,59 @@ describe("continuous satellite-style imagery map", () => {
     } finally { disposeRenderObject(layer); }
   });
 
-  it("recovers from a temporary metadata request failure without a page reload", async () => {
+  it("starts imagery directly even when the nonessential metadata endpoint is unavailable", async () => {
     const { fetcher, requests } = mockTiles(), layer = new TerrainMapLayer(bounds);
-    fetcher.mockRejectedValueOnce(new TypeError("network interrupted"));
     try {
       layer.update(camera(), 1200, 800);
       await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
-      expect(fetcher).toHaveBeenCalledOnce(); expect(requests).toHaveLength(0);
-      await vi.advanceTimersByTimeAsync(MAP_SURROUND.retryDelayMs);
-      expect(fetcher.mock.calls.filter(([url]) => url === MAP_SURROUND.source.url)).toHaveLength(2);
+      expect(fetcher.mock.calls.some(([url]) => url === MAP_SURROUND.source.url)).toBe(false);
       expect(requests).toHaveLength(4);
     } finally { disposeRenderObject(layer); }
   });
 
-  it("bounds metadata retries and preserves the offline map on a sustained outage", async () => {
-    const { fetcher, requests } = mockTiles(), layer = new TerrainMapLayer(bounds);
-    fetcher.mockRejectedValueOnce(new TypeError("offline")).mockRejectedValueOnce(new TypeError("offline"));
+  it("cannot starve requests by repeatedly changing the camera during follow", async () => {
+    const { requests } = mockTiles(), layer = new TerrainMapLayer(bounds);
     try {
-      layer.update(camera(), 1200, 800);
-      await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + MAP_SURROUND.retryDelayMs + 5000);
-      expect(fetcher).toHaveBeenCalledTimes(2); expect(requests).toHaveLength(0);
-      expect(vi.getTimerCount()).toBe(0);
+      for (let index = 0; index < 20; index++) {
+        layer.update(camera(1000, index * 200), 1200, 800);
+        await vi.advanceTimersByTimeAsync(16);
+      }
+      expect(requests.length).toBeGreaterThan(0);
     } finally { disposeRenderObject(layer); }
   });
 
-  it("cancels a pending source retry when its scene is disposed", async () => {
-    const { fetcher } = mockTiles(), layer = new TerrainMapLayer(bounds);
-    fetcher.mockRejectedValueOnce(new TypeError("offline"));
+  it("cancels queued retries and reconnect listeners when its scene is disposed", async () => {
+    const { requests } = mockTiles(), layer = new TerrainMapLayer(bounds);
+    const events = new EventTarget(); vi.stubGlobal("window", events);
+    const remove = vi.spyOn(events, "removeEventListener");
     layer.update(camera(), 1200, 800);
     await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
+    await requests[0]!.fail(503);
+    const count = requests.length;
     disposeRenderObject(layer);
+    events.dispatchEvent(new Event("online"));
     await vi.advanceTimersByTimeAsync(MAP_SURROUND.retryDelayMs + 1);
-    expect(fetcher).toHaveBeenCalledOnce(); expect(vi.getTimerCount()).toBe(0);
+    expect(requests).toHaveLength(count); expect(vi.getTimerCount()).toBe(0);
+    expect(remove).toHaveBeenCalledWith("online", expect.any(Function));
   });
 
-  it("does not retry unsupported or incorrectly projected service metadata", async () => {
-    const { fetcher, requests } = mockTiles(), layer = new TerrainMapLayer(bounds);
-    fetcher.mockResolvedValueOnce({ ok: true, json: async () => ({ ...source,
-      extent: { ...source.extent, spatialReference: { wkid: 4326 } },
-    }) });
+  it("keeps the cached map visible while the native detail service is slow or unavailable", async () => {
+    const { requests } = mockTiles(), host = new THREE.Group();
+    addMapSurround(host, MAP_SURROUND.cityId, bounds);
     try {
-      layer.update(camera(), 1200, 800);
-      await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + MAP_SURROUND.retryDelayMs + 1);
-      expect(fetcher).toHaveBeenCalledOnce(); expect(requests).toHaveLength(0);
-    } finally { disposeRenderObject(layer); }
+      updateMapSurround(host, camera(), 1200, 800);
+      await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
+      expect(requests.slice(0, 4).every(request => request.url.includes("USGSImageryOnly/MapServer/tile/"))).toBe(true);
+      for (let index = 0; index < requests.length; index++) {
+        if (requests[index]!.url.includes("USGSImageryOnly")) await requests[index]!.succeed();
+      }
+      const preview = host.getObjectByName("city-map-preview")!;
+      expect(preview.children.some(child => child.visible)).toBe(true);
+      await vi.advanceTimersByTimeAsync(MAP_SURROUND.requestTimeoutMs + 1);
+      expect(preview.children.some(child => child.visible)).toBe(true);
+      const pending = requests.filter(request => !request.signal.aborted && !request.url.includes("USGSImageryOnly"));
+      expect(pending.length).toBeLessThanOrEqual(MAP_SURROUND.maxConcurrentRequests);
+    } finally { disposeRenderObject(host); }
   });
 
   it("retries a transient visible-tile failure once, then completes the same view", async () => {
@@ -370,7 +395,7 @@ describe("continuous satellite-style imagery map", () => {
       for (let index = 1; index < total; index++) await requests[index]!.succeed();
       await vi.advanceTimersByTimeAsync(MAP_SURROUND.retryDelayMs);
       expect(requests).toHaveLength(total + 1);
-      expect(requests.at(-1)!.url).toBe(requests[0]!.url);
+      expect(requests.at(-1)!.url).toBe(terrainTileURL(visibleTerrainTiles(camera(), 1200, 800, bounds)[0]!, MAP_SURROUND.source.fallbackTileTemplate));
       await requests.at(-1)!.succeed();
       expect(layer.children.every(child => child.visible)).toBe(true);
       expect(layer.userData.displayedZoom).toBe(layer.userData.wantedZoom);
@@ -389,6 +414,48 @@ describe("continuous satellite-style imagery map", () => {
       await requests.at(-1)!.fail(503);
       await vi.advanceTimersByTimeAsync(5000);
       expect(requests).toHaveLength(total + 1); expect(vi.getTimerCount()).toBe(0);
+    } finally { disposeRenderObject(layer); }
+  });
+
+  it("recovers failed visible imagery on reconnect without duplicating live requests", async () => {
+    const { requests } = mockTiles(), events = new EventTarget(); vi.stubGlobal("window", events);
+    const layer = new TerrainMapLayer(bounds);
+    try {
+      layer.update(camera(), 1200, 800);
+      await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
+      const count = layer.userData.tileCount;
+      for (let index = 0; index < count; index++) await requests[index]!.fail(404);
+      expect(vi.getTimerCount()).toBe(0);
+      events.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
+      expect(requests).toHaveLength(count + 4);
+      events.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
+      expect(requests).toHaveLength(count + 4);
+    } finally { disposeRenderObject(layer); }
+  });
+
+  it("shares ground projection between overview and detail even on Retina buffers", () => {
+    const view = camera(), project = vi.spyOn(THREE.Vector3.prototype, "unproject");
+    visibleTerrainTiles(view, 1200, 800, bounds);
+    expect(project).toHaveBeenCalled(); project.mockClear();
+    visibleTerrainTiles(view, 1200, 800, bounds, undefined, MAP_SURROUND.preview.maxZoom);
+    visibleTerrainTiles(view, 2400, 1600, bounds);
+    expect(project).not.toHaveBeenCalled();
+    view.position.x += 10; view.updateMatrixWorld(true);
+    visibleTerrainTiles(view, 1200, 800, bounds); expect(project).toHaveBeenCalled();
+  });
+
+  it("retains an overlapping in-flight parent when zooming instead of continually restarting it", async () => {
+    const { requests } = mockTiles(), layer = new TerrainMapLayer(bounds);
+    try {
+      layer.update(camera(24_000), 1200, 800);
+      await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
+      layer.update(camera(1000), 1200, 800);
+      const relevant = requests.filter(request => !request.signal.aborted);
+      expect(relevant.length).toBeGreaterThan(0);
+      for (const request of relevant) await request.succeed();
+      expect(layer.children.some(mesh => mesh.visible)).toBe(true);
     } finally { disposeRenderObject(layer); }
   });
 
@@ -491,8 +558,9 @@ describe("continuous satellite-style imagery map", () => {
       layer.update(camera(), 1200, 800);
       await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
       const total = layer.children.length;
-      await vi.advanceTimersByTimeAsync(20_001 * Math.ceil(total / 4));
-      expect(ready).toHaveBeenCalledTimes(total); expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync((MAP_SURROUND.requestTimeoutMs + MAP_SURROUND.fallbackTimeoutMs + MAP_SURROUND.retryDelayMs + 1) * total);
+      expect(requests.length).toBeLessThanOrEqual(total * 2);
+      expect(ready).toHaveBeenCalledTimes(requests.length); expect(vi.getTimerCount()).toBe(0);
       expect(requests.every(request => request.signal.aborted)).toBe(true);
       for (const request of requests) await request.succeed();
       expect(layer.children.every(child => !child.visible)).toBe(true);
@@ -520,26 +588,34 @@ describe("continuous satellite-style imagery map", () => {
     } finally { disposeRenderObject(layer); }
   });
 
-  it("keeps the previous LOD visible until the whole replacement is ready and swaps back from cache", async () => {
+  it("crops the previous imagery into child footprints and sharpens tiles independently without holes", async () => {
     const { requests } = mockTiles(), layer = new TerrainMapLayer(bounds);
     try {
       const coarse = camera(24_000); layer.update(coarse, 1200, 800);
       await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
       for (let index = 0; index < requests.length; index++) await requests[index]!.succeed();
       const oldZoom = layer.userData.displayedZoom, before = requests.length;
+      const parentSources = (layer.children as TileMesh[]).map(mesh => mesh.material.map!.source);
+      const parentImages = parentSources.map(source => source.data);
       layer.update(camera(1000), 1200, 800);
       expect(layer.userData.wantedZoom).toBeGreaterThan(oldZoom);
       expect(layer.children.some(mesh => mesh.visible)).toBe(true);
       await vi.advanceTimersByTimeAsync(MAP_SURROUND.updateDelayMs + 1);
       const replacementCount = layer.userData.tileCount;
+      expect(layer.children.filter(mesh => mesh.visible).every(mesh => parentSources.includes((mesh as TileMesh).material.map!.source))).toBe(true);
+      const expectedZoom = layer.userData.wantedZoom;
+      expect(expectedZoom).toBeGreaterThan(oldZoom);
       for (let index = before; index < before + replacementCount - 1; index++) {
         await requests[index]!.succeed();
-        expect(layer.userData.displayedZoom).toBe(oldZoom);
-        expect(layer.children.filter(mesh => mesh.visible).every(mesh => mesh.name.startsWith(`terrain-tile-${oldZoom}/`))).toBe(true);
+        expect(layer.userData.displayedZoom).toBe(expectedZoom);
+        expect(layer.children.filter(mesh => mesh.visible).every(mesh => mesh.name.startsWith(`terrain-tile-${expectedZoom}/`))).toBe(true);
+        expect(layer.children.filter(mesh => mesh.visible)).toHaveLength(replacementCount);
       }
       await requests[before + replacementCount - 1]!.succeed();
       expect(layer.userData.displayedZoom).toBe(layer.userData.wantedZoom);
       expect(layer.children.filter(mesh => mesh.visible)).toHaveLength(replacementCount);
+      expect(parentSources.map(source => source.data)).toEqual(parentImages);
+      expect(layer.children.filter(mesh => mesh.visible).every(mesh => !parentSources.includes((mesh as TileMesh).material.map!.source))).toBe(true);
       const after = requests.length;
       layer.update(coarse, 1200, 800);
       expect(layer.userData.displayedZoom).toBe(oldZoom);
