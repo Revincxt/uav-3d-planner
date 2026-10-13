@@ -6,9 +6,11 @@ export const MIN_MAP_ELEVATION_RAD = MIN_MAP_ELEVATION_DEG * Math.PI / 180;
 export const MAP_OVERVIEW_ELEVATION_DEG = MIN_MAP_ELEVATION_DEG;
 export const MAP_OVERVIEW_SOUTH_OF_WEST_DEG = 12;
 
-/** City panorama keeps both river banks in frame; Top retains the tight fit. */
+/** Compact panorama: physical bounds already include mission margins and empty
+ * rectangle corners around the island. Avoid adding a second surround margin.
+ * Top keeps its existing full-region fit. */
 export function mapFramingPadding(panorama: boolean): number {
-  return panorama ? 1.5 : 1.12;
+  return panorama ? 0.86 : 1.12;
 }
 
 /** Low western panorama: Manhattan runs across the frame, not vertically into the distance. */

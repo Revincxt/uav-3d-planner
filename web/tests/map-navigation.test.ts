@@ -5,6 +5,7 @@ import { configureMapNavigation, FrameRenderer, mapFramingPadding, MAP_OVERVIEW_
 import { SceneViewer } from "../src/scene-viewer";
 import { DynamicViewer } from "../src/dynamic-viewer";
 import { PredictiveViewer } from "../src/predictive-viewer";
+import { fitMapCamera } from "../src/viewer-geometry";
 
 afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -22,10 +23,32 @@ function controlledCamera() {
 }
 
 describe("above-ground map navigation", () => {
-  it("adds river context to the city panorama while preserving tight top-view framing", () => {
-    expect(mapFramingPadding(true)).toBe(1.5);
+  it("tightens the default city panorama while preserving the existing top-view fit", () => {
+    expect(mapFramingPadding(true)).toBe(0.86);
     expect(mapFramingPadding(false)).toBe(1.12);
   });
+  it.each([[1440, 818], [1920, 1080], [3024, 1718]])(
+    "matches the reference overview scale at %ix%i without changing bounds or camera angle", (width, height) => {
+      const viewer = Object.create(SceneViewer.prototype);
+      const { camera, controls } = controlledCamera();
+      const bounds = new THREE.Box3(new THREE.Vector3(-1214.11806, 0, -3056.08779),
+        new THREE.Vector3(3294.2203, 520, 4640.21941));
+      Object.assign(viewer, { camera, controls, scenario: {}, resize: vi.fn(), sceneBounds: () => bounds });
+      viewer.setView("isometric");
+      const originalBounds = bounds.clone(), originalPosition = camera.position.clone();
+      fitMapCamera(camera, bounds, width, height, 1.5);
+      const previousWidth = camera.right - camera.left;
+      fitMapCamera(camera, bounds, width, height, mapFramingPadding(true));
+      // The reference places the island across the frame instead of leaving
+      // nearly half its width to metropolitan-map context.
+      expect((camera.right - camera.left) / previousWidth).toBeCloseTo(0.86 / 1.5, 8);
+      expect(bounds.equals(originalBounds)).toBe(true);
+      expect(camera.position.equals(originalPosition)).toBe(true);
+      expect(camera.zoom).toBe(1);
+      expect(elevation(camera, controls.target)).toBeCloseTo(MAP_OVERVIEW_ELEVATION_DEG, 8);
+      const center = bounds.getCenter(new THREE.Vector3()).project(camera);
+      expect(center.x).toBeCloseTo(0, 8); expect(center.y).toBeCloseTo(0, 8);
+    });
   it.each([0, -1, -300, -30_000])("clamps a forbidden relative camera height of %s to 15 degrees", height => {
     const { camera, controls } = controlledCamera();
     camera.position.set(300, height, 300); controls.update();
