@@ -2,7 +2,7 @@ import type { PredictiveBundleV3 } from "./predictive-schema";
 import { validatePredictiveBundle } from "./predictive-validation";
 import { loadDataset } from "./data-loader";
 import { fetchRuntimeData } from "./runtime-fetch";
-export { validatePredictiveBundle, buildPredictiveComparisonRows, stationaryDuration, type PredictiveComparisonRow } from "./predictive-validation";
+export { validatePredictiveBundle, stationaryDuration } from "./predictive-validation";
 export async function loadPredictiveBundle(fetcher: typeof fetch = fetch): Promise<PredictiveBundleV3> {
   if (fetcher !== fetch) {
     const response = await fetcher(`${import.meta.env.BASE_URL}predictive-data.json`);

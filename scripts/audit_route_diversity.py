@@ -118,7 +118,7 @@ def main():
     parser.add_argument("--public", type=Path, default=ROOT / "web/public")
     parser.add_argument("--baseline", type=Path)
     parser.add_argument(
-        "--output", type=Path, default=ROOT / "data/manhattan/route-diversity-audit.json"
+        "--output", type=Path, default=ROOT / "artifacts/route-diversity-audit.json"
     )
     args = parser.parse_args()
     report = {

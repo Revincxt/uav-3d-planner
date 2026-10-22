@@ -33,10 +33,10 @@ describe("shared translucent simulator surfaces", () => {
   it("shares the glass theme across Details, Results, HUD and chart cards", async () => {
     const css = await styles();
     expect(css).toMatch(/\.workspace \.inspector-card\s*\{[^}]*background: var\(--glass-panel\)/);
-    expect(css).toMatch(/\.workspace-results \.stage-card\s*\{[^}]*background: var\(--glass-panel\)/);
     expect(css).toMatch(/\.workspace-results \.app-header\s*\{[^}]*background: var\(--glass-surface\)/);
     expect(css).toMatch(/\.flight-hud\s*\{[^}]*background: var\(--hud-surface\)/);
     const charts = await styles("results.css");
+    expect(charts).toMatch(/\.benchmark-panel\s*\{[^}]*background: linear-gradient\(145deg, #[0-9a-f]{8}, #[0-9a-f]{8}\)/);
     expect(charts).toMatch(/\.comparison-chart\s*\{[^}]*background: var\(--glass-card\)/);
     expect(charts).toMatch(/::after\s*\{[^}]*background: var\(--glass-popup\)/);
   });

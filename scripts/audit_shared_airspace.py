@@ -101,7 +101,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--public", type=Path, default=ROOT / "web/public")
     parser.add_argument(
-        "--output", type=Path, default=ROOT / "data/manhattan/shared-airspace-audit.json"
+        "--output", type=Path, default=ROOT / "artifacts/shared-airspace-audit.json"
     )
     args = parser.parse_args()
     static, dynamic, predictive = [

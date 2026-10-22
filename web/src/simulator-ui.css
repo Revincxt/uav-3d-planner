@@ -236,7 +236,6 @@ body { background: var(--page); font-size: var(--ui-size); }
 .workspace .viewer-witness-readout :is(strong, small) { font-size: var(--ui-size); }
 .workspace-results .app-header { padding-inline: var(--hud-gap); gap: 12px; background: var(--glass-surface); border-color: var(--hud-border); backdrop-filter: blur(8px); }
 .workspace-results .study-nav { margin-left: auto; height: 44px; padding: 3px; border: 1px solid var(--hud-border); border-radius: 7px; background: var(--hud-surface); }
-.workspace-results .stage-card { background: var(--glass-panel); border-color: var(--hud-border); backdrop-filter: blur(8px); }
 
 /* Compact details keep the same type size; reflow cards rather than shrinking labels. */
 @container flight-inspector (max-height: 520px) {

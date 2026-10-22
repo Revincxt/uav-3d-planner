@@ -29,10 +29,7 @@
   height: 100%;
 }
 .viewer-error {
-  display: grid;
   place-items: center;
-  padding: 30px;
-  color: var(--muted, #718097);
   text-align: center;
 }
 .dynamic-stage .planner-control select {
@@ -41,7 +38,6 @@
 .dynamic-stage .scene-legend {
   position: absolute;
   left: 18px;
-  bottom: 18px;
   display: flex;
   align-items: center;
   gap: 13px;
@@ -174,7 +170,7 @@
   .dynamic-stage .stage-toolbar { gap: 10px; }
   .dynamic-stage .planner-control select { max-width: 125px; font-size: 10px; }
   .dynamic-stage .view-controls button { padding-left: 7px; padding-right: 7px; }
-  .dynamic-stage .scene-legend { left: 10px; bottom: 10px; gap: 8px; padding: 8px 9px; font-size: 9px; }
+  .dynamic-stage .scene-legend { left: 10px; gap: 8px; padding: 8px 9px; font-size: 9px; }
   .dynamic-stage .playback-bar { gap: 10px; padding: 11px; }
 }
 @media (max-height: 550px) {

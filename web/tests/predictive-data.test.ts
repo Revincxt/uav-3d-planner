@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildPredictiveComparisonRows,
   loadPredictiveBundle,
   stationaryDuration,
   validatePredictiveBundle,
@@ -402,24 +401,6 @@ describe("predictive bundle v3", () => {
     const parsed = await loadPredictiveBundle(fetcher as typeof fetch);
     expect(parsed.verificationStatus).toBe("PREDICTIVE_DEMO_NON_CONFIRMATORY");
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("predictive-data.json"));
-  });
-
-  it("builds comparison rows from planner metrics rather than post-processed evidence", () => {
-    const input = fixture();
-    input.scenarios[0]!.runs[1]!.plannerMetrics.expandedStates = 4321;
-    input.scenarios[0]!.runs[1]!.geometryMetrics.expandedStates = 4321;
-    input.scenarios[0]!.runs[1]!.executionMetrics!.expandedStates = 4321;
-    const value = validatePredictiveBundle(input);
-    const rows = buildPredictiveComparisonRows(value, value.scenarios[0]!);
-    expect(rows.map((row) => row.plannerId)).toEqual([
-      "repeated-astar-3d",
-      "space-time-astar-4d",
-    ]);
-    expect(rows[1]!.expandedStates).toBe(4321);
-    expect(rows[1]!.executedPathLengthM).toBe(70);
-    expect(rows[1]!.smoothingApplied).toBe(true);
-    expect(rows[1]!.executionQualified).toBe(true);
-    expect(rows[1]!.executionStatus).toBe("qualified");
   });
 
   it("rejects schema/protocol drift and false continuous-dynamics claims", () => {
