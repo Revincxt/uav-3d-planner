@@ -16,16 +16,16 @@ A 3D UAV path-planning simulator built on real Manhattan building data, featurin
 
 </div>
 
-![System overview: Manhattan city model, eight mission routes, and the UAV flight dashboard](assets/system-overview.jpg)
+![System overview: Manhattan city model, mission routes, and the UAV flight dashboard](assets/system-overview.jpg)
 
 ## Features
 
 - **Static**: Compare A*, Lazy Theta*, and RRT* routes around fixed obstacles.
 - **Dynamic**: Replay reactive obstacle avoidance and local replanning around shared moving obstacles and temporary no-fly zones.
 - **Predictive**: Use known traffic schedules for 4D space-time planning, avoiding future conflicts and restricted time windows.
-- **Benchmark**: Compare three aggregate metrics per study using bar charts.
+- **Benchmark**: Compare planning performance using aggregate bar charts.
 
-Explore a 4.5 × 7.7 km city model from Midtown to Battery Park, with 20,757 source buildings, 8 long-range missions per study, 6–8 mandatory waypoints per route, and 12 shared cargo drones in each dynamic study. Includes collision-checked XYZ spline smoothing, variable-speed playback, close-range drone following, and mission details.
+Includes multi-waypoint missions, collision-checked 3D spline smoothing, variable-speed playback, close-range drone following, and interactive mission inspection.
 
 ## Quick Start
 
@@ -36,10 +36,6 @@ cd web
 pnpm install --frozen-lockfile
 pnpm dev
 ```
-
-Open [http://localhost:5173](http://localhost:5173). Precomputed results are restored automatically from verified lossless archives; no Python installation or route recomputation is needed. Online aerial imagery requires internet access, with a road-map fallback when offline.
-
-Native records are stored as checksum-verified compressed shards, each capped at 24 MiB for GitHub compatibility. They remain local audit inputs; the deployed site includes only lossless, deduplicated browser datasets and required assets.
 
 ## References
 
