@@ -2,12 +2,9 @@
 (() => {
   const root = document.documentElement;
   const overlay = document.getElementById('page-loading');
-  const label = document.getElementById('page-loading-label');
   const title = document.getElementById('page-loading-title');
   const detail = document.getElementById('page-loading-detail');
   const retry = document.getElementById('page-loading-retry');
-  const names = { 'dynamic.html': 'Dynamic', 'predictive.html': 'Predictive', 'results.html': 'Benchmark' };
-  const scene = names[location.pathname.split('/').pop()] || 'Static';
   let ready = false, timer;
   const busy = () => {
     const main = document.querySelector('main');
@@ -19,18 +16,17 @@
     overlay.setAttribute('aria-hidden', String(value === 'ready'));
     overlay.setAttribute('role', value === 'error' ? 'alert' : 'status');
     retry.hidden = value !== 'error';
-    label.textContent = scene;
     busy();
     if (value === 'ready') { ready = true; return; }
     if (value === 'error') {
-      title.textContent = 'Unable to load scene'; detail.textContent = 'Check your connection and retry.'; return;
+      title.textContent = 'Unable to load scene'; detail.textContent = 'Check your connection and retry.'; detail.hidden = false; return;
     }
-    title.textContent = value === 'navigation' ? 'Switching scene' : value === 'scene' ? 'Preparing 3D map' : 'Opening scene';
-    detail.textContent = value === 'data' ? 'Restoring flight data…' : value === 'scene' ? 'Building city and routes…' : value === 'navigation' ? 'Opening flight workspace…' : 'Loading scene modules…';
+    title.textContent = 'Loading…';
+    detail.textContent = ''; detail.hidden = true;
     timer = setTimeout(() => {
       // A cancelled/stalled navigation must not trap a working scene behind a veil.
       if (value === 'navigation' && ready) { stage('ready'); return; }
-      detail.textContent = 'Taking longer than usual. You can retry.'; retry.hidden = false;
+      detail.textContent = 'Taking longer than usual. You can retry.'; detail.hidden = false; retry.hidden = false;
     }, 12000);
   }
   stage('boot');
@@ -53,6 +49,6 @@
     const destination = new URL(link.href, location.href);
     if (destination.origin !== location.origin || destination.href === location.href) return;
     // Bubble after Benchmark's link handler, but paint before navigation starts.
-    stage('navigation'); label.textContent = link.textContent.trim();
+    stage('navigation');
   });
 })();
