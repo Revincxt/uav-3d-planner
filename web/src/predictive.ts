@@ -3,6 +3,7 @@ import "./workspace.css";
 import "./simulator-ui.css";
 import { mountBenchmark } from "./benchmark-panel";
 import { mountPageLifecycle } from "./page-lifecycle";
+import { prepareScene, runScene } from "./page-loading";
 import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
 import { predictiveAvoidanceEvents, FlightAnnouncements, type AvoidanceEvent } from "./flight-announcements";
@@ -392,6 +393,7 @@ function renderComparison(
 
 async function start(): Promise<void> {
   const bundle = await loadPredictiveBundle();
+  await prepareScene();
   const scenarioSelect = element<HTMLSelectElement>("#scenario-select");
   const plannerSelect = element<HTMLSelectElement>("#planner-select");
   const timeline = element<HTMLInputElement>("#timeline");
@@ -832,7 +834,6 @@ async function start(): Promise<void> {
     select: scenarioSelect,
     scenarios: bundle.scenarios,
   });
-  element("#load-state").remove();
   routeStates.update(routes, currentTimeS, true);
   mountFollowControls(viewer, scenarioSelect, enabled => { taskNotice.reset(); flightAnnouncements.reset(); routeInteraction.followChanged(enabled); });
 
@@ -860,9 +861,4 @@ async function start(): Promise<void> {
   } });
 }
 
-start().catch((error: unknown) => {
-  const state = element("#load-state");
-  state.classList.add("is-error");
-  state.textContent = error instanceof Error ? error.message : "Predictive traces could not load.";
-  console.error(error);
-});
+runScene(start).catch(console.error);

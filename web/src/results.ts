@@ -6,6 +6,7 @@ import { loadDemoBundle } from "./data";
 import { SceneViewer } from "./scene-viewer";
 import { staticRoutes } from "./route-overview";
 import { mountPageLifecycle } from "./page-lifecycle";
+import { prepareScene, runScene } from "./page-loading";
 
 async function start(): Promise<void> {
   const host = document.querySelector<HTMLElement>("#benchmark-host")!;
@@ -13,7 +14,9 @@ async function start(): Promise<void> {
   const summary = populateBenchmark(host.querySelector<HTMLElement>(".benchmark-panel")!).catch(console.error);
   let viewer: SceneViewer | undefined;
   try {
-    const bundle = await loadDemoBundle(); viewer = new SceneViewer(document.querySelector<HTMLElement>("#benchmark-map")!);
+    const bundle = await loadDemoBundle();
+    await prepareScene();
+    viewer = new SceneViewer(document.querySelector<HTMLElement>("#benchmark-map")!);
     const planner = "lazy-theta-star" as const;
     viewer.setScenario(bundle.scenarios[0]!);
     viewer.setRoutes(staticRoutes(bundle.scenarios, planner), bundle.scenarios[0]!.id);
@@ -21,4 +24,4 @@ async function start(): Promise<void> {
   mountPageLifecycle({ pause: () => {}, restore: () => viewer?.setTime(0), dispose: () => viewer?.dispose() });
   await summary;
 }
-if (typeof document !== "undefined") void start().catch(console.error);
+if (typeof document !== "undefined") void runScene(start).catch(console.error);

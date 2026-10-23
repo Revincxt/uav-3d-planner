@@ -8,6 +8,7 @@ import "./workspace.css";
 import "./simulator-ui.css";
 import { mountBenchmark } from "./benchmark-panel";
 import { mountPageLifecycle } from "./page-lifecycle";
+import { prepareScene, runScene } from "./page-loading";
 import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
 import { overviewDuration, staticRoutes } from "./route-overview";
@@ -103,6 +104,7 @@ function renderPlannerResults(
 
 async function start(): Promise<void> {
   const bundle = await loadDemoBundle();
+  await prepareScene();
   const select = element<HTMLSelectElement>("#scene-select");
   const plannerSelect = element<HTMLSelectElement>("#static-planner-select");
   const viewerElement = element("#scene-viewer");
@@ -258,7 +260,7 @@ async function start(): Promise<void> {
   mountBenchmark({ isPlaying: () => animationFrame !== null, pause: () => setPlaying(false), resume: beginPlayback });
 }
 
-start().catch((error: unknown) => {
+runScene(start).catch((error: unknown) => {
   const viewer = element("#scene-viewer");
   viewer.classList.add("viewer-error");
   viewer.textContent = error instanceof Error ? error.message : "The recorded dataset could not load.";

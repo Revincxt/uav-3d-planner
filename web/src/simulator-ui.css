@@ -231,7 +231,6 @@ body { background: var(--page); font-size: var(--ui-size); }
 .workspace .evidence-list > div { border-color: #ffffff0e; }
 .workspace .layer-controls label { color: #c2d3d4; }
 .workspace .profile-chart figcaption { color: #c0d2d4; }
-.workspace .load-state { background: var(--hud-surface); border-color: var(--hud-border); color: var(--ink); font-size: var(--ui-size); }
 .workspace .viewer-witness-readout { top: 266px; left: var(--hud-gap); color: #f0cf9c; background: rgba(40, 39, 25, .72); border-color: #e7bf7d42; font-size: var(--ui-size); }
 .workspace .viewer-witness-readout :is(strong, small) { font-size: var(--ui-size); }
 .workspace-results .app-header { padding-inline: var(--hud-gap); gap: 12px; background: var(--glass-surface); border-color: var(--hud-border); backdrop-filter: blur(8px); }

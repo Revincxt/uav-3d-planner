@@ -3,6 +3,7 @@ import "./workspace.css";
 import "./simulator-ui.css";
 import { mountBenchmark } from "./benchmark-panel";
 import { mountPageLifecycle } from "./page-lifecycle";
+import { prepareScene, runScene } from "./page-loading";
 import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
 import { dynamicAvoidanceEvents, FlightAnnouncements, type AvoidanceEvent } from "./flight-announcements";
@@ -120,6 +121,7 @@ function renderFrameMetrics(frame: DynamicFrame, index: number, total: number): 
 
 async function start(): Promise<void> {
   const bundle: DynamicBundleV1 = await loadDynamicBundle();
+  await prepareScene();
   const scenarioSelect = element<HTMLSelectElement>("#scenario-select");
   const plannerSelect = element<HTMLSelectElement>("#planner-select");
   const timeline = element<HTMLInputElement>("#timeline");
@@ -317,7 +319,6 @@ async function start(): Promise<void> {
   mountTabs();
   routeStates.update(routes, currentTimeS, true);
   mountFollowControls(viewer, scenarioSelect, enabled => { taskNotice.reset(); flightAnnouncements.reset(); routeInteraction.followChanged(enabled); });
-  element("#load-state").remove();
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) setPlaying(false);
   });
@@ -331,9 +332,4 @@ async function start(): Promise<void> {
   } });
 }
 
-start().catch((error: unknown) => {
-  const state = element("#load-state");
-  state.classList.add("is-error");
-  state.textContent = error instanceof Error ? error.message : "Dynamic traces could not load.";
-  console.error(error);
-});
+runScene(start).catch(console.error);

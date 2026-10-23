@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { runtimeDataPlugin } from "./build/runtime-data.mjs";
 import { publicAssetsPlugin } from "./build/public-assets.mjs";
+import { pageLoadingPlugin } from "./build/page-loading.mjs";
 import { staticAnalysis, dynamicAnalysis, predictiveAnalysis } from "./src/results-data";
 import { validateBundle } from "./src/static-validation";
 import { validateDynamicBundle } from "./src/dynamic-validation";
@@ -8,7 +9,7 @@ import { validatePredictiveBundle } from "./src/predictive-validation";
 
 export default defineConfig({
   base: "./",
-  plugins: [publicAssetsPlugin(), runtimeDataPlugin((name: string, value: unknown) => {
+  plugins: [pageLoadingPlugin(), publicAssetsPlugin(), runtimeDataPlugin((name: string, value: unknown) => {
     if (name === "demo-data") { const bundle = validateBundle(value); return { analysis: staticAnalysis(bundle), citySha256: bundle.scenarios[0]!.city!.sourceSha256 }; }
     if (name === "dynamic-data") { const bundle = validateDynamicBundle(value); return { analysis: dynamicAnalysis(bundle), citySha256: bundle.scenarios[0]!.city!.sourceSha256 }; }
     const bundle = validatePredictiveBundle(value); return { analysis: predictiveAnalysis(bundle), citySha256: bundle.scenarios[0]!.city!.sourceSha256 };
