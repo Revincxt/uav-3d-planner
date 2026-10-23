@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package and development tools
-        run: python -m pip install -e '.[dev]'
+        run: python -m pip install --retries 10 --timeout 60 -e '.[dev]'
       - name: Set up Node.js for study archives
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6.0.0
         with:
