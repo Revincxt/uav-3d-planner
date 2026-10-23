@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  buildDynamicComparisonRows,
-  loadDynamicBundle,
-  validateDynamicBundle,
-} from "../src/dynamic-data";
+import { loadDynamicBundle } from "../src/dynamic-data";
+import { validateDynamicBundle } from "../src/dynamic-validation";
+import { fetchRuntimeData } from "../src/runtime-fetch";
 import type { DynamicBundleV1, DynamicFrame, DynamicPlannerId, DynamicRun } from "../src/dynamic-schema";
+
+vi.mock("../src/runtime-fetch", () => ({ fetchRuntimeData: vi.fn() }));
+afterEach(() => vi.mocked(fetchRuntimeData).mockReset());
 
 const start = [4, 5, 6] as [number, number, number];
 const midpoint = [25, 20, 12] as [number, number, number];
@@ -159,26 +160,37 @@ describe("dynamic bundle v1", () => {
     expect(parsed.scenarios[0]!.runs[0]!.frames[1]!.timeS).toBe(8);
   });
 
-  it("loads and validates the public bundle through an injected fetch implementation", async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify(fixture()), { status: 200 }));
-    const parsed = await loadDynamicBundle(fetcher as typeof fetch);
+  it("loads and validates through the same verified runtime delivery as the application", async () => {
+    vi.mocked(fetchRuntimeData).mockResolvedValue(fixture());
+    const parsed = await loadDynamicBundle();
     expect(parsed.verificationStatus).toBe("DYNAMIC_DEMO_NON_CONFIRMATORY");
-    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("dynamic-data.json"));
+    expect(fetchRuntimeData).toHaveBeenCalledExactlyOnceWith("dynamic", import.meta.env.BASE_URL);
   });
 
-  it("builds one ordered comparison row per planner without equating work units", () => {
+  it("retains each planner's native status and work units without a second comparison model", () => {
     const value = validateDynamicBundle(fixture());
-    const rows = buildDynamicComparisonRows(value, value.scenarios[0]!);
-    expect(rows.map((row) => row.plannerId)).toEqual([
+    expect(value.planners.map((planner) => planner.id)).toEqual([
       "repeated-astar-3d",
       "repeated-lazy-theta-star",
       "dstar-lite-3d",
     ]);
-    expect(rows.map((row) => row.workUnit)).toEqual([
+    expect(value.scenarios[0]!.runs.map((run) => run.metrics.workUnit)).toEqual([
       "expanded-nodes",
       "expanded-nodes",
       "queue-pops",
     ]);
+  });
+
+  it("rejects invalid foreground data instead of bypassing the validator", async () => {
+    vi.mocked(fetchRuntimeData).mockResolvedValue({ ...fixture(), schemaVersion: 99 });
+    await expect(loadDynamicBundle()).rejects.toThrow(/schemaVersion/);
+  });
+
+  it("propagates runtime integrity failures without trying an old native JSON URL", async () => {
+    const error = new Error("Runtime asset SHA-256 mismatch");
+    vi.mocked(fetchRuntimeData).mockRejectedValue(error);
+    await expect(loadDynamicBundle()).rejects.toBe(error);
+    expect(fetchRuntimeData).toHaveBeenCalledTimes(1);
   });
 
   it("rejects frames that do not advance monotonically", () => {

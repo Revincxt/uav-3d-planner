@@ -15,6 +15,19 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe("background dataset lifecycle", () => {
+  it.each(["static", "dynamic", "predictive"] as const)("uses the shared worker and memoized protocol through the public %s loader", async kind => {
+    const load = kind === "static" ? (await import("../src/data")).loadDemoBundle
+      : kind === "dynamic" ? (await import("../src/dynamic-data")).loadDynamicBundle
+      : (await import("../src/predictive-data")).loadPredictiveBundle;
+    const result = load();
+    expect(FakeWorker.all).toHaveLength(1);
+    expect(FakeWorker.all[0]!.postMessage).toHaveBeenCalledExactlyOnceWith({ kind, base: "https://example.test/planner/" });
+    const value = { scenarios: [] };
+    FakeWorker.all[0]!.onmessage!({ data: { value } });
+    await expect(result).resolves.toBe(value);
+    await expect(load()).resolves.toBe(value);
+    expect(FakeWorker.all).toHaveLength(1);
+  });
   it("shares one in-flight load, keeps relative deployment base and terminates on delivery", async () => {
     const { loadInBackground } = await import("../src/data-loader");
     const first = loadInBackground("static"), second = loadInBackground("static");

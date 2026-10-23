@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { packStudyData, restoreStudyData, STUDY_FILES, MAX_ARCHIVE_PART_BYTES } from '../scripts/study-data.mjs';
 import type { StudyArchiveEntry } from '../scripts/study-data.mjs';
+import { PUBLIC_SITE_ASSETS } from '../build/public-assets.mjs';
 
 const filesystemModule = 'node:fs/promises', osModule = 'node:os', pathModule = 'node:path';
 const { mkdtemp, mkdir, readFile, readdir, stat, rm, unlink, writeFile } = await import(filesystemModule);
@@ -125,6 +126,14 @@ describe('lossless study source archives', () => {
 });
 
 describe('committed study inventory', () => {
+  it('keeps only current native inputs, their audit sidecars and deliberate site assets', async () => {
+    const files: string[] = await readdir(new URL('../public/', import.meta.url));
+    expect(files.filter(name => !name.startsWith('.')).sort()).toEqual([
+      ...STUDY_FILES, ...PUBLIC_SITE_ASSETS,
+      'dynamic-records.csv', 'dynamic-scenario-manifest.json',
+      'predictive-records.csv', 'predictive-scenario-manifest.json',
+    ].sort());
+  });
   it('contains only current manifest-referenced archives, within the upload limit', async () => {
     const directory = new URL('../../data/studies/', import.meta.url);
     const manifest = JSON.parse(await readFile(new URL('manifest.json', directory), 'utf8')) as {

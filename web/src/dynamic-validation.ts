@@ -892,37 +892,3 @@ function parseDynamicBundle(value: unknown): DynamicBundleV1 {
 }
 
 
-export interface DynamicComparisonRow {
-  plannerId: DynamicPlannerId;
-  plannerLabel: string;
-  status: DynamicRun["status"];
-  completionTimeS: number | null;
-  executedPathLengthM: number;
-  replans: number;
-  holds: number;
-  safetyGateActivations: number;
-  totalPlanningWork: number;
-  workUnit: DynamicRunMetrics["workUnit"];
-}
-
-export function buildDynamicComparisonRows(
-  bundle: DynamicBundleV1,
-  scenario: DynamicScenario,
-): DynamicComparisonRow[] {
-  return bundle.planners.map((planner) => {
-    const selectedRun = scenario.runs.find((candidate) => candidate.plannerId === planner.id);
-    if (!selectedRun) fail(`${scenario.id} has no run for ${planner.id}`);
-    return {
-      plannerId: planner.id,
-      plannerLabel: planner.label,
-      status: selectedRun.status,
-      completionTimeS: selectedRun.metrics.completionTimeS,
-      executedPathLengthM: selectedRun.metrics.executedPathLengthM,
-      replans: selectedRun.metrics.replans,
-      holds: selectedRun.metrics.holds,
-      safetyGateActivations: selectedRun.metrics.safetyGateActivations,
-      totalPlanningWork: selectedRun.metrics.totalPlanningWork,
-      workUnit: selectedRun.metrics.workUnit,
-    };
-  });
-}

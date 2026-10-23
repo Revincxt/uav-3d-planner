@@ -1,10 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  loadPredictiveBundle,
-  stationaryDuration,
-  validatePredictiveBundle,
-} from "../src/predictive-data";
+import { loadPredictiveBundle } from "../src/predictive-data";
+import { stationaryDuration, validatePredictiveBundle } from "../src/predictive-validation";
+import { fetchRuntimeData } from "../src/runtime-fetch";
 import type {
   PredictiveBundleV3,
   PredictiveDiscreteKinematicDiagnostics,
@@ -16,6 +14,9 @@ import type {
   Vec3,
   WaitInterval,
 } from "../src/predictive-schema";
+
+vi.mock("../src/runtime-fetch", () => ({ fetchRuntimeData: vi.fn() }));
+afterEach(() => vi.mocked(fetchRuntimeData).mockReset());
 
 const start: Vec3 = [0, 0, 10];
 const goal: Vec3 = [30, 40, 10];
@@ -396,11 +397,23 @@ describe("predictive bundle v3", () => {
     expect(parsed.protocol.continuousDynamicsCertified).toBe(false);
   });
 
-  it("loads and validates predictive-data.json through an injected fetch implementation", async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify(fixture()), { status: 200 }));
-    const parsed = await loadPredictiveBundle(fetcher as typeof fetch);
+  it("loads and validates through the same verified runtime delivery as the application", async () => {
+    vi.mocked(fetchRuntimeData).mockResolvedValue(fixture());
+    const parsed = await loadPredictiveBundle();
     expect(parsed.verificationStatus).toBe("PREDICTIVE_DEMO_NON_CONFIRMATORY");
-    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining("predictive-data.json"));
+    expect(fetchRuntimeData).toHaveBeenCalledExactlyOnceWith("predictive", import.meta.env.BASE_URL);
+  });
+
+  it("rejects invalid foreground data instead of bypassing the validator", async () => {
+    vi.mocked(fetchRuntimeData).mockResolvedValue({ ...fixture(), schemaVersion: 99 });
+    await expect(loadPredictiveBundle()).rejects.toThrow(/schemaVersion/);
+  });
+
+  it("propagates runtime integrity failures without trying an old native JSON URL", async () => {
+    const error = new Error("Runtime asset SHA-256 mismatch");
+    vi.mocked(fetchRuntimeData).mockRejectedValue(error);
+    await expect(loadPredictiveBundle()).rejects.toBe(error);
+    expect(fetchRuntimeData).toHaveBeenCalledTimes(1);
   });
 
   it("rejects schema/protocol drift and false continuous-dynamics claims", () => {

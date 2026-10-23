@@ -8,7 +8,7 @@ import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
 import { dynamicAvoidanceEvents, FlightAnnouncements, type AvoidanceEvent } from "./flight-announcements";
 
-import { buildDynamicComparisonRows, loadDynamicBundle } from "./dynamic-data";
+import { loadDynamicBundle } from "./dynamic-data";
 import type {
   DynamicBundleV1,
   DynamicFrame,
@@ -64,16 +64,16 @@ function renderComparison(bundle: DynamicBundleV1, scenario: DynamicScenario): v
   const body = element("#comparison-body");
   const select = element<HTMLSelectElement>("#planner-select");
   body.replaceChildren();
-  for (const result of buildDynamicComparisonRows(bundle, scenario)) {
-    const planner = bundle.planners.find((candidate) => candidate.label === result.plannerLabel);
-    if (!planner) continue;
+  for (const planner of bundle.planners) {
+    const result = scenario.runs.find((run) => run.plannerId === planner.id)!;
+    const values = result.metrics;
     const card = document.createElement("button");
     card.type = "button";
     card.className = "planner-result";
     card.dataset.planner = planner.id;
-    card.setAttribute("aria-label", `Replay ${result.plannerLabel}`);
+    card.setAttribute("aria-label", `Replay ${planner.label}`);
     const name = document.createElement("strong");
-    name.textContent = shortPlanner(result.plannerLabel);
+    name.textContent = shortPlanner(planner.label);
     const status = document.createElement("span");
     status.className = "result-status";
     status.classList.toggle("is-failure", result.status !== "success");
@@ -81,9 +81,9 @@ function renderComparison(bundle: DynamicBundleV1, scenario: DynamicScenario): v
     const details = document.createElement("span");
     details.className = "result-details";
     for (const [label, value] of [
-      ["Time", result.completionTimeS === null ? "—" : `${result.completionTimeS.toFixed(1)} s`],
-      ["Path", `${result.executedPathLengthM.toFixed(0)} m`],
-      ["Replans", result.replans.toLocaleString()],
+      ["Time", values.completionTimeS === null ? "—" : `${values.completionTimeS.toFixed(1)} s`],
+      ["Path", `${values.executedPathLengthM.toFixed(0)} m`],
+      ["Replans", values.replans.toLocaleString()],
     ]) {
       const item = document.createElement("span");
       const number = document.createElement("b");

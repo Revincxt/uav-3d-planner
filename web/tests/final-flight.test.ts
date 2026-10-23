@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { finalFlight } from "../src/final-flight";
-import { validatePredictiveBundle } from "../src/predictive-data";
+import { validatePredictiveBundle } from "../src/predictive-validation";
 import type { PredictiveRun } from "../src/predictive-schema";
 
 const filesystemModule = "node:fs";

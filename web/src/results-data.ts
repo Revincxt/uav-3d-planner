@@ -1,11 +1,11 @@
 import type { DemoBundle } from "./schema";
 import type { DynamicBundleV1 } from "./dynamic-schema";
-import type { PredictiveBundleV3, PredictiveRun, PredictiveScenario } from "./predictive-schema";
+import type { PredictiveBundleV3, PredictiveRun } from "./predictive-schema";
 
 export interface MissionObservation {
-  id: string; label: string; success: boolean; routeM: number | null;
+  success: boolean; routeM: number | null;
   planningTimeMs: number | null; arrivalTimeS: number | null; waitTimeS: number | null;
-  work: number; workUnit: string; failureReason: string | null;
+  work: number; workUnit: string;
 }
 interface ObservedSummary {
   attempts: number; completed: number; routeM: number | null; planningTimeMs: number | null;
@@ -33,12 +33,12 @@ export function summarizeObservedMissions(missions: readonly MissionObservation[
     work: observedMedian(completed.map((m) => m.work)) };
 }
 /** Summaries use the same final flight as the map; unavailable flights remain failures. */
-export function predictiveObservation(scenario: Pick<PredictiveScenario, "id" | "label">, run: Pick<PredictiveRun, "executionMetrics">): MissionObservation {
+export function predictiveObservation(run: Pick<PredictiveRun, "executionMetrics">): MissionObservation {
   const m = run.executionMetrics;
-  if (m === null) return { id: scenario.id, label: scenario.label, success: false, routeM: null,
-    planningTimeMs: null, arrivalTimeS: null, waitTimeS: null, work: 0, workUnit: "expanded-nodes", failureReason: "No validated flight" };
-  return { id: scenario.id, label: scenario.label, success: m.success, routeM: m.success ? m.executedPathLengthM : null,
-    planningTimeMs: null, arrivalTimeS: m.arrivalTimeS, waitTimeS: m.waitTimeS, work: m.expandedStates, workUnit: m.workUnit, failureReason: m.failureReason };
+  if (m === null) return { success: false, routeM: null,
+    planningTimeMs: null, arrivalTimeS: null, waitTimeS: null, work: 0, workUnit: "expanded-nodes" };
+  return { success: m.success, routeM: m.success ? m.executedPathLengthM : null,
+    planningTimeMs: null, arrivalTimeS: m.arrivalTimeS, waitTimeS: m.waitTimeS, work: m.expandedStates, workUnit: m.workUnit };
 }
 function plannerSummary(id: string, label: string, missions: MissionObservation[]): PlannerSummary {
   return { id, label, workUnit: missions[0]?.workUnit ?? "", summary: summarizeObservedMissions(missions) };
@@ -52,19 +52,19 @@ export function analysesFromBundles(stat: DemoBundle, dyn: DynamicBundleV1, pred
 export function staticAnalysis(stat: DemoBundle): Analysis {
   return { id: "static", label: "Static",
       planners: stat.planners.map((planner) => plannerSummary(planner.id, planner.label,
-        stat.scenarios.flatMap((scenario) => scenario.results.filter((run) => run.plannerId === planner.id).map((run) => ({ id: scenario.id, label: scenario.label,
+        stat.scenarios.flatMap((scenario) => scenario.results.filter((run) => run.plannerId === planner.id).map((run) => ({
           success: run.status === "success", routeM: run.metrics.smoothedLengthM, planningTimeMs: run.metrics.planningTimeMs, arrivalTimeS: null, waitTimeS: null,
-          work: run.searchEffort.value, workUnit: run.searchEffort.kind, failureReason: run.failureReason }))))) };
+          work: run.searchEffort.value, workUnit: run.searchEffort.kind }))))) };
 }
 export function dynamicAnalysis(dyn: DynamicBundleV1): Analysis {
   return { id: "dynamic", label: "Dynamic",
       planners: dyn.planners.map((planner) => plannerSummary(planner.id, planner.label,
-        dyn.scenarios.flatMap((scenario) => scenario.runs.filter((run) => run.plannerId === planner.id).map((run) => ({ id: scenario.id, label: scenario.label.replace(/ · reactive$/, ""),
+        dyn.scenarios.flatMap((scenario) => scenario.runs.filter((run) => run.plannerId === planner.id).map((run) => ({
           success: run.metrics.success, routeM: run.metrics.success ? run.metrics.executedPathLengthM : null, planningTimeMs: null, arrivalTimeS: run.metrics.completionTimeS,
-          waitTimeS: null, work: run.metrics.totalPlanningWork, workUnit: run.metrics.workUnit, failureReason: run.metrics.failureReason }))))) };
+          waitTimeS: null, work: run.metrics.totalPlanningWork, workUnit: run.metrics.workUnit }))))) };
 }
 export function predictiveAnalysis(pred: PredictiveBundleV3): Analysis {
   return { id: "predictive", label: "Predictive",
       planners: pred.planners.map((planner) => plannerSummary(planner.id, planner.label,
-        pred.scenarios.flatMap((scenario) => scenario.runs.filter((run) => run.plannerId === planner.id).map((run) => predictiveObservation(scenario, run))))) };
+        pred.scenarios.flatMap((scenario) => scenario.runs.filter((run) => run.plannerId === planner.id).map(predictiveObservation)))) };
 }

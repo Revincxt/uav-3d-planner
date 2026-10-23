@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validatePredictiveBundle } from "../src/predictive-data";
+import { validatePredictiveBundle } from "../src/predictive-validation";
 import losFixture from "./fixtures/predictive-los-only.json";
 import { readStudyData } from '../scripts/study-reader.mjs';
 

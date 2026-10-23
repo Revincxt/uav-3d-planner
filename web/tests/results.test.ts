@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { observedMedian, predictiveObservation, summarizeObservedMissions, type MissionObservation } from "../src/results-data";
 import type { PredictiveRunMetrics } from "../src/predictive-schema";
 function mission(success: boolean, routeM: number | null, arrivalTimeS: number | null): MissionObservation {
-  return { id: "test", label: "Test mission", success, routeM, planningTimeMs: null, arrivalTimeS, waitTimeS: 0, work: 30, workUnit: "expanded-nodes", failureReason: success ? null : "timeout" };
+  return { success, routeM, planningTimeMs: null, arrivalTimeS, waitTimeS: 0, work: 30, workUnit: "expanded-nodes" };
 }
 describe("observed Manhattan mission results", () => {
   it("removes the old study heading, counter, per-mission lists and their styles", async () => {
@@ -46,12 +46,13 @@ describe("observed Manhattan mission results", () => {
   it("summarizes the final predictive flight shown on the map, not intermediate paths", () => {
     const plannerMetrics = { success: true, executedPathLengthM: 1800, arrivalTimeS: 120, waitTimeS: 2, expandedStates: 100, workUnit: "expanded-spacetime-states", failureReason: null } as PredictiveRunMetrics;
     const run = { plannerMetrics, geometryMetrics: { ...plannerMetrics, executedPathLengthM: 1500, arrivalTimeS: 100 }, executionMetrics: { ...plannerMetrics, executedPathLengthM: 1500, arrivalTimeS: 400 }, status: "invalid" };
-    const observation = predictiveObservation({ id: "mission", label: "Mission" }, run);
+    const observation = predictiveObservation(run);
     expect(observation.routeM).toBe(1500); expect(observation.arrivalTimeS).toBe(400); expect(observation.waitTimeS).toBe(2); expect(observation.success).toBe(true); expect(observation.planningTimeMs).toBeNull();
   });
   it("does not substitute raw metrics when a final flight is missing", () => {
-    const observation = predictiveObservation({ id: "mission", label: "Mission" }, { executionMetrics: null });
+    const observation = predictiveObservation({ executionMetrics: null });
     expect(observation.success).toBe(false); expect(observation.routeM).toBeNull();
     expect(observation.arrivalTimeS).toBeNull(); expect(observation.waitTimeS).toBeNull();
+    for (const field of ["id", "label", "failureReason"]) expect(observation).not.toHaveProperty(field);
   });
 });

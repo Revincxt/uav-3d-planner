@@ -2,9 +2,9 @@ import * as THREE from "three";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { describe, expect, it, vi } from "vitest";
 import { auditMissionTaskVisits } from "../src/city-schema";
-import { validateBundle } from "../src/data";
-import { validateDynamicBundle } from "../src/dynamic-data";
-import { validatePredictiveBundle } from "../src/predictive-data";
+import { validateBundle } from "../src/static-validation";
+import { validateDynamicBundle } from "../src/dynamic-validation";
+import { validatePredictiveBundle } from "../src/predictive-validation";
 import { RetainedCity } from "../src/retained-city";
 import {
   RouteOverview, dynamicRoutes, overviewDuration, predictiveRoutes,

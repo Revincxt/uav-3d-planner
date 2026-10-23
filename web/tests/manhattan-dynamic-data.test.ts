@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateDynamicBundle } from "../src/dynamic-data";
+import { validateDynamicBundle } from "../src/dynamic-validation";
 import { readStudyData } from '../scripts/study-reader.mjs';
 
 const source = await readStudyData(new URL("../public/dynamic-data.json", import.meta.url));

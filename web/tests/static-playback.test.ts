@@ -3,7 +3,7 @@ import { staticPlaybackPath } from "../src/static-playback";
 import { playbackAction } from "../src/playback-state";
 import { auditMissionTaskVisits } from "../src/city-schema";
 import { staticRoutes, timedPosition } from "../src/route-overview";
-import { validateBundle } from "../src/data";
+import { validateBundle } from "../src/static-validation";
 import type { CityMission } from "../src/city-schema";
 import type { RoutePoint } from "../src/route-overview";
 
