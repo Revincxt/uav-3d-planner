@@ -273,27 +273,6 @@ def mission_task_points(
     ]
 
 
-def mission_leg_event(
-    start: Point3, goal: Point3, tasks: list[dict[str, Any]], *, speed: float, fraction: float
-) -> tuple[Point3, float, tuple[float, float]]:
-    """Place simulated traffic between service roofs, including earlier dwell times."""
-    from uav3d.geometry import distance, lerp
-
-    points = [start, *(cast(Point3, tuple(task["position"])) for task in tasks), goal]
-    lengths = [distance(a, b) for a, b in pairwise(points)]
-    candidates = [index for index, length in enumerate(lengths) if length >= 280]
-    if not candidates:
-        raise ValueError("A mission needs a cross-block corridor for its simulated traffic")
-    index = min(candidates, key=lambda index: abs((index + 0.5) / len(lengths) - fraction))
-    a, b = points[index : index + 2]
-    dx, dy = b[0] - a[0], b[1] - a[1]
-    norm = math.hypot(dx, dy)
-    arrival = (sum(lengths[:index]) + lengths[index] / 2) / speed + sum(
-        task["serviceDurationS"] for task in tasks[:index]
-    )
-    return lerp(a, b, 0.5), arrival, (-dy / norm, dx / norm)
-
-
 def audit_task_visits(
     positions: Sequence[Sequence[float]],
     tasks: list[dict[str, Any]],

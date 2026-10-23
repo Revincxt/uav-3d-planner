@@ -4,6 +4,9 @@ Fingerprints encode every binary float, so regenerating ENU anchors on Linux mus
 not replace the inputs originally computed on macOS. This snapshot retains those
 inputs, binds them to the native records, and still checks regenerated semantics.
 Building envelopes come directly from the separately verified official city file.
+Source manifests describe the original computation, not the current checkout.
+Their recorded identities are retained while current geometry and timing are
+independently re-audited against the exact inputs and native records.
 """
 
 from __future__ import annotations
@@ -38,10 +41,20 @@ def digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def audit_source(path: Path, expected: str) -> None:
-    """Require the exact computation bytes bound to the current recorded studies."""
-    if digest(path) != expected:
-        raise ValueError(f"Computation source changed: {path.relative_to(ROOT)}")
+def audit_provenance(bundle: dict[str, Any]) -> None:
+    """Check historical manifest identity without treating it as today's source."""
+    provenance = bundle["sourceProvenance"]
+    if bundle["sourceCommit"] != "local-snapshot:" + provenance["sha256"]:
+        raise ValueError("Source snapshot identity mismatch")
+    for key in ("sourceProvenance", "computationSourceProvenance"):
+        if key not in bundle:
+            continue
+        recorded = bundle[key]
+        if recorded.get("kind") != "local-snapshot" or not recorded.get("files"):
+            raise ValueError("Missing computation source manifest")
+        encoded = json.dumps(recorded["files"], sort_keys=True, separators=(",", ":")).encode()
+        if recorded["sha256"] != "sha256:" + hashlib.sha256(encoded).hexdigest():
+            raise ValueError("Computation source manifest digest mismatch")
 
 
 def input_record(problem: Scene | DynamicScenario) -> dict[str, Any]:

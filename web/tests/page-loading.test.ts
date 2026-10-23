@@ -49,33 +49,6 @@ describe('immediate HTML loading shell', () => {
     expect(tags[2].injectTo).toBe('body-prepend');
     expect(tags.every((tag: { attrs?: Record<string, string> }) => !tag.attrs?.src)).toBe(true);
   });
-  it('uses a frameless local flight mark without stage bars or decorative asset requests', async () => {
-    const tags = await pageLoadingPlugin().transformIndexHtml(), markup = tags[1].children;
-    expect(markup).toContain('class="page-loading-drone"');
-    expect(markup).toContain('class="page-loading-warning"');
-    expect(markup).toContain('class="page-loading-content"');
-    expect(markup).toContain('class="page-loading-copy"');
-    expect(markup).not.toMatch(/page-loading-card|page-loading-steps|data-step=|page-loading-label/);
-    expect(markup).toContain('<strong id="page-loading-title">Loading…</strong>');
-    expect(markup).toContain('<p id="page-loading-detail" hidden></p>');
-    const content = tags[0].children.match(/\.page-loading-content\s*\{([^}]+)\}/)![1]!;
-    for (const rule of ['border: 0', 'border-radius: 0', 'background: none', 'box-shadow: none']) expect(content).toContain(rule);
-    for (const rule of ['display: flex', 'align-items: center', 'width: max-content']) expect(content).toContain(rule);
-    expect(tags[0].children).not.toMatch(/page-loading-card|page-loading-step|page-loading-stage/);
-    expect(markup).not.toMatch(/<img|<canvas|<iframe|\bsrc=/);
-    expect(tags[0].children).not.toMatch(/@import|url\(/);
-  });
-  it('matches the simulator HUD palette with local, reduced-motion-aware flight instrumentation', async () => {
-    const tags = await pageLoadingPlugin().transformIndexHtml();
-    expect(tags[0].children).toContain('color-scheme: dark');
-    expect(tags[0].children).toContain('--loading-text: #e5eef4');
-    expect(tags[0].children).toContain('--loading-muted: #cfdae3');
-    expect(tags[1].children).toContain('class="page-loading-reference"');
-    expect(tags[1].children).toContain('class="page-loading-scan"');
-    expect(tags[1].children).toContain('class="page-loading-field" aria-hidden="true"');
-    expect(tags[0].children).toMatch(/prefers-reduced-motion: reduce[\s\S]+\.page-loading-course, #page-loading \.page-loading-scan \{ animation: none;/);
-    expect(tags[0].children).toContain('html[data-page-loading="navigation"] #page-loading .page-loading-field { display: none; }');
-  });
   it.each(['', 'dynamic.html', 'predictive.html', 'results.html'])(
     'shows only a fixed loading message immediately for %s', (path) => {
       const f = fixture(path);

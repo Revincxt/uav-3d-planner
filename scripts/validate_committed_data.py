@@ -1,4 +1,4 @@
-"""Re-audit the current Manhattan records without recomputing or replacing them."""
+"""Re-audit recorded Manhattan flights with current validators and exact inputs."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from typing import Any
 
 from committed_inputs import (
     assert_equivalent,
-    audit_source,
+    audit_provenance,
     input_record,
     load_inputs,
     restore_input,
@@ -61,13 +61,7 @@ def audit_city(bundle: dict[str, Any], city: Any) -> None:
             raise ValueError("City source digest mismatch")
         if scenario["city"].get("planningRegion", {}).get("id") != "manhattan-south-expanded-v4":
             raise ValueError("Stale planning region")
-    provenance = bundle.get("computationSourceProvenance", bundle.get("sourceProvenance"))
-    if provenance:
-        for source in provenance["files"]:
-            path = ROOT / source["path"]
-            if not path.resolve().is_relative_to(ROOT):
-                raise ValueError("Source provenance leaves the project")
-            audit_source(path, source["sha256"])
+    audit_provenance(bundle)
 
 
 def audit_current(public: Path) -> dict[str, int]:

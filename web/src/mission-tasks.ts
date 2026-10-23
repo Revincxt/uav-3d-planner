@@ -8,12 +8,14 @@ import { GATE_SIZE_M, missionGateGeometry, missionGateMaterial, missionGateYaw }
 export function addMissionTaskMarkers(host: THREE.Group, mission?: CityMission): void {
   const tasks = new THREE.Group();
   tasks.name = "mission-task-points";
+  const geometry = mission?.taskPoints?.length ? missionGateGeometry() : undefined;
+  const material = geometry ? missionGateMaterial() : undefined;
   for (const task of mission?.taskPoints ?? []) {
     const group = new THREE.Group();
     group.name = `mission-task-${task.order}`;
     group.position.fromArray(enuToThree(task.position));
     group.userData = { taskId: task.id, order: task.order, position: task.position };
-    const marker = new THREE.Mesh(missionGateGeometry(), missionGateMaterial());
+    const marker = new THREE.Mesh(geometry!, material!);
     marker.name = "mission-gate";
     group.add(marker);
     const canvas = document.createElement("canvas");

@@ -122,10 +122,6 @@ class _Traversal:
     end_time: float
 
 
-def list_replanning_algorithms() -> tuple[str, ...]:
-    return REPLANNING_ALGORITHMS
-
-
 def _planner(
     algorithm: str,
     resolution: float,
@@ -722,6 +718,5 @@ __all__ = [
     "DynamicFrame",
     "DynamicMetrics",
     "DynamicRun",
-    "list_replanning_algorithms",
     "simulate_replanning",
 ]

@@ -185,10 +185,6 @@ def source_snapshot() -> tuple[str, dict[str, Any]]:
     return "local-snapshot:" + digest, {"kind": "local-snapshot", "sha256": digest, "files": files}
 
 
-def rooftop_target(city: Any, longitude: float, latitude: float) -> Point3:
-    return resolve_rooftop_anchor(city, longitude, latitude).position
-
-
 def mission_scenes(city: Any) -> list[tuple[dict[str, Any], Scene]]:
     from uav3d.manhattan_city import make_city_scene
 

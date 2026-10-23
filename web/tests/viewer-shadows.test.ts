@@ -330,6 +330,24 @@ describe("world-space scene occlusion", () => {
 });
 
 describe("cached viewer shadows", () => {
+  it.each([["dynamic", DynamicViewer], ["predictive", PredictiveViewer]] as const)("updates %s zones only at activation changes, including rewind", (_name, Viewer) => {
+    const viewer = Viewer === DynamicViewer ? dynamicHarness() : predictiveHarness();
+    const zone = { id: "temporary", center: [50, 50], radiusM: 10, zMinM: 0, zMaxM: 50, activeFromS: 2, activeUntilS: 4 };
+    viewer.scenario = { ...viewer.scenario, temporaryNoFlyZones: [zone] };
+    const visual = viewer.addZone(zone, "temporary");
+    viewer.temporaryZones.set(zone.id, visual);
+    const traversal = vi.spyOn(visual.outline, "traverse");
+    for (const [time, active] of [[0, false], [2, true], [4, false], [2, true]] as const) {
+      viewer.setTime(time);
+      expect(visual.fill.visible).toBe(active); expect(visual.outline.visible).toBe(active);
+      expect(visual.fill.material.opacity).toBe(active ? 0.18 : 0.025);
+      const calls = traversal.mock.calls.length;
+      viewer.setTime(time + 0.1);
+      expect(traversal).toHaveBeenCalledTimes(calls);
+    }
+    viewer.clearContent();
+  });
+
   it.each([
     ["static", SceneViewer],
     ["dynamic", DynamicViewer],

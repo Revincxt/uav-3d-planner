@@ -146,32 +146,50 @@ def test_snapshot_rejects_stale_or_incomplete_inputs(inputs, snapshot, change):
         inputs.load_inputs(public, city)
 
 
-@pytest.fixture
-def computation_source(inputs, tmp_path, monkeypatch):
-    source = b"def distance(x, y):\n    return (x*x + y*y)**0.5\n"
-    sha256 = "sha256:" + hashlib.sha256(source).hexdigest()
-    path = tmp_path / "planner.py"
-    path.write_bytes(source)
+def test_recorded_source_identity_is_independent_of_current_checkout(inputs, monkeypatch, tmp_path):
+    files = [{"path": "src/uav3d/retired.py", "sha256": "sha256:" + "a" * 64}]
+    sha256 = (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+    )
+    bundle = {
+        "sourceCommit": "local-snapshot:" + sha256,
+        "sourceProvenance": {"kind": "local-snapshot", "sha256": sha256, "files": files},
+    }
     monkeypatch.setattr(inputs, "ROOT", tmp_path)
-    return path, sha256
-
-
-def test_computation_source_requires_exact_bytes(inputs, computation_source):
-    path, sha256 = computation_source
-    inputs.audit_source(path, sha256)
+    before = deepcopy(bundle)
+    inputs.audit_provenance(bundle)
+    assert bundle == before
+    bundle["computationSourceProvenance"] = deepcopy(bundle["sourceProvenance"])
+    bundle["computationSourceProvenance"]["files"][0]["sha256"] = "sha256:" + "b" * 64
+    with pytest.raises(ValueError, match="manifest digest mismatch"):
+        inputs.audit_provenance(bundle)
+    del bundle["computationSourceProvenance"]
+    bundle["sourceProvenance"]["files"][0]["sha256"] = "sha256:" + "b" * 64
+    with pytest.raises(ValueError, match="manifest digest mismatch"):
+        inputs.audit_provenance(bundle)
 
 
 @pytest.mark.parametrize(
-    "source",
+    "change",
     [
-        "def distance(x, y):\n    return (x * x + y * y) ** 0.5\n",
-        "def distance(x, y):\n    return (x * x + y * y) ** 0.6\n",
-        "def distance(x, y):\n    return x + y\n",
+        {"sourceCommit": "local-snapshot:sha256:other"},
+        {"sourceProvenance": {"kind": "other", "sha256": "sha256:original", "files": [1]}},
+        {"sourceProvenance": {"kind": "local-snapshot", "sha256": "sha256:original", "files": []}},
     ],
 )
-def test_changed_computation_bytes_cannot_reuse_recorded_hash(inputs, computation_source, source):
-    path, sha256 = computation_source
-    path.write_text(source, encoding="utf-8")
-    assert inputs.digest(path) != sha256
-    with pytest.raises(ValueError, match="Computation source changed"):
-        inputs.audit_source(path, sha256)
+def test_recorded_source_rejects_inconsistent_identity(inputs, change):
+    with pytest.raises(ValueError):
+        inputs.audit_provenance(
+            {
+                "sourceCommit": "local-snapshot:sha256:original",
+                "sourceProvenance": {
+                    "kind": "local-snapshot",
+                    "sha256": "sha256:original",
+                    "files": [1],
+                },
+                **change,
+            }
+        )

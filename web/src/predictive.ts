@@ -107,11 +107,10 @@ function mostRecentEvent(
   flight: FinalFlight,
   timeS: number,
 ): PredictiveFrame | null {
-  return (
-    [...visibleEvents(flight)]
-      .reverse()
-      .find(({ frame }) => frame.timeS <= timeS + EPSILON)?.frame ?? null
-  );
+  const events = visibleEvents(flight);
+  for (let i = events.length - 1; i >= 0; i--)
+    if (events[i]!.frame.timeS <= timeS + EPSILON) return events[i]!.frame;
+  return null;
 }
 
 const turnSampleCache = new WeakMap<TimedWaypoint[], TurnSample[]>();

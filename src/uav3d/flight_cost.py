@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from itertools import pairwise
 
 from uav3d.collision import point_is_free
 from uav3d.geometry import Point3, distance
@@ -41,10 +40,6 @@ def mission_altitude_levels(scene: Scene, resolution: float) -> tuple[float, ...
     levels.update((scene.start[2], scene.goal[2]))
     levels.update(task["position"][2] for task in scene.metadata.get("missionTaskPoints", []))
     return tuple(sorted(z for z in levels if lower <= z <= upper))
-
-
-def vertical_travel(points: tuple[Point3, ...]) -> float:
-    return math.fsum(abs(b[2] - a[2]) for a, b in pairwise(points))
 
 
 def with_turn_clearance(scene: Scene, reserve_m: float = 2.0) -> Scene:

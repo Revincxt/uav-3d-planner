@@ -223,17 +223,18 @@ describe("real eight-route records", () => {
       const overview = new RouteOverview();
       overview.setRoutes(routes, routes[0]!.id, 800, 600);
       const gates = routes.map(route => overview.group.getObjectByName(`overview-tasks-${route.id}`) as THREE.InstancedMesh);
-      const reference = gates[0]!.geometry.getAttribute("position");
+      const reference = gates[0]!.geometry, disposed = vi.spyOn(reference, "dispose");
       for (const [index, gate] of gates.entries()) {
         expect(gate).toBeInstanceOf(THREE.InstancedMesh);
         expect(gate.count).toBe(routes[index]!.mission!.taskPoints!.length);
-        expect(gate.geometry.getAttribute("position").array).toEqual(reference.array);
+        expect(gate.geometry).toBe(reference);
         const material = gate.material as THREE.MeshStandardMaterial;
         expect(material.userData.style).toBe("racing-gate");
         expect(material.color.getHex()).toBe(routeColor(index));
         expect(material.depthTest && material.depthWrite).toBe(true);
       }
       overview.dispose();
+      expect(disposed).toHaveBeenCalledOnce();
     }
   });
   it.each(staticBundle.planners)("retains all static stops and original data for $id", planner => {

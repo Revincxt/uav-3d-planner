@@ -54,12 +54,15 @@ describe("required mission stops", () => {
     addMissionTaskMarkers(host, mission);
     const tasks = host.getObjectByName("mission-task-points")!;
     expect(tasks.children).toHaveLength(8);
+    const shared = tasks.children[0]!.getObjectByName("mission-gate") as THREE.Mesh;
+    const geometryDisposed = vi.spyOn(shared.geometry, "dispose"), materialDisposed = vi.spyOn(shared.material as THREE.Material, "dispose");
     tasks.children.forEach((task, index) => {
       const point = mission.taskPoints![index]!.position;
       expect(task.position.toArray()).toEqual([point[0], point[2], -point[1]]);
       const number = task.getObjectByName("task-number") as THREE.Sprite;
       expect(number.scale.x).toBe(7);
       const gate = task.getObjectByName("mission-gate") as THREE.Mesh;
+      expect(gate.geometry).toBe(shared.geometry); expect(gate.material).toBe(shared.material);
       expect(gate.geometry.type).toBe("ExtrudeGeometry");
       expect((gate.material as THREE.Material).depthTest).toBe(true);
       expect(number.material.depthTest).toBe(true);
@@ -71,6 +74,7 @@ describe("required mission stops", () => {
     const disposed = vi.spyOn(sprite.material.map!, "dispose");
     disposeRenderObject(host);
     expect(disposed).toHaveBeenCalledOnce();
+    expect(geometryDisposed).toHaveBeenCalledOnce(); expect(materialDisposed).toHaveBeenCalledOnce();
   });
   it("caps close-follow annotations and restores world sizes without moving task positions", () => {
     const host = new THREE.Group(), tasks = new THREE.Group(), task = new THREE.Group();

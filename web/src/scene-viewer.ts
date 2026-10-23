@@ -24,6 +24,7 @@ export class SceneViewer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.OrthographicCamera();
+  private readonly viewport = new THREE.Vector2();
   private readonly controls: OrbitControls;
   private motion?: MapCameraMotion;
   private readonly frames = new FrameRenderer(() => this.drawFrame());
@@ -267,12 +268,13 @@ export class SceneViewer {
     const drone = this.follow?.routeId ? this.overview?.vehicle(this.follow.routeId) : undefined;
     if (drone && this.follow?.update(drone.position, this.overview!.heading(this.follow.routeId!, this.playbackTimeS), this.playbackTimeS)) this.frames.request();
     const camera = drone ? this.follow!.camera : this.camera;
-    this.overview?.updateSymbols(camera, this.container.clientHeight, this.follow?.routeId);
-    sizeMissionTaskMarkers(this.content, camera, this.container.clientHeight, Boolean(drone) || Boolean(this.observationBounds));
+    const { x: width, y: height } = this.renderer.getSize(this.viewport);
+    this.overview?.updateSymbols(camera, height, this.follow?.routeId);
+    sizeMissionTaskMarkers(this.content, camera, height, Boolean(drone) || Boolean(this.observationBounds));
     avoidDroneMarkerOverlap(this.content, this.overview?.vehicle(this.scenario?.id ?? ""));
     const pixelRatio = this.renderer.getPixelRatio();
-    updateMapSurround(this.content, camera, this.container.clientWidth * pixelRatio,
-      this.container.clientHeight * pixelRatio, this.renderer.capabilities.getMaxAnisotropy());
+    updateMapSurround(this.content, camera, width * pixelRatio,
+      height * pixelRatio, this.renderer.capabilities.getMaxAnisotropy());
     const background = this.scene.background;
     if (drone) this.scene.background = this.follow!.sky;
     this.renderer.render(this.scene, camera);

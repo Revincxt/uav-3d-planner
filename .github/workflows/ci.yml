@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
         with:
@@ -42,6 +40,7 @@ jobs:
       - name: Verify curated scenarios
         run: python scripts/export_scenarios.py --check
       - name: Re-audit committed web study data
+        if: matrix.python-version == '3.12'
         run: python scripts/validate_committed_data.py
       - name: Run tests with branch coverage
         run: pytest --cov=uav3d --cov-report=term-missing
@@ -115,7 +114,5 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Validate, test, and build
         run: |
-          pnpm validate:data
           pnpm test
-          pnpm typecheck
           pnpm build

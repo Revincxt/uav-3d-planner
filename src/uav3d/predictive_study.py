@@ -24,7 +24,7 @@ from uav3d.kinematics import (
 )
 from uav3d.planners.space_time_astar import SpaceTimeAStar3D, SpaceTimeAStarConfig
 from uav3d.predictive import TimedPath, TimedWaypoint
-from uav3d.predictive_scenarios import build_predictive_cohort, load_predictive_scenario
+from uav3d.predictive_scenarios import build_predictive_cohort
 from uav3d.predictive_smoothing import (
     PredictiveSmoothingResult,
     smooth_predictive_timed_path,
@@ -1415,10 +1415,6 @@ def export_predictive_study(output_dir: Path, *, source_commit: str) -> dict[str
     return bundle
 
 
-def load_and_run_predictive_episode(scenario_id: str, planner_id: str) -> PredictiveEpisode:
-    return run_predictive_episode(load_predictive_scenario(scenario_id), planner_id)
-
-
 __all__ = [
     "APPROXIMATE_SEPARATION_WITNESS_DECIMAL_PLACES",
     "CRUISE_SPEED_MPS",
@@ -1447,7 +1443,6 @@ __all__ = [
     "PredictiveEpisodeMetrics",
     "build_predictive_bundle",
     "export_predictive_study",
-    "load_and_run_predictive_episode",
     "predictive_record_rows",
     "predictive_run_id",
     "run_predictive_episode",

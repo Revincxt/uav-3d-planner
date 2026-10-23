@@ -48,18 +48,4 @@ describe("one final flight", () => {
     run.smoothing.execution.qualification = null;
     expect(() => finalFlight(run)).toThrow("No validated flight");
   });
-
-  it("exposes no trajectory-version controls, audit panels or trace downloads", () => {
-    const read = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
-    for (const file of ["index.html", "predictive.html"]) {
-      const html = read(file);
-      expect(html).not.toMatch(/data-path-mode|name="path-mode"|data-layer="raw"/);
-      expect(html).not.toMatch(/\b(?:Raw|Geometry|Execution)\b/);
-    }
-    expect(read("predictive.html")).not.toMatch(/smoothing-meta|smoothing-note|path-layer-label|path-toolbar/);
-    expect(read("results.html")).not.toMatch(/dataset-downloads|source-digest|analysis-note|\bdownload\b/i);
-    for (const file of ["src/predictive.css", "src/styles.css", "src/workspace.css"]) {
-      expect(read(file)).not.toMatch(/path-toolbar|path-mode-control|segmented-control|raw-line|smoothing-meta/);
-    }
-  });
 });

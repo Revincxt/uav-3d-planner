@@ -14,7 +14,6 @@ from uav3d.dynamic import DynamicScenario
 from uav3d.flight_cost import (
     flight_distance,
     mission_altitude_levels,
-    vertical_travel,
     with_turn_clearance,
 )
 from uav3d.horizontal_curves import smooth_horizontal_curves
@@ -68,8 +67,10 @@ def test_slow_climb_prefers_a_level_horizontal_detour(kind: str) -> None:
     assert old.success and new.success
     assert path_is_free(scene, new.path)
     assert new.path[0] == scene.start and new.path[-1] == scene.goal
-    assert vertical_travel(new.path) < vertical_travel(old.path)
-    assert vertical_travel(new.path) == pytest.approx(0)
+    old_vertical_travel = math.fsum(abs(b[2] - a[2]) for a, b in pairwise(old.path))
+    new_vertical_travel = math.fsum(abs(b[2] - a[2]) for a, b in pairwise(new.path))
+    assert new_vertical_travel < old_vertical_travel
+    assert new_vertical_travel == pytest.approx(0)
     assert max(abs(p[1] - 50) for p in new.path) >= 16
 
 

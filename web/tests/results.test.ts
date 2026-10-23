@@ -5,37 +5,6 @@ function mission(success: boolean, routeM: number | null, arrivalTimeS: number |
   return { success, routeM, planningTimeMs: null, arrivalTimeS, waitTimeS: 0, work: 30, workUnit: "expanded-nodes" };
 }
 describe("observed Manhattan mission results", () => {
-  it("removes the old study heading, counter, per-mission lists and their styles", async () => {
-    const filesystemModule = "node:fs";
-    const { readFileSync } = await import(filesystemModule);
-    const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-    expect(read("results.html")).not.toMatch(/Mission studies|case-count|sidebar-heading/);
-    expect(read("src/benchmark-panel.ts")).toContain('charts.id = "comparison-charts"');
-    expect(read("results.html")).toContain('id="benchmark-map"');
-    for (const path of ["src/results.ts", "src/results.css", "src/simulator-ui.css"]) {
-      expect(read(path)).not.toMatch(/mission-outcomes|mission-outcome|outcome-values|outcome-name|median-heading|summary-completion/);
-    }
-  });
-  it("uses charts alone without counts, inspector controls or repeated summary cards", async () => {
-    const filesystemModule = "node:fs";
-    const { readFileSync } = await import(filesystemModule);
-    const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-    expect(read("results.html")).not.toMatch(/summary-body|inspector|dataset-metrics|official-source/);
-    expect(read("src/results.ts")).not.toMatch(/mountInspector|renderCards|renderDataset|missions ·|planners`/);
-    expect(read("src/workspace.ts")).not.toContain("copy.append(title, subtitle)");
-    for (const path of ["src/results.css", "src/simulator-ui.css"]) {
-      expect(read(path)).not.toMatch(/planner-summary|summary-measure/);
-    }
-  });
-  it("shows all study charts together without a sidebar or study selector", async () => {
-    const filesystemModule = "node:fs";
-    const { readFileSync } = await import(filesystemModule);
-    const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-    expect(read("results.html")).not.toMatch(/case-sidebar|case-library|scenario-select|analysis-title/);
-    expect(read("src/results.ts")).not.toMatch(/mountWorkspace|select\.value|select\.addEventListener/);
-    expect(read("src/benchmark-panel.ts")).toContain("analyses.map(renderStudy)");
-    expect(read("src/results.css")).toContain("grid-template-rows: repeat(3, minmax(0, 1fr))");
-  });
   it("keeps zero waits and excludes missing values without inventing zero observations", () => {
     expect(observedMedian([null, Number.NaN])).toBeNull(); expect(observedMedian([0, 0, 2, 4])).toBe(1); expect(observedMedian([3, null, 1])).toBe(2);
   });

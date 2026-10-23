@@ -94,22 +94,3 @@ def smooth_timed_curves(
     if not candidate.is_safe(scenario):
         raise ValueError("spline curve failed its complete time-domain collision audit")
     return candidate, curves.rounded_corners, curves.turn_scale_m
-
-
-def smooth_timed_horizontal_curves(
-    scenario: DynamicScenario,
-    path: TimedPath,
-    turn_scale_m: float,
-    sample_spacing_m: float,
-    *,
-    round_reversals: bool = False,
-) -> tuple[TimedPath, int, float | None]:
-    """Explicit altitude-locked mode for callers requiring unchanged z(t)."""
-    return smooth_timed_curves(
-        scenario,
-        path,
-        turn_scale_m,
-        sample_spacing_m,
-        round_reversals=round_reversals,
-        preserve_altitude=True,
-    )

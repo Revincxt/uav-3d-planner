@@ -1,10 +1,12 @@
 import * as THREE from "three";
 import { createDrone, orientDrone } from "./drone-model";
-import { enuToThree } from "./coordinates";
 import { timedPosition, waypointIndex } from "./route-overview";
 import { ringPoints } from "./viewer-geometry";
 import type { MovingSphereDefinition } from "./dynamic-schema";
 import { metresPerPixelAt, type DisplayCamera } from "./camera-scale";
+
+const position: [number, number, number] = [0, 0, 0];
+const direction = new THREE.Vector3();
 
 /** Large cargo traffic; camera-sized body is a depth-tested display annotation. */
 export function createTrafficAircraft(definition: MovingSphereDefinition): THREE.Group {
@@ -49,7 +51,8 @@ export function sizeTrafficAircraft(aircraft: THREE.Object3D, camera: DisplayCam
 }
 
 export function updateTrafficAircraft(aircraft: THREE.Object3D, definition: MovingSphereDefinition, timeS: number): void {
-  aircraft.position.fromArray(enuToThree(timedPosition(definition.keyframes, timeS)));
+  timedPosition(definition.keyframes, timeS, position);
+  aircraft.position.set(position[0], position[2], -position[1]);
   const index = waypointIndex(definition.keyframes, timeS);
   const frames = definition.keyframes;
   const moving = (i: number): boolean => frames[i]!.position.some((v, axis) => Math.abs(v - frames[i + 1]!.position[axis]!) > 1e-8);
@@ -61,7 +64,9 @@ export function updateTrafficAircraft(aircraft: THREE.Object3D, definition: Movi
     segment = 0;
     while (segment < frames.length - 1 && !moving(segment)) segment++;
   }
-  if (segment < frames.length - 1) orientDrone(aircraft, new THREE.Vector3().fromArray(enuToThree(frames[segment + 1]!.position))
-    .sub(new THREE.Vector3().fromArray(enuToThree(frames[segment]!.position))));
+  if (segment < frames.length - 1) {
+    const a = frames[segment]!.position, b = frames[segment + 1]!.position;
+    orientDrone(aircraft, direction.set(b[0] - a[0], b[2] - a[2], a[1] - b[1]));
+  }
 }
 

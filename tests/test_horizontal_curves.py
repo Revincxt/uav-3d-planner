@@ -8,7 +8,7 @@ from itertools import pairwise
 
 import pytest
 
-from uav3d.curve_timing import smooth_timed_horizontal_curves
+from uav3d.curve_timing import smooth_timed_curves
 from uav3d.dynamic import DynamicScenario
 from uav3d.geometry import Point3, lerp
 from uav3d.horizontal_curves import _heading_samples, _span, smooth_horizontal_curves
@@ -174,7 +174,7 @@ def test_timed_curve_passes_through_service_point_and_keeps_the_complete_hold() 
         path.positions[-1],
     )
     scenario = DynamicScenario("curve", "Curve", scene)
-    result, count, _ = smooth_timed_horizontal_curves(scenario, path, 60, 2)
+    result, count, _ = smooth_timed_curves(scenario, path, 60, 2, preserve_altitude=True)
     assert count == 1 and result.is_safe(scenario)
     assert position_at(result, 10.0) == path.positions[1]
     assert position_at(result, 16.0) == path.positions[1]
@@ -210,8 +210,8 @@ def test_decimal_service_clock_does_not_become_a_roundoff_movement() -> None:
         path.start,
         path.goal,
     )
-    result, count, _ = smooth_timed_horizontal_curves(
-        DynamicScenario("decimal", "Decimal", scene), path, 60, 2
+    result, count, _ = smooth_timed_curves(
+        DynamicScenario("decimal", "Decimal", scene), path, 60, 2, preserve_altitude=True
     )
     assert count == 1
     assert result.wait_time_s == path.wait_time_s

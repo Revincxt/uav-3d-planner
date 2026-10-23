@@ -257,6 +257,7 @@ export class RouteOverview {
       return;
     }
     this.clear();
+    let gateGeometry: THREE.BufferGeometry | undefined;
     routes.forEach((route, index) => {
       if (route.points.length < 2) throw new Error(`Empty overview route: ${route.id}`);
       const color = routeColor(index), group = new THREE.Group();
@@ -309,7 +310,7 @@ export class RouteOverview {
       const tasks = route.mission?.taskPoints ?? [];
       let markers: THREE.InstancedMesh | undefined;
       if (tasks.length) {
-        markers = new THREE.InstancedMesh(missionGateGeometry(), missionGateMaterial(color), tasks.length);
+        markers = new THREE.InstancedMesh(gateGeometry ??= missionGateGeometry(), missionGateMaterial(color), tasks.length);
         markers.name = `overview-tasks-${route.id}`;
         tasks.forEach((task, index) => {
           markers!.setMatrixAt(index, missionGateMatrix(route.points, task.position));

@@ -81,6 +81,7 @@ export class PredictiveViewer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.OrthographicCamera();
+  private readonly viewport = new THREE.Vector2();
   private readonly controls: OrbitControls;
   private motion?: MapCameraMotion;
   private readonly frames = new FrameRenderer(() => this.drawFrame());
@@ -215,6 +216,8 @@ export class PredictiveViewer {
       if (!visual) continue;
       animatedShadows ||= this.zonesGroup.visible && visual.fill.castShadow;
       const active = zone.activeFromS <= hazardTime && hazardTime < zone.activeUntilS;
+      if (visual.fill.visible === active && visual.outline.visible === active
+        && visual.fill.material.opacity === (active ? 0.18 : 0.025)) continue;
       visual.fill.visible = visual.outline.visible = active;
       visual.fill.material.opacity = active ? 0.18 : 0.025;
       visual.outline.traverse((child) => {
@@ -234,8 +237,8 @@ export class PredictiveViewer {
       }
       const mesh = this.movingSpheres.get(definition.id);
       if (mesh) {
-        mesh.position.fromArray(enuToThree(timedPosition(definition.keyframes, hazardTime)));
         if (this.scenario.city) updateTrafficAircraft(mesh, definition, hazardTime);
+        else mesh.position.fromArray(enuToThree(timedPosition(definition.keyframes, hazardTime)));
         if (this.dynamicGroup.visible) {
           mesh.traverseVisible((child) => { animatedShadows ||= child.castShadow; });
         }
@@ -609,13 +612,14 @@ export class PredictiveViewer {
     const drone = this.follow?.routeId ? this.overview?.vehicle(this.follow.routeId) : undefined;
     if (drone && this.follow?.update(drone.position, this.overview!.heading(this.follow.routeId!, this.playbackTimeS), this.playbackTimeS)) this.frames.request();
     const camera = drone ? this.follow!.camera : this.camera;
-    for (const aircraft of this.movingSpheres.values()) sizeTrafficAircraft(aircraft, camera, this.container.clientHeight);
-    this.overview?.updateSymbols(camera, this.container.clientHeight, this.follow?.routeId);
-    sizeMissionTaskMarkers(this.content, camera, this.container.clientHeight, Boolean(drone) || Boolean(this.observationBounds));
+    const { x: width, y: height } = this.renderer.getSize(this.viewport);
+    for (const aircraft of this.movingSpheres.values()) sizeTrafficAircraft(aircraft, camera, height);
+    this.overview?.updateSymbols(camera, height, this.follow?.routeId);
+    sizeMissionTaskMarkers(this.content, camera, height, Boolean(drone) || Boolean(this.observationBounds));
     avoidDroneMarkerOverlap(this.content, this.overview?.vehicle(this.scenario?.id ?? ""));
     const pixelRatio = this.renderer.getPixelRatio();
-    updateMapSurround(this.content, camera, this.container.clientWidth * pixelRatio,
-      this.container.clientHeight * pixelRatio, this.renderer.capabilities.getMaxAnisotropy());
+    updateMapSurround(this.content, camera, width * pixelRatio,
+      height * pixelRatio, this.renderer.capabilities.getMaxAnisotropy());
     const background = this.scene.background;
     if (drone) this.scene.background = this.follow!.sky;
     this.renderer.render(this.scene, camera);

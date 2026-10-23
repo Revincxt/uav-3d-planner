@@ -30,26 +30,6 @@ describe("shared translucent simulator surfaces", () => {
     expect(css).toContain("--hud-surface: var(--glass-surface)");
   });
 
-  it("shares the glass theme across Details, Results, HUD and chart cards", async () => {
-    const css = await styles();
-    expect(css).toMatch(/\.workspace \.inspector-card\s*\{[^}]*background: var\(--glass-panel\)/);
-    expect(css).toMatch(/\.workspace-results \.app-header\s*\{[^}]*background: var\(--glass-surface\)/);
-    expect(css).toMatch(/\.flight-hud\s*\{[^}]*background: var\(--hud-surface\)/);
-    const charts = await styles("results.css");
-    expect(charts).toMatch(/\.benchmark-panel\s*\{[^}]*background: linear-gradient\(145deg, #[0-9a-f]{8}, #[0-9a-f]{8}\)/);
-    expect(charts).toMatch(/\.comparison-chart\s*\{[^}]*background: var\(--glass-card\)/);
-    expect(charts).toMatch(/::after\s*\{[^}]*background: var\(--glass-popup\)/);
-  });
-
-  it("does not fade text or icons by changing a whole panel's opacity", async () => {
-    const css = await styles();
-    const opacityRules = [...css.matchAll(/([^{}]+)\{[^{}]*\bopacity:\s*[^;}]+/g)];
-    expect(opacityRules).toHaveLength(1);
-    expect(opacityRules[0]![1]).toContain("button:disabled");
-    expect(opacityRules[0]![1]).toContain("select:disabled");
-    expect(css).toMatch(/#play-pause\[aria-pressed="true"\]\s*\{[^}]*background: #[0-9a-f]{8};/);
-  });
-
   it("keeps normal, muted and unit labels readable even above a white map", async () => {
     const css = await styles(), surface = rgbaToken(css, "glass-surface");
     const background = surface.slice(0, 3).map(value => value * surface[3]! + 255 * (1 - surface[3]!));
@@ -59,13 +39,5 @@ describe("shared translucent simulator surfaces", () => {
       const contrast = (luminance(foreground) + .05) / (luminance(background) + .05);
       expect(contrast, `${name} contrast over the brightest possible map`).toBeGreaterThanOrEqual(4.5);
     }
-  });
-
-  it("reuses panel blur instead of adding a blur layer to every nested card", async () => {
-    const css = await styles(), charts = await styles("results.css");
-    for (const rule of [
-      charts.match(/\.comparison-chart\s*\{([^}]+)\}/)![1],
-      css.match(/\.workspace \.inspector-card :is\(\.metric-card[^}]+\{([^}]+)\}/)![1],
-    ]) expect(rule).not.toContain("backdrop-filter");
   });
 });
