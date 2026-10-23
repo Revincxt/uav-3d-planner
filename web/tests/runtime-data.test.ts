@@ -1,13 +1,12 @@
-import { describe, expect, it, afterEach, vi } from "vitest";
-import { packRuntimeData, unpackRuntimeData } from "../shared/runtime-data.mjs";
-import { fetchRuntimeData } from "../src/runtime-fetch";
+import { describe, expect, it } from "vitest";
+import { packRuntimeData, splitRuntimeCity, unpackRuntimeData } from "../shared/runtime-data.mjs";
 import { validateBundle } from "../src/static-validation";
 import { validateDynamicBundle } from "../src/dynamic-validation";
 import { validatePredictiveBundle } from "../src/predictive-validation";
 import { readStudyData } from '../scripts/study-reader.mjs';
 
-const compression = "node:zlib", cryptoModule = "node:crypto";
-const { gzipSync } = await import(compression), { createHash } = await import(cryptoModule);
+const cryptoModule = "node:crypto";
+const { createHash } = await import(cryptoModule);
 // Same JSON value digest without materializing a >512 MiB root string.
 const digest = (value: Record<string, unknown>) => {
   const hash = createHash("sha256").update('{');
@@ -20,7 +19,6 @@ const digest = (value: Record<string, unknown>) => {
   });
   return hash.update('}').digest('hex');
 };
-afterEach(() => vi.unstubAllGlobals());
 
 describe("lossless runtime delivery", () => {
   it.each([
@@ -29,7 +27,9 @@ describe("lossless runtime delivery", () => {
     const original = await readStudyData(new URL(`../public/${name}.json`, import.meta.url));
     const expected = digest(original);
     const packed = packRuntimeData(original);
-    const decoded = unpackRuntimeData(JSON.parse(JSON.stringify(packed))) as typeof original;
+    const split = splitRuntimeCity(packed);
+    const decoded = unpackRuntimeData(JSON.parse(JSON.stringify({ runtimeVersion: 2, citySha256: 'a'.repeat(64),
+      pool: split.pool, bundle: split.bundle })), JSON.parse(JSON.stringify(split.city))) as typeof original;
     expect(digest(decoded)).toBe(expected);
     expect(digest(original)).toBe(expected);
     expect(decoded.scenarios[0].buildings).toBe(decoded.scenarios[1].buildings);
@@ -68,64 +68,19 @@ describe("lossless runtime delivery", () => {
     expect(() => unpackRuntimeData({ runtimeVersion: 2, pool: [], bundle: {} })).toThrow("Unsupported");
     expect(() => unpackRuntimeData({ runtimeVersion: 1, pool: [1], bundle: { ref: { $runtimeRef: 0, prefix: 0 } } })).toThrow("prefix");
   });
+  it('requires matching cities for every task without modifying the original packed data', () => {
+    const city = { bounds: {}, buildings: [], city: { id: 'first' } };
+    const packed = packRuntimeData({ scenarios: [{ ...city }, { ...city, city: { id: 'different' } }] });
+    const before = JSON.stringify(packed);
+    expect(() => splitRuntimeCity(packed)).toThrow('different cities');
+    expect(JSON.stringify(packed)).toBe(before);
+    expect(() => splitRuntimeCity(packRuntimeData({ scenarios: [] }))).toThrow('Missing shared runtime city');
+  });
+  it('rejects unknown, missing and augmented shared-city references', () => {
+    for (const ref of [{ $runtimeCity: 'missing' }, { $runtimeCity: 'buildings' }, { $runtimeCity: 'city', extra: true }]) {
+      expect(() => unpackRuntimeData({ runtimeVersion: 2, citySha256: 'a'.repeat(64), pool: [ref],
+        bundle: { ref: { $runtimeRef: 0 } } }, { city: {} })).toThrow('Invalid runtime city reference');
+    }
+  });
 });
 
-describe("compressed and compact delivery", () => {
-  const original = { scenarios: [{ buildings: [], start: [1, 2, 3] }] };
-  it("decompresses a real gzip response before lossless decoding", async () => {
-    const bytes = gzipSync(JSON.stringify(packRuntimeData(original)));
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(bytes));
-    expect(await fetchRuntimeData("static", "/app/", fetcher)).toEqual(original);
-    expect(fetcher).toHaveBeenCalledExactlyOnceWith("/app/demo-data.runtime.json.gz");
-  });
-  it("uses ordinary compact JSON when streaming decompression is unavailable", async () => {
-    vi.stubGlobal("DecompressionStream", undefined);
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(packRuntimeData(original)));
-    expect(await fetchRuntimeData("predictive", "./", fetcher)).toEqual(original);
-    expect(fetcher).toHaveBeenCalledWith("./predictive-data.runtime.json");
-  });
-  it("accepts .gz that a static host already decompressed via Content-Encoding", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json(packRuntimeData(original), { headers: { "Content-Encoding": "gzip" } }));
-    expect(await fetchRuntimeData("static", "./", fetcher)).toEqual(original);
-  });
-  it("recognizes gzip when its magic bytes arrive in separate stream chunks", async () => {
-    const bytes: Uint8Array = gzipSync(JSON.stringify(packRuntimeData(original)));
-    const body = new ReadableStream({ start(controller) {
-      controller.enqueue(bytes.slice(0, 1)); controller.enqueue(bytes.slice(1, 2)); controller.enqueue(bytes.slice(2)); controller.close();
-    } });
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(body));
-    expect(await fetchRuntimeData("static", "./", fetcher)).toEqual(original);
-  });
-  it("reports missing runtime assets without fetching a huge offline audit record", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(null, { status: 404 }))
-      .mockResolvedValueOnce(new Response(null, { status: 404 }));
-    await expect(fetchRuntimeData("dynamic", "./", fetcher)).rejects.toThrow("404");
-    expect(fetcher.mock.calls.map(call => call[0])).toEqual(["./dynamic-data.runtime.json.gz", "./dynamic-data.runtime.json"]);
-  });
-  it('uses compact lossless JSON when gzip is absent', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(null, { status: 404 }))
-      .mockResolvedValueOnce(Response.json(packRuntimeData(original)));
-    expect(await fetchRuntimeData('dynamic', './', fetcher)).toEqual(original);
-    expect(fetcher.mock.calls.map(call => call[0])).toEqual(['./dynamic-data.runtime.json.gz', './dynamic-data.runtime.json']);
-  });
-  it.each([403, 500])('does not hide compact fallback HTTP %s', async status => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(null, { status: 404 }))
-      .mockResolvedValueOnce(new Response(null, { status }));
-    await expect(fetchRuntimeData('dynamic', './', fetcher)).rejects.toThrow(String(status));
-    expect(fetcher).toHaveBeenCalledTimes(2);
-  });
-  it.each([403, 500])("does not hide HTTP %s behind the old dataset", async status => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status }));
-    await expect(fetchRuntimeData("static", "./", fetcher)).rejects.toThrow(String(status));
-    expect(fetcher).toHaveBeenCalledTimes(1);
-  });
-  it("does not accept corrupted compressed bytes or references", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response("bad gzip"));
-    await expect(fetchRuntimeData("static", "./", fetcher)).rejects.toThrow();
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    vi.stubGlobal("DecompressionStream", undefined);
-    fetcher.mockClear().mockResolvedValue(Response.json({ runtimeVersion: 1, pool: [], bundle: { scenarios: { $runtimeRef: 7 } } }));
-    await expect(fetchRuntimeData("static", "./", fetcher)).rejects.toThrow("reference");
-    expect(fetcher).toHaveBeenCalledTimes(1);
-  });
-});

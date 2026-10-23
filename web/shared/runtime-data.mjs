@@ -34,15 +34,36 @@ export function packRuntimeData(bundle) {
   });
   return { runtimeVersion: 1, pool, bundle: { ...bundle, scenarios } };
 }
-export function unpackRuntimeData(value) {
-  if (!value || value.runtimeVersion !== 1 || !Array.isArray(value.pool) || !value.bundle || typeof value.bundle !== 'object') throw new Error('Unsupported runtime delivery format');
+/** Externalize only byte-identical city fields; mission and hazard records stay local. */
+export function splitRuntimeCity(value) {
+  const fields = ['bounds', 'buildings', 'city'], city = {}, pool = [...value.pool];
+  for (const scenario of value.bundle.scenarios) for (const field of fields) {
+    const index = scenario[field]?.$runtimeRef;
+    if (!Number.isInteger(index) || index < 0 || index >= pool.length) throw new Error('Missing shared runtime city');
+    const entry = value.pool[index];
+    if (Object.hasOwn(city, field) && city[field] !== entry && JSON.stringify(city[field]) !== JSON.stringify(entry)) throw new Error('Runtime missions use different cities');
+    city[field] = entry;
+    pool[index] = { $runtimeCity: field };
+  }
+  if (fields.some(field => !Object.hasOwn(city, field))) throw new Error('Missing shared runtime city');
+  return { pool, bundle: value.bundle, city };
+}
+export function unpackRuntimeData(value, city) {
+  if (!value || ![1, 2].includes(value.runtimeVersion) || !Array.isArray(value.pool) || !value.bundle || typeof value.bundle !== 'object'
+    || (value.runtimeVersion === 2 && (!/^[a-f\d]{64}$/.test(value.citySha256 ?? '') || !city || typeof city !== 'object'))) throw new Error('Unsupported runtime delivery format');
+  const pool = value.runtimeVersion === 1 ? value.pool : value.pool.map(entry => {
+    if (!entry || typeof entry !== 'object' || !Object.hasOwn(entry, '$runtimeCity')) return entry;
+    if (Object.keys(entry).length !== 1 || !['bounds', 'buildings', 'city'].includes(entry.$runtimeCity)
+      || !Object.hasOwn(city, entry.$runtimeCity)) throw new Error('Invalid runtime city reference');
+    return city[entry.$runtimeCity];
+  });
   const prefixes = new Map();
   const decode = item => {
     if (!item || typeof item !== 'object') return item;
     if (Object.hasOwn(item, '$runtimeRef')) {
       const index = item.$runtimeRef;
-      if (!Number.isInteger(index) || index < 0 || index >= value.pool.length || Object.keys(item).some(key => key !== '$runtimeRef' && key !== 'prefix')) throw new Error('Invalid runtime data reference');
-      const entry = value.pool[index];
+      if (!Number.isInteger(index) || index < 0 || index >= pool.length || Object.keys(item).some(key => key !== '$runtimeRef' && key !== 'prefix')) throw new Error('Invalid runtime data reference');
+      const entry = pool[index];
       if (!Object.hasOwn(item, 'prefix')) return entry;
       if (!Array.isArray(entry) || !Number.isInteger(item.prefix) || item.prefix < 0 || item.prefix > entry.length) throw new Error('Invalid runtime path prefix');
       // Different frames/identical planner traces may borrow the same prefix.

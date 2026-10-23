@@ -11,6 +11,9 @@ const { tmpdir } = await import(osModule), { join, basename } = await import(pat
 const { gunzipSync } = await import(compressionModule);
 const { runtimeDataPlugin } = await import(pluginModule);
 const names = ['demo-data', 'dynamic-data', 'predictive-data'];
+const kinds = ['static', 'dynamic', 'predictive'];
+const city = { bounds: { min: [0, 0, 0], max: [10, 10, 10] }, buildings: [], city: { id: 'test-city' } };
+const native = (name: string) => ({ name, city: 'a'.repeat(64), scenarios: [{ ...city }] });
 
 describe('runtime assets and Benchmark share a single source read', () => {
   let root: string;
@@ -25,7 +28,7 @@ describe('runtime assets and Benchmark share a single source read', () => {
     for (const name of names) await writeFile(join(root, 'public', `${name}.json`), '{}');
     reader.mockImplementation(async (path) => {
       const name = basename(String(path), '.json');
-      return { value: { name, city: 'a'.repeat(64), scenarios: [] }, sha256: `sha256:${name}` };
+      return { value: native(name), sha256: 'b'.repeat(64) };
     });
   });
   afterEach(async () => { await rm(root, { recursive: true, force: true }); });
@@ -50,17 +53,24 @@ describe('runtime assets and Benchmark share a single source read', () => {
     await plugin.generateBundle.call({ emitFile, info: vi.fn() });
     expect(reader).toHaveBeenCalledTimes(3);
     expect(summarize).toHaveBeenCalledTimes(3);
-    expect(emitFile).toHaveBeenCalledTimes(7);
+    expect(emitFile).toHaveBeenCalledTimes(10);
     const assets = emitFile.mock.calls.map(call => call[0]);
-    for (const name of names) {
-      const compact = assets.find(asset => asset.fileName === `${name}.runtime.json`)!;
-      const compressed = assets.find(asset => asset.fileName === `${name}.runtime.json.gz`)!;
+    const delivery = JSON.parse(assets.find(asset => asset.fileName === 'runtime-manifest.json')!.source);
+    for (const [index, name] of names.entries()) {
+      const entry = delivery.datasets[kinds[index]!];
+      const compact = assets.find(asset => asset.fileName === entry.data.path)!;
+      const compressed = assets.find(asset => asset.fileName === entry.data.gzipPath)!;
       expect(gunzipSync(compressed.source).toString()).toBe(compact.source);
+      const common = JSON.parse(assets.find(asset => asset.fileName === entry.city.path)!.source);
+      expect(unpackRuntimeData(JSON.parse(compact.source), common)).toEqual(native(name));
     }
+    expect(new Set(Object.values(delivery.datasets).map((entry: any) => entry.city.path)).size).toBe(1);
+    expect(assets.filter(asset => asset.fileName.startsWith('runtime/city.'))).toHaveLength(2);
+    expect(assets.some(asset => /^\w+-data\.runtime\.json/.test(asset.fileName))).toBe(false);
     const summary = JSON.parse(assets.find(asset => asset.fileName === 'benchmark-summary.json')!.source);
     expect(summary.citySha256).toBe('a'.repeat(64));
     expect(summary.analyses).toEqual(names.map(name => ({ name, verified: true })));
-    expect(summary.sources).toEqual(Object.fromEntries(names.map(name => [name, `sha256:${name}`])));
+    expect(summary.sources).toEqual(Object.fromEntries(names.map(name => [name, 'b'.repeat(64)])));
   });
 
   it('caches a dev summary and invalidates it when an export changes', async () => {
@@ -73,6 +83,39 @@ describe('runtime assets and Benchmark share a single source read', () => {
     expect(reader).toHaveBeenCalledTimes(6);
   });
 
+  it('keeps addresses stable across builds and replaces only changed study assets', async () => {
+    const { plugin } = await setup();
+    const build = async () => {
+      const emitFile = vi.fn();
+      await plugin.generateBundle.call({ emitFile, info: vi.fn() });
+      const assets = emitFile.mock.calls.map(call => call[0]);
+      return { assets, manifest: JSON.parse(assets.find(asset => asset.fileName === 'runtime-manifest.json')!.source) };
+    };
+    const first = await build(), second = await build();
+    expect(second.manifest).toEqual(first.manifest);
+    expect(reader).toHaveBeenCalledTimes(3);
+    reader.mockImplementation(async path => {
+      const name = basename(String(path), '.json');
+      const value = native(name);
+      return { value: { ...value, revision: 'changed' }, sha256: 'c'.repeat(64) };
+    });
+    await utimes(join(root, 'public', 'demo-data.json'), 100, 100);
+    const changed = await build();
+    expect(changed.manifest.datasets.static.data.path).not.toBe(first.manifest.datasets.static.data.path);
+    expect(changed.manifest.datasets.static.city).toEqual(first.manifest.datasets.static.city);
+    for (const kind of ['dynamic', 'predictive']) expect(changed.manifest.datasets[kind]).toEqual(first.manifest.datasets[kind]);
+    expect(changed.assets).toHaveLength(10);
+    expect(changed.assets.some(asset => asset.fileName === first.manifest.datasets.static.data.path)).toBe(false);
+    expect(reader).toHaveBeenCalledTimes(4);
+  });
+
+  it('rejects different shared cities before emitting a production manifest', async () => {
+    const { plugin } = await setup(), emitFile = vi.fn();
+    reader.mockResolvedValueOnce({ value: { ...native(names[0]!), scenarios: [{ ...city, buildings: [{ id: 'different' }] }] }, sha256: 'b'.repeat(64) });
+    await expect(plugin.generateBundle.call({ emitFile, info: vi.fn() })).rejects.toThrow('Runtime studies use different cities');
+    expect(emitFile).not.toHaveBeenCalled();
+  });
+
   it('preserves every native field even when the summarizer normalizes its input', async () => {
     summarize.mockImplementationOnce((name, value) => {
       const verified = value.name === name;
@@ -80,16 +123,17 @@ describe('runtime assets and Benchmark share a single source read', () => {
       return { citySha256: `sha256:${value.city}`, analysis: { name, verified } };
     });
     const { handler } = await setup();
-    const packed = await request(handler, '/demo-data.runtime.json');
-    expect(unpackRuntimeData(JSON.parse(packed))).toEqual({
-      name: 'demo-data', city: 'a'.repeat(64), scenarios: [],
-    });
+    const delivery = JSON.parse(await request(handler, '/runtime-manifest.json?study=static'));
+    const entry = delivery.datasets.static;
+    const packed = await request(handler, '/' + entry.data.path);
+    const common = await request(handler, '/' + entry.city.path);
+    expect(unpackRuntimeData(JSON.parse(packed), JSON.parse(common))).toEqual(native('demo-data'));
     expect(reader).toHaveBeenCalledOnce();
   });
 
   it('reuses a dev runtime asset audit for a subsequent Benchmark request', async () => {
     const { handler } = await setup();
-    await request(handler, '/dynamic-data.runtime.json.gz');
+    await request(handler, '/runtime-manifest.json?study=dynamic');
     await request(handler, '/benchmark-summary.json');
     expect(reader).toHaveBeenCalledTimes(3);
     expect(summarize).toHaveBeenCalledTimes(3);
