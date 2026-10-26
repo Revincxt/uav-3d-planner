@@ -1,9 +1,3 @@
-.workspace-dynamic {
-  --planned: #28a745;
-  --executed: #12722e;
-  --temporary: #df5656;
-  --moving: #98535b;
-}
 .dynamic-demo-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 292px;

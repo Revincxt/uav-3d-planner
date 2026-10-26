@@ -18,6 +18,7 @@ from uav3d.manhattan_city import (
     make_city_scene,
     preprocess_city,
 )
+from uav3d.manhattan_missions import resolve_rooftop_anchor
 
 
 class ManhattanGeometryTests(unittest.TestCase):
@@ -68,7 +69,6 @@ class ManhattanGeometryTests(unittest.TestCase):
 
     def test_web_polygons_use_matching_physical_ids_and_retain_courtyards(self) -> None:
         web = self.city.web_buildings()
-        self.assertEqual(web, self.city.to_web_buildings())
         for record, box, footprint in zip(
             web, self.city.buildings, self.city.footprints, strict=True
         ):
@@ -106,8 +106,8 @@ class ManhattanGeometryTests(unittest.TestCase):
         )
 
     def test_real_city_is_shared_in_scenes_and_simulated_endpoints_are_free(self) -> None:
-        start = self.city.rooftop_point(-73.9935, 40.7506)
-        goal = self.city.rooftop_point(-73.9842, 40.7537)
+        start = resolve_rooftop_anchor(self.city, -73.9935, 40.7506).position
+        goal = resolve_rooftop_anchor(self.city, -73.9842, 40.7537).position
         scene = make_city_scene(
             self.city, "test-penn-bryant", name="Test transfer", start=start, goal=goal
         )

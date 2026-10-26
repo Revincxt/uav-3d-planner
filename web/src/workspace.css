@@ -1,14 +1,6 @@
 :root {
   font-synthesis: none;
   --planned: #28a745;
-  --raw: #969e95;
-  --executed: #12722e;
-  --restricted: #cc4545;
-  --temporary: #df5656;
-  --moving: #98535b;
-  --witness: #a16f3d;
-  --wait: #d59452;
-  --building: #bcbcbc;
 }
 
 * { box-sizing: border-box; }
@@ -48,7 +40,7 @@ dd { margin: 0; }
 .workspace-content { display: flex; flex-direction: column; gap: 18px; min-width: 0; min-height: 0; padding: 25px 24px 24px; }
  .run-status, .witness-quality { display: inline-flex; align-items: center; width: fit-content; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: #718093; font-size: 9px; letter-spacing: .01em; white-space: nowrap; }
 .run-status.is-success, .status-success, .metric-positive { color: #248773; }
-.run-status.is-failed, .status-failed, .metric-negative { color: var(--failed); }
+.run-status.is-failed, .metric-negative { color: var(--failed); }
 .demo-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 276px; gap: 16px; flex: 1; min-width: 0; min-height: 0; }
 .stage-card { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid #dfe5ed; border-radius: 12px; background: #fff; box-shadow: 0 4px 18px rgba(32,42,55,.025); }
 .stage-toolbar { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-height: 49px; padding: 10px 13px; border-bottom: 1px solid var(--line); background: #fff; font-size: 10px; }

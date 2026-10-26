@@ -25,7 +25,6 @@ html { background: #344956; }
 #page-loading .page-loading-flight { display: block; width: 100%; height: 100%; }
 #page-loading .page-loading-reference { opacity: .32; stroke-width: 1; }
 #page-loading .page-loading-drone { filter: drop-shadow(0 2px 1.5px #20354440); }
-#page-loading .page-loading-heading { color: var(--loading-text); }
 #page-loading .page-loading-propeller { transform-box: view-box; transform-origin: 0 0; animation: page-loading-course .55s linear infinite; }
 #page-loading .page-loading-course { opacity: .65; transform-origin: 100px 100px; animation: page-loading-course 8s linear infinite; }
 #page-loading .page-loading-warning { display: none; position: absolute; inset: 32%; width: 36%; height: 36%; }

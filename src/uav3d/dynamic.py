@@ -51,18 +51,6 @@ class TemporaryCylinder:
         if self.active_from < 0 or self.active_from >= self.active_until:
             raise ValueError(f"invalid half-open active interval for {self.zone_id}")
 
-    @property
-    def active_start(self) -> float:
-        """Compatibility alias for the inclusive interval boundary."""
-
-        return self.active_from
-
-    @property
-    def active_end(self) -> float:
-        """Compatibility alias for the exclusive interval boundary."""
-
-        return self.active_until
-
     def is_active(self, time_s: float) -> bool:
         return self.active_from <= time_s < self.active_until
 
@@ -157,13 +145,6 @@ class DynamicScenario:
         all_ids = [*static_ids, *dynamic_ids]
         if len(all_ids) != len(set(all_ids)):
             raise ValueError("all static and dynamic obstacle IDs must be unique")
-
-    @property
-    def base_scene(self) -> Scene:
-        return self.static_scene
-
-    def snapshot_scene(self, time_s: float, start: Point3 | None = None) -> Scene:
-        return snapshot_scene(self, time_s, start=start)
 
     def to_dict(self) -> dict[str, object]:
         return {

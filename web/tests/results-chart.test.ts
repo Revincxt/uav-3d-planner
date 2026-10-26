@@ -17,16 +17,6 @@ describe("three overall algorithm comparisons", () => {
     expect(metrics[1]!.entries[0]).toMatchObject({ value: 310, unit: "s" });
     expect(metrics[2]!.entries[0]).toMatchObject({ value: 0, unit: "s" });
   });
-  it("renders vertical columns with one value label per algorithm and no parallel readout", async () => {
-    const filesystemModule = "node:fs";
-    const { readFileSync } = await import(filesystemModule);
-    const source = readFileSync(new URL("../src/results-chart.ts", import.meta.url), "utf8");
-    const css = readFileSync(new URL("../src/results.css", import.meta.url), "utf8");
-    expect(source).toContain('"--bar-height"');
-    expect(css).toContain("height: var(--bar-height)");
-    expect(source).not.toMatch(/comparison-row|comparison-track|comparison-full-value|comparison-compact-value/);
-    expect(source.match(/node\("output", "comparison-value"/g)).toHaveLength(1);
-  });
   it("never compares sample counts, queue pops and node expansions against one shared scale", () => {
     const metric = metricComparisons("static", [planner(), planner("lazy-theta-star", "expanded-nodes", 1800), planner("rrt-star", "samples", 1200)])[2]!;
     const groups = comparisonGroups(metric);

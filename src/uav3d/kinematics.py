@@ -118,10 +118,6 @@ class DiscreteExecutionQualification:
         ):
             raise ValueError("boundary-aware acceleration proxy must be finite and non-negative")
 
-    @property
-    def continuous_dynamics_certified(self) -> bool:
-        return False
-
     def to_dict(self) -> dict[str, object]:
         return {
             "status": "qualified" if self.qualified else "not-qualified",

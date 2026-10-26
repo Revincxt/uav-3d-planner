@@ -100,36 +100,6 @@ class ManhattanCity:
             for box, footprint in zip(self.buildings, self.footprints, strict=True)
         ]
 
-    def to_web_buildings(self) -> list[dict[str, Any]]:
-        return self.web_buildings()
-
-    def rooftop_point(self, longitude: float, latitude: float, clearance_m: float = 12.0) -> Point3:
-        """A simulated launch point above every conservative envelope at this location."""
-        east, north, _ = self.project(longitude, latitude)
-        nearby = [
-            box
-            for box in self.buildings
-            if box.minimum[0] - 3 <= east <= box.maximum[0] + 3
-            and box.minimum[1] - 3 <= north <= box.maximum[1] + 3
-        ]
-        if not nearby:
-            nearest = min(
-                self.buildings,
-                key=lambda box: math.hypot(
-                    (box.minimum[0] + box.maximum[0]) / 2 - east,
-                    (box.minimum[1] + box.maximum[1]) / 2 - north,
-                ),
-            )
-            east = (nearest.minimum[0] + nearest.maximum[0]) / 2
-            north = (nearest.minimum[1] + nearest.maximum[1]) / 2
-            nearby = [
-                box
-                for box in self.buildings
-                if box.minimum[0] - 3 <= east <= box.maximum[0] + 3
-                and box.minimum[1] - 3 <= north <= box.maximum[1] + 3
-            ]
-        return (east, north, max(box.maximum[2] for box in nearby) + clearance_m)
-
 
 def preprocess_city(source: dict[str, Any], provenance: dict[str, Any]) -> dict[str, Any]:
     """Convert unmodified official source rings to metres, keeping all selected features."""

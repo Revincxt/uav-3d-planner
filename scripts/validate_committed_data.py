@@ -53,7 +53,7 @@ def audit_downloads(bundle: dict[str, Any], public: Path) -> None:
 def audit_city(bundle: dict[str, Any], city: Any) -> None:
     if len(bundle["scenarios"]) != 8:
         raise ValueError("Each current study requires exactly eight missions")
-    expected = city.to_web_buildings()
+    expected = city.web_buildings()
     for scenario in bundle["scenarios"]:
         if scenario["buildings"] != expected:
             raise ValueError(f"Changed or incomplete source geometry: {scenario['id']}")

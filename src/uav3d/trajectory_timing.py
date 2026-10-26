@@ -60,10 +60,6 @@ class TrajectoryTimingResult:
     def added_duration_s(self) -> float:
         return self.candidate_duration_s - self.original_duration_s
 
-    @property
-    def continuous_dynamics_certified(self) -> bool:
-        return False
-
     def to_dict(self) -> dict[str, object]:
         return {
             "status": self.status,

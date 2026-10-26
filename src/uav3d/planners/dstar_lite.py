@@ -62,18 +62,6 @@ class DStarLite3D:
         self._replans = 0
 
     @property
-    def queue_pops_last(self) -> int:
-        return self._queue_pops_last
-
-    @property
-    def queue_pops_total(self) -> int:
-        return self._queue_pops_total
-
-    @property
-    def changed_edges_last(self) -> int:
-        return self._changed_edges_last
-
-    @property
     def replans(self) -> int:
         return self._replans
 

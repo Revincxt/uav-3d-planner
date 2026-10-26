@@ -508,7 +508,7 @@ def static_scene_record(
             "safetyMarginM": scene.safety_margin,
             "maxAltitudeM": scene.bounds.maximum[2],
         },
-        "buildings": city.to_web_buildings(),
+        "buildings": city.web_buildings(),
         "noFlyZones": [
             {
                 "id": zone.zone_id,
@@ -752,7 +752,7 @@ def dynamic_record(city: Any, mission: dict[str, Any], scenario: DynamicScenario
         {
             "description": mission["purpose"]
             + "; simulated temporary restrictions and air traffic.",
-            "buildings": city.to_web_buildings(),
+            "buildings": city.web_buildings(),
             "city": city.to_web_metadata(),
             "mission": {
                 key: mission[key]
@@ -788,7 +788,7 @@ def write_json(path: Path, value: Any) -> None:
 def refresh_artifacts(output_dir: Path, city: Any) -> None:
     """Serialize existing certified runs compactly without changing recorded metrics."""
     source, provenance = source_snapshot()
-    expected_buildings = city.to_web_buildings()
+    expected_buildings = city.web_buildings()
     for name in ("demo-data.json", "dynamic-data.json"):
         path = output_dir / name
         bundle = json.loads(path.read_text(encoding="utf-8"))

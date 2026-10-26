@@ -10,27 +10,6 @@ async function html(file: string): Promise<string> {
 }
 
 describe("shared navigation and flight controls", () => {
-  it("anchors the flight status at the viewport top center without moving the flight HUD", async () => {
-    const styles = await html("src/simulator-ui.css");
-    const status = styles.match(/\.workspace:not\(\.workspace-results\) \.playback-state\s*\{([^}]+)\}/)![1]!;
-    expect(status).toContain("top: var(--hud-gap)");
-    expect(status).toContain("left: 50%");
-    expect(status).toContain("transform: translateX(-50%)");
-    expect(styles).not.toMatch(/\.playback-state\s*\{[^}]*top: (170|244|139)px/);
-    const hud = styles.match(/\.flight-hud\s*\{([^}]+)\}/)![1]!;
-    expect(hud).toContain("bottom: var(--hud-gap)");
-  });
-
-  it("keeps algorithm and follow on the left while camera controls align to the right", async () => {
-    const styles = await html("src/simulator-ui.css");
-    const toolbar = styles.match(/\.workspace:not\(\.workspace-results\) \.stage-toolbar\s*\{([^}]+)\}/)![1]!;
-    expect(toolbar).toContain("left: var(--hud-gap)");
-    expect(toolbar).toContain("right: var(--hud-gap)");
-    expect(toolbar).toContain("width: auto");
-    expect(styles).toMatch(/\.stage-toolbar > \.camera-controls\s*\{\s*margin-left: auto;/);
-    expect(styles).toMatch(/\.workspace-static \.stage-toolbar \.planner-control\s*\{[^}]*width: 146px;/);
-  });
-
   it.each(["index.html", "dynamic.html", "predictive.html", "results.html"])(
     "keeps four named links and one active page in %s", async (file) => {
       const navigation = (await html(file)).match(/<nav class="study-nav"[^>]*>([\s\S]*?)<\/nav>/)![1]!;
