@@ -120,7 +120,6 @@ body { background: var(--page); font-size: var(--ui-size); }
 .flight-announcement[data-kind="resume"] { color: #b0e5cd; border-color: #80cda840; }
 .stage-viewport:has(> .flight-announcement:not([hidden])) .task-arrival-notice { visibility: hidden; }
 .flight-announcement[hidden] { display: none; }
-.workspace:not(.workspace-results) .map-attribution { bottom: var(--hud-gap); right: var(--hud-gap); max-width: calc(100% - 36px); color: #d7e3eb; font-size: 9px; background: var(--hud-surface); }
 .workspace .flight-hud .playback-bar {
   position: relative; bottom: auto; left: auto; transform: none; width: 100%; padding: 10px 12px;
   display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "transport transport" "timeline speed";
@@ -280,6 +279,9 @@ body { background: var(--page); font-size: var(--ui-size); }
   .workspace:not(.workspace-results) .app-header .route-legend { min-height: 32px; padding: 2px; }
   .workspace .route-legend button { min-height: 24px; padding-block: 3px; }
 }
+@media (min-width: 761px) and (max-width: 960px) {
+  .workspace:not(.workspace-results) .map-attribution { max-width: calc((100% - 380px) / 2 - 2 * var(--hud-gap)); }
+}
 @media (max-width: 760px) {
   :root { --hud-gap: 12px; }
   .workspace:not(.workspace-results) .app-header { grid-template-columns: minmax(0, 1fr); grid-template-rows: 32px 26px; grid-template-areas: "navigation" "routes"; height: auto; gap: 6px; }
@@ -305,12 +307,13 @@ body { background: var(--page); font-size: var(--ui-size); }
   .hud-reading > span { gap: 3px; }
   .flight-announcement { bottom: 239px; }
   .workspace .task-arrival-notice { bottom: 235px; padding: 9px 13px; }
-  .workspace:not(.workspace-results) .map-attribution { bottom: 218px; right: 12px; }
+  .workspace:not(.workspace-results) .map-attribution { bottom: 218px; }
   .workspace:not(.workspace-results) .demo-grid > .inspector-card { top: 206px; bottom: 12px; right: 12px; width: calc(100% - 24px); }
   .workspace .viewer-witness-readout { top: 316px; }
 }
 @media (max-height: 550px) and (min-width: 761px) {
   :root { --hud-gap: 12px; }
+  .workspace:not(.workspace-results) .map-attribution { max-width: calc((100% - 346px) / 2 - 2 * var(--hud-gap)); }
   .workspace-results .study-nav { height: 36px; padding: 2px; }
   .workspace-results .study-nav a { min-height: 30px; padding: 5px 6px; }
   .workspace:not(.workspace-results) .app-header { height: 36px; grid-template-rows: 36px; }

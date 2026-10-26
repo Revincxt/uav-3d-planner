@@ -38,10 +38,10 @@
 .benchmark-map canvas { display: block; width: 100%; height: 100%; }
 .workspace-results .app-header { position: fixed; z-index: 2; top: 12px; left: 20px; right: 20px; border: 0; background: transparent; pointer-events: none; }
 .workspace-results .app-header > * { pointer-events: auto; }
-.workspace-results .map-attribution { position: fixed; right: 18px; bottom: 8px; color: #d7e3eb; background: var(--hud-surface); }
+.workspace-results .map-attribution { position: fixed; bottom: 8px; }
 .benchmark-host, .benchmark-dialog[open] { display: grid; place-items: center; }
-.benchmark-host { position: fixed; inset: 76px 0 28px; pointer-events: none; }
-.benchmark-dialog { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 76px 0 28px; border: 0; background: transparent; color: var(--ink); overflow: hidden; }
+.benchmark-host { position: fixed; inset: 76px 0 48px; pointer-events: none; }
+.benchmark-dialog { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 76px 0 48px; border: 0; background: transparent; color: var(--ink); overflow: hidden; }
 .benchmark-dialog::backdrop { background: #07121a12; }
 .benchmark-panel { position: relative; display: grid; grid-template-rows: 56px minmax(0, 1fr); width: min(1220px, calc(100vw - 112px)); height: min(810px, 100%); min-height: 0; border: 1px solid #9ed7f03b; border-radius: 14px; background: linear-gradient(145deg, #142b38b3, #0b1828a8); backdrop-filter: blur(9px) saturate(.85); box-shadow: 0 24px 80px #020b1740, inset 0 1px #cdf2ff16; pointer-events: auto; color: var(--ink); font-family: inherit; }
 .benchmark-panel::before, .benchmark-panel::after { content: ""; position: absolute; width: 28px; height: 28px; pointer-events: none; border-color: #78dbec; border-style: solid; opacity: .6; }
@@ -108,8 +108,8 @@
   .benchmark-heading { padding: 0 14px; }
 }
 @media (max-width: 430px) {
-  .benchmark-dialog { padding: 88px 0 22px; }
-  .benchmark-host { inset: 70px 0 22px; }
+  .benchmark-dialog { padding: 88px 0 48px; }
+  .benchmark-host { inset: 70px 0 48px; }
   .benchmark-panel { width: calc(100vw - 24px); grid-template-rows: 44px minmax(0, 1fr); }
   .benchmark-panel .results-panel { padding: 8px; }
   .benchmark-panel .comparison-chart { padding: 6px 3px; }
@@ -117,8 +117,8 @@
   .benchmark-panel .study-comparison-heading { gap: 5px; }
 }
 @media (max-height: 550px) {
-  .benchmark-dialog { padding: 62px 0 20px; }
-  .benchmark-host { inset: 62px 0 20px; }
+  .benchmark-dialog { padding: 62px 0 48px; }
+  .benchmark-host { inset: 62px 0 48px; }
   .benchmark-panel { width: calc(100vw - 64px); grid-template-rows: 38px minmax(0, 1fr); }
   .benchmark-heading h1 { font-size: 13px; }
   .benchmark-panel .results-panel { padding: 8px 12px; }
