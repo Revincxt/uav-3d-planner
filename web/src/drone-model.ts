@@ -1,38 +1,75 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { metresPerPixelAt, type DisplayCamera } from "./camera-scale";
 
 /** A depth-tested display symbol, never a replacement for the recorded collision radius. */
 export function createDrone(color: number): THREE.Group {
   const drone = new THREE.Group();
   drone.userData = { kind: "quadcopter", rotorCount: 4, displaySymbol: true };
-  const frame: THREE.BufferGeometry[] = [new THREE.BoxGeometry(0.52, 0.22, 0.72)];
+  const rounded = (w: number, h: number, d: number, r: number, segments = 1) => new RoundedBoxGeometry(w, h, d, segments, r);
+  const paint = (geometry: THREE.BufferGeometry, tint: number): THREE.BufferGeometry => {
+    const shade = new THREE.Color(tint), colors = new Float32Array(geometry.getAttribute("position").count * 3);
+    for (let i = 0; i < colors.length; i += 3) shade.toArray(colors, i);
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    return geometry;
+  };
+  const frame: THREE.BufferGeometry[] = [rounded(.47, .12, .85, .055).translate(0, -.065, .035)];
+  const shell: THREE.BufferGeometry[] = [
+    rounded(.5, .26, .94, .11, 2).translate(0, .035, 0),
+    paint(rounded(.34, .035, .53, .016).translate(0, .177, .08), color),
+    paint(rounded(.16, .018, .035, .008).translate(0, .205, .25), 0xadc7bd),
+  ];
   const rotors: THREE.BufferGeometry[] = [];
-  for (const x of [-0.7, 0.7]) for (const z of [-0.7, 0.7]) {
-    const arm = new THREE.BoxGeometry(Math.SQRT2 * 0.7, 0.1, 0.11);
-    arm.rotateY(-Math.atan2(z, x));
-    arm.translate(x / 2, 0, z / 2);
-    frame.push(arm, new THREE.CylinderGeometry(0.09, 0.09, 0.22, 10).translate(x, 0.08, z));
-    const ring = new THREE.TorusGeometry(0.34, 0.025, 5, 24);
-    ring.rotateX(Math.PI / 2); ring.translate(x, 0.2, z);
-    rotors.push(ring, new THREE.BoxGeometry(0.62, 0.018, 0.045).translate(x, 0.2, z));
+  // Swept, tapered two-blade propellers; closed airfoils stay opaque and depth-tested.
+  const profile = new THREE.Shape().moveTo(.035, -.018).lineTo(.13, -.035)
+    .quadraticCurveTo(.27, -.06, .342, -.005).quadraticCurveTo(.36, .022, .31, .036)
+    .lineTo(.12, .045).quadraticCurveTo(.06, .04, .035, .018).closePath();
+  const blade = new THREE.ExtrudeGeometry(profile, { depth: .012, bevelEnabled: false, curveSegments: 4 });
+  blade.rotateX(Math.PI / 2);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = sx * .68, z = sz * .61;
+    const dx = x - sx * .16, dz = z - sz * .14, length = Math.hypot(dx, dz), angle = -Math.atan2(dz, dx);
+    frame.push(rounded(length, .085, .15, .035).rotateY(angle).translate(x - dx / 2, -.015, z - dz / 2),
+      new THREE.CylinderGeometry(.086, .074, .14, 12).translate(x, .07, z),
+      new THREE.CylinderGeometry(.072, .072, .018, 12).translate(x, .167, z));
+    shell.push(rounded(length * .88, .035, .11, .016).rotateY(angle).translate(x - dx / 2, .041, z - dz / 2),
+      new THREE.CylinderGeometry(.09, .09, .028, 16).translate(x, .145, z),
+      paint(rounded(.085, .018, .14, .008).rotateY(angle).translate(x - dx * .2, .063, z - dz * .2), color),
+      paint(new THREE.SphereGeometry(.025, 8, 6).scale(1, .6, 1).translate(x, .075, z + sz * .075), sz < 0 ? sx < 0 ? 0xe96257 : 0x6cc696 : color));
+    for (const side of [0, 1]) rotors.push(blade.clone().rotateY(side * Math.PI + sx * .45 + sz * .6).translate(x, .195, z));
+    rotors.push(new THREE.CylinderGeometry(.052, .065, .045, 12).translate(x, .2, z));
   }
-  for (const x of [-0.22, 0.22]) {
-    frame.push(new THREE.BoxGeometry(0.04, 0.2, 0.04).translate(x, -0.18, 0.22),
-      new THREE.BoxGeometry(0.04, 0.04, 0.65).translate(x, -0.28, 0));
+  blade.dispose();
+  for (const sx of [-1, 1]) {
+    for (const z of [-.23, .26]) shell.push(rounded(.04, .23, .05, .017).rotateZ(-sx * .16).translate(sx * .225, -.23, z));
+    frame.push(rounded(.075, .045, .68, .021).translate(sx * .24, -.355, .03));
+    // Recessed battery vents and forward stereo sensors.
+    for (let i = 0; i < 4; i++) frame.push(new THREE.BoxGeometry(.012, .035, .027).translate(sx * .247, .035, .16 + i * .049));
+    frame.push(new THREE.CylinderGeometry(.034, .034, .018, 12).rotateX(Math.PI / 2).translate(sx * .14, .045, -.477));
   }
-  const mesh = (parts: THREE.BufferGeometry[], tint: number, name: string): void => {
-    const geometry = mergeGeometries(parts)!;
+  // Underslung three-axis camera, protected inside the landing-gear clearance.
+  frame.push(rounded(.06, .11, .07, .02).translate(0, -.16, -.29),
+    rounded(.21, .16, .16, .045).translate(0, -.235, -.39),
+    new THREE.CylinderGeometry(.071, .071, .034, 16).rotateX(Math.PI / 2).translate(0, -.235, -.48));
+  shell.push(new THREE.TorusGeometry(.063, .009, 6, 16).translate(0, -.235, -.5),
+    paint(new THREE.CylinderGeometry(.051, .051, .008, 16).rotateX(Math.PI / 2).translate(0, -.235, -.504), 0x214657));
+
+  const mesh = (parts: THREE.BufferGeometry[], tint: number, name: string, roughness: number, metalness: number, vertexColors = false): void => {
+    // Rounded surfaces and extrusions are non-indexed; normalize before batching.
+    const normalized = parts.map(part => part.index ? part.toNonIndexed() : part);
+    if (vertexColors) for (const part of normalized) if (!part.hasAttribute("color")) paint(part, 0xcbd4db);
+    const geometry = mergeGeometries(normalized)!;
+    normalized.forEach((part, index) => { if (part !== parts[index]) part.dispose(); });
     parts.forEach(part => part.dispose());
     const object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-      color: tint, roughness: 0.55, metalness: 0.15, depthTest: true, depthWrite: true,
+      color: tint, roughness, metalness, vertexColors, depthTest: true, depthWrite: true,
     }));
     object.name = name; drone.add(object);
   };
-  mesh(frame, 0x182735, "drone-frame");
-  mesh(rotors, 0xe6edf3, "drone-rotors");
-  mesh([new THREE.BoxGeometry(0.46, 0.1, 0.5).translate(0, 0.15, 0),
-    new THREE.SphereGeometry(0.08, 10, 8).translate(0, 0, -0.4)], color, "drone-shell");
+  mesh(frame, 0x26313c, "drone-frame", .48, .28);
+  mesh(rotors, 0x263039, "drone-rotors", .64, .12);
+  mesh(shell, 0xffffff, "drone-shell", .4, .18, true);
   return drone;
 }
 

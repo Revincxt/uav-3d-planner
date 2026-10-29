@@ -5,7 +5,7 @@ import type { CityBox } from "./city-scene";
 import { timedPosition, type RouteWaypoint } from "./route-overview";
 import { BASE_PLAYBACK_SPEED, PLAYBACK_RATES } from "./playback-clock";
 
-const CHASE_DISTANCE_M = 12 / Math.cos(MIN_MAP_ELEVATION_RAD);
+const CHASE_DISTANCE_M = 8 / Math.cos(MIN_MAP_ELEVATION_RAD);
 const CAMERA_GRID_M = 64;
 const YAW_RESPONSE = 8, MAX_YAW_RATE = Math.PI, MAX_YAW_ACCELERATION = 3 * Math.PI;
 const MAX_TRACE_RATE = BASE_PLAYBACK_SPEED * Math.max(...PLAYBACK_RATES);
@@ -21,6 +21,7 @@ export class DroneFollow {
   private traceTime?: number;
   private yaw = 0;
   private yawVelocity = 0;
+  private headingYaw = 0;
   private boomDistance = CHASE_DISTANCE_M;
   private buildingSource?: readonly CityBox[];
   private readonly blockers = new Map<string, THREE.Box3[]>();
@@ -79,20 +80,27 @@ export class DroneFollow {
   private place(position: THREE.Vector3, heading: THREE.Vector3, snap: boolean, dt: number, timeS: number, rate: number, path?: readonly RouteWaypoint[]): boolean {
     const desiredYaw = heading.x * heading.x + heading.z * heading.z > 1e-10
       ? Math.atan2(-heading.x, -heading.z) : this.yaw;
-    const error = () => Math.atan2(Math.sin(desiredYaw - this.yaw), Math.cos(desiredYaw - this.yaw));
+    const difference = (to: number, from: number) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
+    const error = () => difference(desiredYaw, this.yaw);
     if (snap) { this.yaw += error(); this.yawVelocity = 0; }
     else {
-      // Critically damped yaw with bounded speed/acceleration. Small integration
-      // steps keep the response stable across refresh rates and rendering hitches.
+      // Follow the already-smoothed aircraft attitude with angular feed-forward.
+      // A second position-only damper lags behind a sustained turn and shows the
+      // aircraft sideways; track its turn rate while retaining the safety limits.
+      const turn = difference(desiredYaw, this.headingYaw);
+      const headingRate = dt > 0 ? THREE.MathUtils.clamp(turn / dt, -MAX_YAW_RATE, MAX_YAW_RATE) : 0;
       const steps = Math.max(1, Math.ceil(dt * 120)), stepS = dt / steps;
       for (let i = 0; i < steps; i++) {
-        const turn = error(), acceleration = THREE.MathUtils.clamp(YAW_RESPONSE ** 2 * turn - 2 * YAW_RESPONSE * this.yawVelocity, -MAX_YAW_ACCELERATION, MAX_YAW_ACCELERATION);
+        const target = this.headingYaw + turn * (i + .5) / steps;
+        const acceleration = THREE.MathUtils.clamp(YAW_RESPONSE ** 2 * difference(target, this.yaw)
+          + 2 * YAW_RESPONSE * (headingRate - this.yawVelocity), -MAX_YAW_ACCELERATION, MAX_YAW_ACCELERATION);
         const previousVelocity = this.yawVelocity;
         this.yawVelocity = THREE.MathUtils.clamp(this.yawVelocity + acceleration * stepS, -MAX_YAW_RATE, MAX_YAW_RATE);
         this.yaw += (previousVelocity + this.yawVelocity) * .5 * stepS;
       }
       if (Math.abs(error()) < 1e-5 && Math.abs(this.yawVelocity) < 1e-4) { this.yaw += error(); this.yawVelocity = 0; }
     }
+    this.headingYaw = desiredYaw;
     const turning = !snap && (Math.abs(error()) > 1e-5 || Math.abs(this.yawVelocity) > 1e-4);
     // Orbit only the short camera boom, not the recorded aircraft position.
     const rear = this.rear.set(Math.sin(this.yaw) * Math.cos(MIN_MAP_ELEVATION_RAD),

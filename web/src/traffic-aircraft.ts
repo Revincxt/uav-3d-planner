@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createDrone, orientDrone } from "./drone-model";
 import { timedPosition, waypointIndex } from "./route-overview";
 import { ringPoints } from "./viewer-geometry";
@@ -26,10 +27,10 @@ export function createTrafficAircraft(definition: MovingSphereDefinition): THREE
       node.material.emissiveIntensity = 0.25;
     }
   });
-  const cargo = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.55), new THREE.MeshStandardMaterial({
+  const cargo = new THREE.Mesh(new RoundedBoxGeometry(0.34, 0.2, 0.4, 1, 0.025), new THREE.MeshStandardMaterial({
     color: 0xd1a178, roughness: 0.85, depthTest: true, depthWrite: true,
   }));
-  cargo.position.y = -0.32;
+  cargo.position.y = -0.24;
   body.add(cargo);
   body.traverse(object => { if (object instanceof THREE.Mesh) { object.castShadow = false; object.receiveShadow = true; } });
   aircraft.add(body);

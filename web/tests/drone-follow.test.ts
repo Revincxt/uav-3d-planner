@@ -17,17 +17,23 @@ function fixture() {
 }
 
 describe("quadcopter display", () => {
-  it("has four rotors and three batched opaque, depth-tested parts, not a moving dot", () => {
+  it("keeps four rotors within the three-batch, depth-tested display budget", () => {
     const drone = createDrone(0x2563eb);
     expect(drone.userData.rotorCount).toBe(4);
     expect(drone.children).toHaveLength(3);
+    let triangles = 0;
     drone.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       expect(object.material.transparent).toBe(false);
       expect(object.material.depthTest).toBe(true);
       expect(object.material.depthWrite).toBe(true);
-      expect(object.geometry.index!.count).toBeGreaterThan(30);
+      const vertices = object.geometry.index?.count ?? object.geometry.getAttribute("position").count;
+      expect(vertices).toBeGreaterThan(30); triangles += vertices / 3;
+      expect(object.geometry.getAttribute("position").array.every(Number.isFinite)).toBe(true);
     });
+    expect(triangles).toBeLessThan(6000);
+    const span = new THREE.Box3().setFromObject(drone).getSize(new THREE.Vector3());
+    expect(Math.max(span.x, span.z)).toBeLessThanOrEqual(2.1);
     disposeRenderObject(drone);
   });
   it("uses horizontal heading, retains its level attitude and does not spin during holds", () => {
@@ -71,8 +77,8 @@ describe("centered close chase camera", () => {
     expect(follow.camera).toBeInstanceOf(THREE.PerspectiveCamera);
     expect(follow.camera.aspect).toBe(2); expect(follow.camera.fov).toBe(70);
     expect(follow.camera.position.x).toBeCloseTo(100);
-    expect(follow.camera.position.z).toBeCloseTo(-188);
-    expect(follow.camera.position.y - position.y).toBeCloseTo(12 * Math.tan(Math.PI / 12));
+    expect(follow.camera.position.z).toBeCloseTo(-192);
+    expect(follow.camera.position.y - position.y).toBeCloseTo(8 * Math.tan(Math.PI / 12));
     const center = position.clone().project(follow.camera);
     expect(center.x).toBeCloseTo(0); expect(center.y).toBeCloseTo(0);
     expect(center.z).toBeGreaterThan(-1); expect(center.z).toBeLessThan(1);
@@ -86,13 +92,13 @@ describe("centered close chase camera", () => {
     follow.start("uav-1", origin, north, 1200, 600); follow.update(origin, north, 0, 1000);
     const next = new THREE.Vector3(500, 130, 500);
     follow.update(next, east, 80, 1016);
-    expect(follow.camera.position.x).toBeCloseTo(488);
+    expect(follow.camera.position.x).toBeCloseTo(492);
     expect(follow.camera.position.z).toBeCloseTo(500);
-    expect(follow.camera.position.y - next.y).toBeCloseTo(12 * Math.tan(Math.PI / 12));
+    expect(follow.camera.position.y - next.y).toBeCloseTo(8 * Math.tan(Math.PI / 12));
     expect(follow.camera.getWorldDirection(new THREE.Vector3()).x).toBeCloseTo(Math.cos(Math.PI / 12));
     follow.update(origin, north, 0, 1032);
     expect(follow.camera.position.x).toBeCloseTo(100);
-    expect(follow.camera.position.z).toBeCloseTo(-188);
+    expect(follow.camera.position.z).toBeCloseTo(-192);
     expect(origin.clone().project(follow.camera).y).toBeCloseTo(0);
     expect(follow.camera.getWorldDirection(new THREE.Vector3()).x).toBeCloseTo(0);
   });
@@ -100,7 +106,7 @@ describe("centered close chase camera", () => {
     const { follow } = fixture(), origin = new THREE.Vector3(0, 90, 0), next = new THREE.Vector3(15, 90, 0);
     follow.start("uav-1", origin, north, 1200, 600); follow.update(origin, north, 0, 1000);
     expect(follow.update(next, east, 1, 1016)).toBe(true);
-    expect(follow.camera.position.distanceTo(next)).toBeCloseTo(12 / Math.cos(Math.PI / 12));
+    expect(follow.camera.position.distanceTo(next)).toBeCloseTo(8 / Math.cos(Math.PI / 12));
     expect(next.clone().project(follow.camera).x).toBeCloseTo(0);
     expect(next.clone().project(follow.camera).y).toBeCloseTo(0);
     const direction = follow.camera.getWorldDirection(new THREE.Vector3());
@@ -134,6 +140,26 @@ describe("centered close chase camera", () => {
         expect(follow.camera.rotation.z).toBe(0);
         yaw = next; velocity = speed;
       }
+    }
+  });
+  it("tracks sustained aircraft turns without the side-on lag of a second attitude filter", () => {
+    for (const hz of [30, 60, 120]) for (const traceRate of [2, 4, 8]) {
+      const { follow } = fixture(), position = new THREE.Vector3(0, 90, 0);
+      follow.start("uav-1", position, north, 1200, 600); follow.update(position, north, 0, 1000);
+      for (let frame = 1; frame <= hz * 3; frame++) {
+        const time = frame * traceRate / hz, yaw = time * Math.PI / 12;
+        const heading = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+        follow.update(position, heading, time, 1000 + frame * 1000 / hz);
+        if (frame >= hz) {
+          const error = Math.atan2(Math.sin(follow.camera.rotation.y - yaw), Math.cos(follow.camera.rotation.y - yaw));
+          expect(Math.abs(error)).toBeLessThan(3 * Math.PI / 180);
+        }
+      }
+      // A seek must discard the previous turn rate as well as the previous yaw.
+      follow.update(position, east, 100, 5000);
+      follow.update(position, east, 100, 5016);
+      const direction = follow.camera.getWorldDirection(new THREE.Vector3());
+      expect(direction.x).toBeCloseTo(Math.cos(Math.PI / 12)); expect(direction.z).toBeCloseTo(0);
     }
   });
   it("does not treat a slow frame at 2× playback as a seek, while real seeks still snap", () => {
@@ -202,17 +228,17 @@ describe("centered close chase camera", () => {
     expect(position.clone().project(follow.camera).y).toBeCloseTo(0);
     expect(follow.camera.position.distanceTo(position)).toBeCloseTo(4 / Math.cos(Math.PI / 12) - 0.5);
     follow.setBuildings([]); follow.update(position, north, 80, 1000);
-    expect(follow.camera.position.z).toBeCloseTo(12);
+    expect(follow.camera.position.z).toBeCloseTo(8);
     expect(position.toArray()).toEqual([0, 30, 0]);
   });
   it("ignores buildings below or beyond the short boom and supports negative grid coordinates", () => {
     const { follow } = fixture(), position = new THREE.Vector3(-64, 30, -64);
     follow.setBuildings([
-      { min: [-66, 40, 0], max: [-62, 45, 100] }, // Beyond the 12 m boom.
+      { min: [-66, 40, 0], max: [-62, 45, 100] }, // Beyond the 8 m boom.
       { min: [-66, 58, 0], max: [-62, 60, 10] }, // Below the aircraft.
     ]);
     follow.start("uav-1", position, north, 1200, 600);
-    expect(follow.camera.position.z).toBeCloseTo(-52);
+    expect(follow.camera.position.z).toBeCloseTo(-56);
     follow.setBuildings([{ min: [-66, 58, 0], max: [-62, 60, 100] }]);
     follow.update(position, north, 80, 1000);
     expect(follow.camera.position.z).toBeLessThan(-60);
@@ -228,10 +254,10 @@ describe("centered close chase camera", () => {
     follow.setBuildings([]);
     expect(follow.update(position, north, 1, 1016)).toBe(true);
     expect(follow.camera.position.distanceTo(position)).toBeGreaterThan(near);
-    expect(follow.camera.position.distanceTo(position)).toBeLessThan(12 / Math.cos(Math.PI / 12));
+    expect(follow.camera.position.distanceTo(position)).toBeLessThan(8 / Math.cos(Math.PI / 12));
     expect(position.clone().project(follow.camera).y).toBeCloseTo(0);
     for (let frame = 2; frame < 160; frame++) follow.update(position, north, 1, 1000 + frame * 16);
-    expect(follow.camera.position.distanceTo(position)).toBeCloseTo(12 / Math.cos(Math.PI / 12));
+    expect(follow.camera.position.distanceTo(position)).toBeCloseTo(8 / Math.cos(Math.PI / 12));
     expect(follow.update(position, north, 1, 4000)).toBe(false);
     follow.setBuildings(buildings); follow.update(position, north, 1, 4016);
     expect(follow.camera.position.distanceTo(position)).toBeCloseTo(near);

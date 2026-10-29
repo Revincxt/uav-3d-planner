@@ -452,7 +452,7 @@ export class RouteOverview {
     for (const { vehicle, group, route, hold, tasks, start, goal } of this.visuals) if (vehicle) {
       const followed = route.id === followedId;
       vehicle.visible = true;
-      sizeDrone(vehicle, camera, height, followed ? Math.min(88, Math.max(24, height * 0.18)) : group.userData.focused ? 32 : 24,
+      sizeDrone(vehicle, camera, height, followed ? Math.min(128, Math.max(24, height * 0.18)) : group.userData.focused ? 32 : 24,
         followed ? 0 : 0.8);
       if (hold?.visible) {
         const scale = metresPerPixelAt(camera, vehicle.position, height) * 11;

@@ -199,7 +199,7 @@ describe("four routes, one world", () => {
     const normal = followed.scale.x;
     overview.updateSymbols(camera, 600, routes[2]!.id);
     expect(followed.visible).toBe(true);
-    expect(followed.scale.x / normal).toBeCloseTo(88 / 24);
+    expect(followed.scale.x / normal).toBeCloseTo(108 / 24);
     expect(overview.vehicle(routes[0]!.id)!.visible).toBe(true);
     expect(overview.vehicle(routes[1]!.id)!.visible).toBe(true);
     overview.updateSymbols(camera, 600, routes[1]!.id);
