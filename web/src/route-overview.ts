@@ -10,6 +10,7 @@ import type { PredictiveScenario } from "./predictive-schema";
 import { finalFlight } from "./final-flight";
 import { createEndpointMarker } from "./scene-style";
 import { createDrone, orientDrone, sizeDrone } from "./drone-model";
+import { setDroneRotorTime } from "./drone-rotors";
 import { disposeRenderObject } from "./render-resources";
 import type { DisplayCamera } from "./camera-scale";
 import { staticPlaybackPath } from "./static-playback";
@@ -419,6 +420,7 @@ export class RouteOverview {
       const position = timedPosition(route.timedPath, timeS, this.position);
       vehicle.position.set(position[0], position[2], -position[1]);
       orientDrone(vehicle, displayHeading(route.timedPath, timeS));
+      setDroneRotorTime(vehicle, timeS);
       if (hold) {
         hold.visible = !preview && flightPhase(route, timeS).kind === "waiting";
         hold.position.copy(vehicle.position);

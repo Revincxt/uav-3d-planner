@@ -24,9 +24,10 @@ describe("quadcopter display", () => {
     let triangles = 0;
     drone.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
-      expect(object.material.transparent).toBe(false);
+      const rotor = object.name === "drone-rotors";
+      expect(object.material.transparent).toBe(rotor);
       expect(object.material.depthTest).toBe(true);
-      expect(object.material.depthWrite).toBe(true);
+      expect(object.material.depthWrite).toBe(!rotor);
       const vertices = object.geometry.index?.count ?? object.geometry.getAttribute("position").count;
       expect(vertices).toBeGreaterThan(30); triangles += vertices / 3;
       expect(object.geometry.getAttribute("position").array.every(Number.isFinite)).toBe(true);

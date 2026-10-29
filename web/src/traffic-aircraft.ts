@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createDrone, orientDrone } from "./drone-model";
+import { setDroneRotorTime } from "./drone-rotors";
 import { timedPosition, waypointIndex } from "./route-overview";
 import { ringPoints } from "./viewer-geometry";
 import type { MovingSphereDefinition } from "./dynamic-schema";
@@ -54,6 +55,8 @@ export function sizeTrafficAircraft(aircraft: THREE.Object3D, camera: DisplayCam
 export function updateTrafficAircraft(aircraft: THREE.Object3D, definition: MovingSphereDefinition, timeS: number): void {
   timedPosition(definition.keyframes, timeS, position);
   aircraft.position.set(position[0], position[2], -position[1]);
+  const body = aircraft.getObjectByName("traffic-airframe");
+  if (body) setDroneRotorTime(body, timeS);
   const index = waypointIndex(definition.keyframes, timeS);
   const frames = definition.keyframes;
   const moving = (i: number): boolean => frames[i]!.position.some((v, axis) => Math.abs(v - frames[i + 1]!.position[axis]!) > 1e-8);

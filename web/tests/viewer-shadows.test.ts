@@ -263,8 +263,10 @@ describe("world-space scene occlusion", () => {
     expect(drone.userData.kind).toBe("quadcopter");
     drone.traverse((object: THREE.Object3D) => {
       if (!(object instanceof THREE.Mesh)) return;
-      expect(object.material.transparent).toBe(false);
-      expect(object.material.depthTest && object.material.depthWrite).toBe(true);
+      const rotor = object.name === "drone-rotors";
+      expect(object.material.transparent).toBe(rotor);
+      expect(object.material.depthTest).toBe(true);
+      expect(object.material.depthWrite).toBe(!rotor);
       expect(object.castShadow).toBe(false);
     });
     expect(viewer.content.getObjectByName("vehicle")).toBeUndefined();
@@ -274,9 +276,10 @@ describe("world-space scene occlusion", () => {
       expect(traffic.userData.airframeSpanM).toBe(18);
       traffic.traverse((object: THREE.Object3D) => {
         if (object instanceof THREE.Mesh) {
-          expect(object.material.transparent).toBe(false);
+          const rotor = object.name === "drone-rotors";
+          expect(object.material.transparent).toBe(rotor);
           expect(object.material.depthTest).toBe(true);
-          expect(object.material.depthWrite).toBe(true);
+          expect(object.material.depthWrite).toBe(!rotor);
         }
       });
       viewer.clearContent();
