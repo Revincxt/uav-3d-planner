@@ -119,6 +119,50 @@ describe("centered close chase camera", () => {
     expect(follow.camera.getWorldDirection(new THREE.Vector3()).z).toBeGreaterThan(0.96);
     expect(follow.camera.rotation.z).toBe(0);
   });
+  it("bounds turning speed and acceleration across refresh rates without drifting off center", () => {
+    for (const hz of [30, 60, 120]) {
+      const { follow } = fixture(), position = new THREE.Vector3(0, 90, 0);
+      follow.start("uav-1", position, north, 1200, 600); follow.update(position, north, 0, 1000);
+      let yaw = follow.camera.rotation.y, velocity = 0;
+      for (let frame = 1; frame <= hz; frame++) {
+        follow.update(position, east, frame * 4 / hz, 1000 + frame * 1000 / hz);
+        const next = follow.camera.rotation.y, speed = (next - yaw) * hz;
+        expect(Math.abs(speed)).toBeLessThanOrEqual(Math.PI + 1e-9);
+        expect(Math.abs(speed - velocity) * hz).toBeLessThanOrEqual(3 * Math.PI + 1e-6);
+        const center = position.clone().project(follow.camera);
+        expect(center.x).toBeCloseTo(0); expect(center.y).toBeCloseTo(0);
+        expect(follow.camera.rotation.z).toBe(0);
+        yaw = next; velocity = speed;
+      }
+    }
+  });
+  it("does not treat a slow frame at 2× playback as a seek, while real seeks still snap", () => {
+    const { follow } = fixture(), position = new THREE.Vector3(0, 90, 0);
+    follow.start("uav-1", position, north, 1200, 600); follow.update(position, north, 0, 1000);
+    follow.update(position, east, 4, 1500);
+    const direction = follow.camera.getWorldDirection(new THREE.Vector3());
+    expect(direction.x).toBeGreaterThan(0); expect(direction.x).toBeLessThan(.5);
+    follow.update(position, east, 80, 1516);
+    expect(follow.camera.getWorldDirection(new THREE.Vector3()).x).toBeCloseTo(Math.cos(Math.PI / 12));
+  });
+  it("eases inward before a recorded corner reaches a wall and retains the hard collision bound", () => {
+    const { follow } = fixture(), position = new THREE.Vector3(0, 30, 0);
+    const path = [{ timeS: 0, position: [0, 0, 30] as [number, number, number] },
+      { timeS: 2, position: [20, 0, 30] as [number, number, number] }];
+    const original = structuredClone(path);
+    follow.setBuildings([{ min: [5, -6, 0], max: [10, -4, 100] }]);
+    follow.start("uav-1", position, north, 1200, 600); follow.update(position, north, 0, 1000, path);
+    const fullDistance = follow.camera.position.distanceTo(position);
+    for (let frame = 1; frame <= 12; frame++) {
+      const time = frame * 4 / 60; position.x = time * 10;
+      follow.update(position, north, time, 1000 + frame * 1000 / 60, path);
+      if (frame === 5) expect(follow.camera.position.distanceTo(position)).toBeLessThan(fullDistance - 1);
+      if (position.x >= 5 && position.x <= 10) expect(follow.camera.position.z).toBeLessThan(4);
+      expect(position.clone().project(follow.camera).x).toBeCloseTo(0);
+      expect(position.clone().project(follow.camera).y).toBeCloseTo(0);
+    }
+    expect(path).toEqual(original);
+  });
   it("leaves the overview pose/projection untouched across target changes, resize and exit", () => {
     const { camera, controls, follow } = fixture();
     const before = camera.position.clone(), target = controls.target.clone(), projection = camera.projectionMatrix.clone();

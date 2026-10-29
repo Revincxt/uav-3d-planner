@@ -346,7 +346,7 @@ export class DynamicViewer {
   private drawFrame(): void {
     if (this.motion?.step()) this.frames.request();
     const drone = this.follow?.routeId ? this.overview?.vehicle(this.follow.routeId) : undefined;
-    if (drone && this.follow?.update(drone.position, this.overview!.heading(this.follow.routeId!, this.playbackTimeS), this.playbackTimeS)) this.frames.request();
+    if (drone && this.follow?.update(drone.position, this.overview!.heading(this.follow.routeId!, this.playbackTimeS), this.playbackTimeS, performance.now(), this.overview!.timedPath(this.follow.routeId!))) this.frames.request();
     const camera = drone ? this.follow!.camera : this.camera;
     const { x: width, y: height } = this.renderer.getSize(this.viewport);
     for (const aircraft of this.movingSpheres.values()) sizeTrafficAircraft(aircraft, camera, height);

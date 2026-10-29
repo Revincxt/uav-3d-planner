@@ -1,4 +1,4 @@
-import { displayHeading, routeColorCSS, timedPosition, waypointIndex, type OverviewRoute } from "./route-overview";
+import { flightHeading, routeColorCSS, timedPosition, waypointIndex, type OverviewRoute } from "./route-overview";
 import { PLAN_LABELS, planMeaning } from "./trajectory-semantics";
 
 export interface FlightReadout {
@@ -15,7 +15,7 @@ export function flightReadout(route: OverviewRoute, timeS: number): FlightReadou
   const speedMps = right && timeS >= left.timeS && right.timeS > left.timeS
     ? Math.hypot(...right.position.map((value, axis) => value - left.position[axis]!)) / (right.timeS - left.timeS)
     : 0;
-  const heading = displayHeading(path, timeS);
+  const heading = flightHeading(path, timeS);
   const headingDeg = ((Math.atan2(heading.x, -heading.z) * 180 / Math.PI) + 360) % 360;
   return {
     altitudeM: timedPosition(path, timeS)[2], speedMps, headingDeg,

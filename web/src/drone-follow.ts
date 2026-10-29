@@ -2,9 +2,14 @@ import * as THREE from "three";
 import type { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { MIN_MAP_ELEVATION_RAD } from "./map-navigation";
 import type { CityBox } from "./city-scene";
+import { timedPosition, type RouteWaypoint } from "./route-overview";
+import { BASE_PLAYBACK_SPEED, PLAYBACK_RATES } from "./playback-clock";
 
 const CHASE_DISTANCE_M = 12 / Math.cos(MIN_MAP_ELEVATION_RAD);
 const CAMERA_GRID_M = 64;
+const YAW_RESPONSE = 8, MAX_YAW_RATE = Math.PI, MAX_YAW_ACCELERATION = 3 * Math.PI;
+const MAX_TRACE_RATE = BASE_PLAYBACK_SPEED * Math.max(...PLAYBACK_RATES);
+const PROBE_HORIZONS = [.12, .24] as const;
 
 /** Close, centered chase camera; the overview and its orbit state remain untouched. */
 export class DroneFollow {
@@ -15,10 +20,14 @@ export class DroneFollow {
   private clock = 0;
   private traceTime?: number;
   private yaw = 0;
+  private yawVelocity = 0;
   private boomDistance = CHASE_DISTANCE_M;
   private buildingSource?: readonly CityBox[];
   private readonly blockers = new Map<string, THREE.Box3[]>();
   private readonly rear = new THREE.Vector3();
+  private readonly ahead = new THREE.Vector3();
+  private readonly aheadRear = new THREE.Vector3();
+  private readonly sample: [number, number, number] = [0, 0, 0];
   private readonly ray = new THREE.Ray();
   private readonly hit = new THREE.Vector3();
   private readonly seen = new Set<THREE.Box3>();
@@ -44,7 +53,7 @@ export class DroneFollow {
     this.routeId = id; this.clock = performance.now(); this.traceTime = undefined;
     this.controls.enabled = false;
     this.resize(width, height);
-    this.place(position, heading, true, 0);
+    this.place(position, heading, true, 0, 0, 0);
     this.onChange?.(true);
   }
 
@@ -54,31 +63,62 @@ export class DroneFollow {
     this.camera.updateProjectionMatrix(); return true;
   }
 
-  update(position: THREE.Vector3, heading: THREE.Vector3, timeS: number, now = performance.now()): boolean {
+  update(position: THREE.Vector3, heading: THREE.Vector3, timeS: number, now = performance.now(), path?: readonly RouteWaypoint[]): boolean {
     if (!this.routeId) return false;
-    const seeking = this.traceTime === undefined || timeS < this.traceTime || Math.abs(timeS - this.traceTime) > 2;
-    const dt = Math.max(0, Math.min(0.1, (now - this.clock) / 1000));
+    const elapsed = Math.max(0, (now - this.clock) / 1000);
+    const advance = this.traceTime === undefined ? 0 : timeS - this.traceTime;
+    // Normal 2× playback advances eight trace seconds per wall second. A slow
+    // render frame must not be mistaken for a timeline seek and snap the camera.
+    const seeking = this.traceTime === undefined || advance < 0 || advance > Math.max(2, elapsed * MAX_TRACE_RATE + .1);
+    const dt = Math.min(0.1, elapsed);
+    const rate = !seeking && elapsed > 0 ? Math.min(MAX_TRACE_RATE, Math.max(0, advance / elapsed)) : 0;
     this.clock = now; this.traceTime = timeS;
-    return this.place(position, heading, seeking, dt);
+    return this.place(position, heading, seeking, dt, timeS, rate, path);
   }
 
-  private place(position: THREE.Vector3, heading: THREE.Vector3, snap: boolean, dt: number): boolean {
+  private place(position: THREE.Vector3, heading: THREE.Vector3, snap: boolean, dt: number, timeS: number, rate: number, path?: readonly RouteWaypoint[]): boolean {
     const desiredYaw = heading.x * heading.x + heading.z * heading.z > 1e-10
       ? Math.atan2(-heading.x, -heading.z) : this.yaw;
-    const turn = Math.atan2(Math.sin(desiredYaw - this.yaw), Math.cos(desiredYaw - this.yaw));
-    const turning = !snap && Math.abs(turn) > 1e-5;
-    this.yaw += turning ? turn * (1 - Math.exp(-dt * 8)) : turn;
+    const error = () => Math.atan2(Math.sin(desiredYaw - this.yaw), Math.cos(desiredYaw - this.yaw));
+    if (snap) { this.yaw += error(); this.yawVelocity = 0; }
+    else {
+      // Critically damped yaw with bounded speed/acceleration. Small integration
+      // steps keep the response stable across refresh rates and rendering hitches.
+      const steps = Math.max(1, Math.ceil(dt * 120)), stepS = dt / steps;
+      for (let i = 0; i < steps; i++) {
+        const turn = error(), acceleration = THREE.MathUtils.clamp(YAW_RESPONSE ** 2 * turn - 2 * YAW_RESPONSE * this.yawVelocity, -MAX_YAW_ACCELERATION, MAX_YAW_ACCELERATION);
+        const previousVelocity = this.yawVelocity;
+        this.yawVelocity = THREE.MathUtils.clamp(this.yawVelocity + acceleration * stepS, -MAX_YAW_RATE, MAX_YAW_RATE);
+        this.yaw += (previousVelocity + this.yawVelocity) * .5 * stepS;
+      }
+      if (Math.abs(error()) < 1e-5 && Math.abs(this.yawVelocity) < 1e-4) { this.yaw += error(); this.yawVelocity = 0; }
+    }
+    const turning = !snap && (Math.abs(error()) > 1e-5 || Math.abs(this.yawVelocity) > 1e-4);
     // Orbit only the short camera boom, not the recorded aircraft position.
     const rear = this.rear.set(Math.sin(this.yaw) * Math.cos(MIN_MAP_ELEVATION_RAD),
       Math.sin(MIN_MAP_ELEVATION_RAD), Math.cos(this.yaw) * Math.cos(MIN_MAP_ELEVATION_RAD));
     const safeDistance = this.clearBoomDistance(position, rear);
-    const extending = !snap && safeDistance - this.boomDistance > 1e-5;
-    // Retract immediately to stay clear of walls; ease back out once the obstruction clears.
-    this.boomDistance = extending ? this.boomDistance + (safeDistance - this.boomDistance) * (1 - Math.exp(-dt * 8)) : safeDistance;
+    let desiredDistance = safeDistance;
+    if (!snap && path?.length && rate > 0) {
+      for (const horizon of PROBE_HORIZONS) {
+        const point = timedPosition(path, timeS + horizon * rate, this.sample);
+        this.ahead.set(point[0], point[2], -point[1]);
+        const yaw = this.yaw + this.yawVelocity * horizon;
+        this.aheadRear.set(Math.sin(yaw) * Math.cos(MIN_MAP_ELEVATION_RAD), Math.sin(MIN_MAP_ELEVATION_RAD), Math.cos(yaw) * Math.cos(MIN_MAP_ELEVATION_RAD));
+        desiredDistance = Math.min(desiredDistance, this.clearBoomDistance(this.ahead, this.aheadRear));
+      }
+    }
+    const previousDistance = this.boomDistance;
+    const response = desiredDistance < previousDistance ? 12 : 8;
+    // Anticipate walls along the recorded flight and ease inward before reaching
+    // them. The current collision bound always wins, including on seeks.
+    this.boomDistance = snap || Math.abs(desiredDistance - previousDistance) < 1e-5 ? desiredDistance
+      : Math.min(safeDistance, previousDistance + (desiredDistance - previousDistance) * -Math.expm1(-dt * response));
+    const movingBoom = Math.abs(this.boomDistance - previousDistance) > 1e-5;
     this.camera.position.copy(position).addScaledVector(rear, this.boomDistance);
     this.camera.rotation.set(-MIN_MAP_ELEVATION_RAD, this.yaw, 0, "YXZ");
     this.camera.updateMatrixWorld(true);
-    return turning || extending;
+    return turning || movingBoom;
   }
 
   private clearBoomDistance(position: THREE.Vector3, rear: THREE.Vector3): number {

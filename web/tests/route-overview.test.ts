@@ -8,7 +8,7 @@ import { validatePredictiveBundle } from "../src/predictive-validation";
 import { RetainedCity } from "../src/retained-city";
 import {
   RouteOverview, dynamicRoutes, overviewDuration, predictiveRoutes,
-  flightHeading, reactiveTrace, routeColor, routeColorCSS, staticRoutes, timedPosition, waypointIndex,
+  displayHeading, flightHeading, reactiveTrace, routeColor, routeColorCSS, staticRoutes, timedPosition, waypointIndex,
   type OverviewRoute, type RouteWaypoint,
 } from "../src/route-overview";
 import type { DynamicRun } from "../src/dynamic-schema";
@@ -28,6 +28,50 @@ function fixtureRoutes(): OverviewRoute[] {
     return { id: `route-${index}`, label: `Route ${index}`, points: path.map(w => w.position), timedPath: path };
   });
 }
+
+describe("continuous display attitude", () => {
+  it("turns continuously at a horizontal reversal and gives the same pose after seeking", () => {
+    const path: RouteWaypoint[] = [
+      { timeS: 0, position: [0, 0, 20] }, { timeS: 4, position: [20, 0, 20] },
+      { timeS: 8, position: [0, 0, 30] },
+    ];
+    const original = structuredClone(path), expected = displayHeading(path, 4.4).toArray();
+    let previous = displayHeading(path, 3);
+    for (let time = 3 + 4 / 60; time <= 5; time += 4 / 60) {
+      const next = displayHeading(path, time);
+      expect(previous.angleTo(next) * 180 / Math.PI).toBeLessThan(25);
+      previous = next;
+    }
+    expect(displayHeading(path, 4 - 1e-7).angleTo(displayHeading(path, 4 + 1e-7))).toBeLessThan(1e-5);
+    displayHeading(path, 8); displayHeading(path, 0);
+    expect(displayHeading(path, 4.4).toArray()).toEqual(expected);
+    expect(path).toEqual(original);
+  });
+  it("retains the local bearing through a slow climb instead of reviving a distant chord", () => {
+    const path: RouteWaypoint[] = [
+      { timeS: 0, position: [0, 0, 20] }, { timeS: 10, position: [0, 10, 20] },
+      { timeS: 11, position: [1, 10, 20] }, { timeS: 12, position: [1, 10.1, 23] },
+      { timeS: 13, position: [1, 10.2, 26] }, { timeS: 15, position: [1, 10.2, 26] },
+      { timeS: 17, position: [1, 10.2, 30] },
+    ];
+    expect(displayHeading(path, 12.2).dot(new THREE.Vector3(0, 0, -1))).toBeGreaterThan(.97);
+    expect(displayHeading(path, 14).toArray()).toEqual(displayHeading(path, 13).toArray());
+    expect(displayHeading(path, 16).toArray()).toEqual(displayHeading(path, 13).toArray());
+  });
+  it("does not rescan a dense near-vertical trace on every rendered frame", () => {
+    const points: RouteWaypoint[] = [{ timeS: 0, position: [0, 0, 20] }, { timeS: 1, position: [10, 0, 20] }];
+    for (let i = 1; i <= 8192; i++) points.push({ timeS: 1 + i * .01, position: [10 + i * .00001, 0, 20 + i * .001] });
+    let reads = 0;
+    const path = new Proxy(points, { get(target, key, receiver) {
+      if (typeof key === "string" && /^\d+$/.test(key)) reads++;
+      return Reflect.get(target, key, receiver);
+    } });
+    displayHeading(path, 80); reads = 0;
+    const heading = displayHeading(path, 81);
+    expect(reads).toBeLessThan(100);
+    expect(heading.x).toBeCloseTo(1); expect(heading.y).toBe(0);
+  });
+});
 
 describe("shared mission clock", () => {
   const path: RouteWaypoint[] = [

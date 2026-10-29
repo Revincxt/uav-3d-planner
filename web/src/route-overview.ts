@@ -122,28 +122,42 @@ export function flightHeading(path: readonly RouteWaypoint[], timeS: number): TH
   return new THREE.Vector3(0, 0, -1);
 }
 
-/** Display attitude only: a short symmetric window suppresses tiny-knot yaw flicker.
- * Coordinates and clocks are untouched; waits and vertical legs retain an actual
- * substantial incoming bearing instead of amplifying sub-centimetre XY noise. */
+interface HeadingIndex { yaw: Float64Array; target: Float64Array }
+const headingIndices = new WeakMap<readonly RouteWaypoint[], HeadingIndex>();
+const HEADING_RESPONSE = 2;
+
+/** Continuous display attitude from local tangents, independent of playback/seek history.
+ * Unwrapped angles remain well-defined at reversals; waits and vertical legs freeze
+ * the arriving attitude. Recorded positions, timestamps and physical headings stay intact. */
 export function displayHeading(path: readonly RouteWaypoint[], timeS: number): THREE.Vector3 {
-  const index = waypointIndex(path, timeS), left = path[index], right = path[index + 1];
-  if (left && right) {
-    const horizontal = Math.hypot(right.position[0] - left.position[0], right.position[1] - left.position[1]);
-    if (horizontal / Math.max(1e-9, right.timeS - left.timeS) > 0.2) {
-      const a = timedPosition(path, timeS - 0.4), b = timedPosition(path, timeS + 0.4);
-      const direction = new THREE.Vector3(b[0] - a[0], 0, a[1] - b[1]);
-      if (direction.lengthSq() > 0.01) return direction.normalize();
+  if (!path.length) return new THREE.Vector3(0, 0, -1);
+  let headings = headingIndices.get(path);
+  if (!headings || headings.yaw.length !== path.length) {
+    const yaw = new Float64Array(path.length), target = new Float64Array(path.length);
+    let raw = 0, turnSign = 1;
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1]!.position, b = path[i]!.position;
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) > .001) { raw = Math.atan2(a[0] - b[0], b[1] - a[1]); break; }
     }
-  }
-  for (const [from, to, step] of [[index, 0, -1], [Math.max(1, index + 1), path.length - 1, 1]]) {
-    for (let i = from!; step! < 0 ? i > to! : i <= to!; i += step!) {
-      const a = path[i - 1]?.position, b = path[i]?.position;
-      if (!a || !b) continue;
-      const direction = new THREE.Vector3(b[0] - a[0], 0, a[1] - b[1]);
-      if (direction.lengthSq() > 0.25) return direction.normalize();
+    yaw[0] = raw;
+    for (let i = 0; i + 1 < path.length; i++) {
+      const a = path[i]!, b = path[i + 1]!, east = b.position[0] - a.position[0], north = b.position[1] - a.position[1];
+      if (Math.hypot(east, north) > .001) {
+        const difference = Math.atan2(-east, north) - raw;
+        let turn = Math.atan2(Math.sin(difference), Math.cos(difference));
+        if (Math.abs(Math.abs(turn) - Math.PI) < 1e-6) turn = turnSign * Math.PI;
+        if (Math.abs(turn) > .001) turnSign = Math.sign(turn);
+        raw += turn;
+        target[i] = raw;
+      } else target[i] = yaw[i]!;
+      yaw[i + 1] = yaw[i]! + (target[i]! - yaw[i]!) * -Math.expm1(-Math.max(0, b.timeS - a.timeS) * HEADING_RESPONSE);
     }
+    target[path.length - 1] = yaw[path.length - 1]!;
+    headings = { yaw, target }; headingIndices.set(path, headings);
   }
-  return flightHeading(path, timeS);
+  const index = waypointIndex(path, timeS), elapsed = Math.max(0, timeS - path[index]!.timeS);
+  const yaw = headings.yaw[index]! + (headings.target[index]! - headings.yaw[index]!) * -Math.expm1(-elapsed * HEADING_RESPONSE);
+  return new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
 }
 
 const staticRouteCache = new WeakMap<DemoScenario, Map<string, OverviewRoute>>();
@@ -429,6 +443,7 @@ export class RouteOverview {
   }
 
   vehicle(id: string): THREE.Group | undefined { return this.visuals.find(v => v.route.id === id)?.vehicle; }
+  timedPath(id: string): readonly RouteWaypoint[] | undefined { return this.visuals.find(v => v.route.id === id)?.route.timedPath; }
   heading(id: string, timeS: number): THREE.Vector3 {
     return displayHeading(this.visuals.find(v => v.route.id === id)?.route.timedPath ?? [], timeS);
   }
