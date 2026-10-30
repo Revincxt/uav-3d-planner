@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FlightHud, flightReadout } from "../src/flight-hud";
+import { FlightHud, flightReadout, altitudeTrend } from "../src/flight-hud";
 import type { OverviewRoute } from "../src/route-overview";
 
 const route: OverviewRoute = {
@@ -17,6 +17,30 @@ const route: OverviewRoute = {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("recorded flight instruments", () => {
+  it("identifies actual climbs and descents and clears at level flight, waits and goals", () => {
+    expect(altitudeTrend(route, 7.5)).toBe("climb");
+    expect(altitudeTrend(route, 12, "climb")).toBeNull();
+    expect(altitudeTrend(route, 16)).toBeNull();
+    expect(altitudeTrend(route, 100, "climb")).toBeNull();
+    expect(altitudeTrend(route, 5)).toBeNull();
+    expect(altitudeTrend(route, NaN)).toBeNull();
+    const descent = { ...route, timedPath: route.timedPath!.map(p => ({ ...p, position: [p.position[0], p.position[1], 100 - p.position[2]] as [number, number, number] })) };
+    expect(altitudeTrend(descent, 7.5)).toBe("descent");
+  });
+  it("ignores small height oscillations and uses hysteresis for an established slow climb", () => {
+    const slow: OverviewRoute = { id: "slow", label: "Slow climb", points: [], timedPath: [
+      { timeS: 0, position: [0, 0, 30] }, { timeS: 5, position: [0, 0, 31.2] },
+    ] };
+    expect(altitudeTrend(slow, 2)).toBeNull();
+    expect(altitudeTrend(slow, 2, "climb")).toBe("climb");
+    expect(altitudeTrend(slow, 2, "descent")).toBeNull();
+    const noise: OverviewRoute = { ...slow, timedPath: [
+      { timeS: 0, position: [0, 0, 30] }, { timeS: 1, position: [1, 0, 30] },
+      { timeS: 1.001, position: [1.001, 0, 30.04] }, { timeS: 2, position: [2, 0, 30] },
+    ] };
+    expect(altitudeTrend(noise, 1.0005, "climb")).toBeNull();
+    expect(altitudeTrend(noise, 1.5)).toBeNull();
+  });
   it("uses interpolated ENU altitude and physical 3D speed, not replay speed", () => {
     expect(flightReadout(route, 7.5)).toEqual({ altitudeM: 50, speedMps: 10, headingDeg: 90 });
     expect(flightReadout(route, 16)).toEqual({ altitudeM: 70, speedMps: 10, headingDeg: 0 });
@@ -52,8 +76,8 @@ describe("recorded flight instruments", () => {
 
 describe("retained flight HUD", () => {
   function fixture(playback?: HTMLElement) {
-    const fields = new Map([".hud-aircraft", ".hud-key-plan", ".hud-key-flown", ...["altitude", "speed", "heading"].map(key => `[data-readout="${key}"]`)]
-      .map(key => [key, { textContent: "" }]));
+    const fields = new Map([".hud-aircraft", ".hud-route-key", ".hud-key-plan", ".hud-key-flown", ".hud-altitude-trend", ...["altitude", "speed", "heading"].map(key => `[data-readout="${key}"]`)]
+      .map(key => [key, { textContent: "", hidden: true, dataset: {} as Record<string, string> }]));
     const root = { hidden: false, dataset: {} as Record<string, string>, title: "", className: "", innerHTML: "",
       style: { setProperty: vi.fn() }, setAttribute: vi.fn(), querySelector: (key: string) => fields.get(key), append: vi.fn(), remove: vi.fn() };
     const createElement = vi.fn(() => root), append = vi.fn();
@@ -64,6 +88,8 @@ describe("retained flight HUD", () => {
   it("retains one instrument tree and throttles playback updates to 10 Hz", () => {
     const f = fixture(); f.hud.update(route, 7.5, 0);
     expect(f.fields.get('[data-readout="altitude"]')!.textContent).toBe("50.0");
+    expect(f.root.style.setProperty).toHaveBeenCalledWith("--speed-angle", "-67.5deg");
+    expect(f.root.style.setProperty).toHaveBeenCalledWith("--altitude-angle", "-118.125deg");
     f.advance(50); f.hud.update(route, 16, 0);
     expect(f.fields.get('[data-readout="altitude"]')!.textContent).toBe("50.0");
     f.advance(50); f.hud.update(route, 16, 0);
@@ -81,16 +107,32 @@ describe("retained flight HUD", () => {
     f.hud.update({ ...route, timedPath: [] }, 0, 0);
     expect(f.root.hidden).toBe(true);
   });
+  it("retains one concise altitude hint and clears it immediately when seeking into a wait", () => {
+    const f = fixture(), hint = f.fields.get(".hud-altitude-trend")!;
+    f.hud.update(route, 7.5, 0);
+    expect(hint.hidden).toBe(false); expect(hint.textContent).toBe("Climb");
+    expect(hint.dataset.direction).toBe("climb");
+    f.hud.update(route, 12, 0, true);
+    expect(hint.hidden).toBe(true); expect(hint.textContent).toBe("");
+    expect(hint.dataset.direction).toBeUndefined();
+    expect(f.root.style.setProperty).toHaveBeenCalledWith("--speed-angle", "-135deg");
+    expect(f.fields.get('[data-readout="altitude"]')!.textContent).toBe("70.0");
+    expect(f.createElement).toHaveBeenCalledOnce();
+  });
   it("moves the existing playback controls into the instrument without recreating them", () => {
-    const playback = { id: "playback" } as unknown as HTMLElement;
+    const timeline = { min: "0", max: "100", value: "25", style: { setProperty: vi.fn() } };
+    const playback = { id: "playback", querySelector: () => timeline } as unknown as HTMLElement;
     const f = fixture(playback);
     f.hud.update(route, 7.5, 0); f.hud.update(route, 18, 0, true);
     expect(f.root.append).toHaveBeenCalledExactlyOnceWith(playback);
+    expect(timeline.style.setProperty).toHaveBeenLastCalledWith("--timeline-progress", "25%");
+    timeline.value = "50"; f.hud.update(route, 18, 0);
+    expect(timeline.style.setProperty).toHaveBeenLastCalledWith("--timeline-progress", "50%");
     expect(f.createElement).toHaveBeenCalledOnce();
     expect(f.root.innerHTML).toContain('class="hud-telemetry"');
-    expect(f.root.innerHTML).toMatch(/class="hud-flight"><div class="hud-compass"/);
+    expect(f.root.innerHTML).toContain('class="hud-compass"');
     expect(f.root.innerHTML).not.toMatch(/gates/i);
-    for (const cardinal of ["N", "E", "S", "W"]) expect(f.root.innerHTML).toContain(`<span>${cardinal}</span>`);
+    for (const cardinal of ["N", "E", "S", "W"]) expect(f.root.innerHTML).toContain(`>${cardinal}</text>`);
     for (const label of ["ALT <small>m</small>", "SPD <small>m/s</small>", "HDG <small>°</small>"]) {
       expect(f.root.innerHTML).toContain(label);
     }
