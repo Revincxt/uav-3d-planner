@@ -147,8 +147,8 @@ def test_opt_in_shortcut_reduces_free_zigzag_without_mutating_raw_evidence() -> 
     assert result.applied
     assert result.raw_waypoint_count == 3
     assert result.output_waypoint_count == 2
-    assert result.geometry_candidate.waypoints == (raw.waypoints[0], raw.waypoints[-1])
-    assert result.geometry_candidate.is_safe(scenario)
+    assert result.timed_path.waypoints == (raw.waypoints[0], raw.waypoints[-1])
+    assert result.timed_path.is_safe(scenario)
     assert raw.to_dict() == original
 
 
@@ -208,9 +208,9 @@ def test_shortcuts_preserve_every_wait_and_its_absolute_start_and_end() -> None:
     )
     scenario = _scenario(raw)
     result = smooth_predictive_timed_path(scenario, raw, max_speed_mps=4.0, shortcut=True)
-    assert result.geometry_candidate.waypoints == tuple(raw.waypoints[i] for i in (0, 2, 3, 5))
-    assert result.geometry_candidate.wait_time_s == 2.0
-    assert result.geometry_candidate.is_safe(scenario)
+    assert result.timed_path.waypoints == tuple(raw.waypoints[i] for i in (0, 2, 3, 5))
+    assert result.timed_path.wait_time_s == 2.0
+    assert result.timed_path.is_safe(scenario)
 
 
 def test_moving_loop_is_not_silently_replaced_with_a_wait() -> None:
@@ -261,7 +261,7 @@ def test_execution_collision_at_first_radius_tries_a_safe_alternate_radius() -> 
     )
     scenario = _scenario(raw, zones=(zone,))
     assert raw.is_safe(scenario)
-    assert first.geometry_candidate.is_safe(scenario)
+    assert first.timed_path.is_safe(scenario)
     assert not first.execution_candidate.is_safe(scenario)
 
     result = smooth_predictive_timed_path(
@@ -277,7 +277,7 @@ def test_execution_collision_at_first_radius_tries_a_safe_alternate_radius() -> 
     assert result.execution_candidate is not None
     assert result.execution_candidate.is_safe(scenario)
     assert qualify_timed_path_execution(result.execution_candidate, envelope).qualified
-    assert distance(result.geometry_candidate.start, raw.start) == 0.0
+    assert distance(result.timed_path.start, raw.start) == 0.0
 
 
 def test_no_execution_candidate_is_exposed_when_all_candidates_fail_the_envelope() -> None:
@@ -291,7 +291,7 @@ def test_no_execution_candidate_is_exposed_when_all_candidates_fail_the_envelope
         execution_envelope=DiscreteExecutionEnvelope(max_speed_mps=4.0, max_execution_time_s=3.9),
     )
     assert result.method == "sampled-circular-fillet"
-    assert result.geometry_candidate.is_safe(_scenario(raw))
+    assert result.timed_path.is_safe(_scenario(raw))
     assert result.execution_candidate is None
     assert result.execution_status == "execution-time-limit-exceeded"
     assert not result.execution_collision_certified

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from uav3d.benchmark import ExperimentRecord, run_experiment, scene_fingerprint
+from uav3d.benchmark import ExperimentRecord, problem_fingerprint, run_experiment
 from uav3d.scene import Scene
 
 
@@ -69,7 +69,7 @@ def build_demo_bundle(scenes: list[Scene], planner_seed: int = 17) -> dict[str, 
                 "label": scene.name,
                 "description": str(scene.metadata.get("description", "Static urban scene.")),
                 "scenarioSeed": scene.metadata.get("seed"),
-                "fingerprint": scene_fingerprint(scene),
+                "fingerprint": problem_fingerprint(scene),
                 "bounds": {
                     "min": list(scene.bounds.minimum),
                     "max": list(scene.bounds.maximum),

@@ -954,7 +954,7 @@ def _export_run(scenario: DynamicScenario, episode: PredictiveEpisode) -> dict[s
             "method": smoothing.method,
             "applied": smoothing.applied,
             "certified": smoothing.certified,
-            "collisionCertified": smoothing.collision_certified,
+            "collisionCertified": smoothing.certified,
             "collisionCertificationScope": "dense-piecewise-linear-space-time-path",
             "rawWaypointCount": smoothing.raw_waypoint_count,
             "outputWaypointCount": smoothing.output_waypoint_count,

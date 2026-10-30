@@ -19,7 +19,7 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
-from uav3d.benchmark import scene_fingerprint
+from uav3d.benchmark import problem_fingerprint
 from uav3d.collision import point_is_free, segment_is_free
 from uav3d.dynamic import DynamicScenario, TemporaryCylinder
 from uav3d.dynamic_study import (
@@ -430,7 +430,7 @@ def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
     parameters = dict(planned.parameters)
     identity = json.dumps(
         {
-            "scene": scene_fingerprint(scene),
+            "scene": problem_fingerprint(scene),
             "algorithm": algorithm,
             "seed": seed if algorithm == "rrt-star" else None,
             "parameters": parameters,
@@ -499,7 +499,7 @@ def static_scene_record(
         "label": scene.name,
         "description": scene.metadata["description"],
         "scenarioSeed": 20261005,
-        "fingerprint": scene_fingerprint(scene),
+        "fingerprint": problem_fingerprint(scene),
         "bounds": {"min": list(scene.bounds.minimum), "max": list(scene.bounds.maximum)},
         "start": list(scene.start),
         "goal": list(scene.goal),

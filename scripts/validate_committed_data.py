@@ -20,7 +20,7 @@ from committed_inputs import (
 )
 from export_manhattan_static_dynamic import mission_scenes, shared_dynamic_scenarios
 
-from uav3d.benchmark import scene_fingerprint
+from uav3d.benchmark import problem_fingerprint
 from uav3d.dynamic import dynamic_scenario_fingerprint
 from uav3d.dynamic_collision import spacetime_segment_is_free
 from uav3d.manhattan_city import build_manhattan_city
@@ -86,7 +86,9 @@ def audit_current(public: Path) -> dict[str, int]:
         assert_equivalent(input_record(regenerated_scene), saved)
         scene = restore_input(saved, city, dynamic=False)
         exported = static["scenarios"][index]
-        if exported["id"] != scene.scene_id or exported["fingerprint"] != scene_fingerprint(scene):
+        if exported["id"] != scene.scene_id or exported["fingerprint"] != problem_fingerprint(
+            scene
+        ):
             raise ValueError("Static mission identity mismatch")
         if len(exported["results"]) != 3:
             raise ValueError("Static planner matrix is incomplete")

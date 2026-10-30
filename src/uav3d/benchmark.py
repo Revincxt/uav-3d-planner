@@ -145,12 +145,6 @@ def problem_fingerprint(scene: Scene) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
-def scene_fingerprint(scene: Scene) -> str:
-    """Backward-compatible name for the v2 semantic problem fingerprint."""
-
-    return problem_fingerprint(scene)
-
-
 def _canonical_parameter(value: object) -> object:
     if value is None or isinstance(value, (str, bool)):
         return value

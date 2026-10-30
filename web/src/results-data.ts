@@ -43,12 +43,6 @@ export function predictiveObservation(run: Pick<PredictiveRun, "executionMetrics
 function plannerSummary(id: string, label: string, missions: MissionObservation[]): PlannerSummary {
   return { id, label, workUnit: missions[0]?.workUnit ?? "", summary: summarizeObservedMissions(missions) };
 }
-export function analysesFromBundles(stat: DemoBundle, dyn: DynamicBundleV1, pred: PredictiveBundleV3): Analysis[] {
-  const s = stat.scenarios[0]!, d = dyn.scenarios[0]!, p = pred.scenarios[0]!;
-  if (!s.city || !d.city || !p.city) throw new Error("Results require the current official Manhattan city datasets.");
-  if (new Set([s.city.sourceSha256, d.city.sourceSha256, p.city.sourceSha256].map((digest) => digest.replace(/^sha256:/, ""))).size !== 1) throw new Error("The studies use different Manhattan extracts.");
-  return [staticAnalysis(stat), dynamicAnalysis(dyn), predictiveAnalysis(pred)];
-}
 export function staticAnalysis(stat: DemoBundle): Analysis {
   return { id: "static", label: "Static",
       planners: stat.planners.map((planner) => plannerSummary(planner.id, planner.label,

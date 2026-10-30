@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from uav3d.benchmark import scene_fingerprint
+from uav3d.benchmark import problem_fingerprint
 from uav3d.collision import point_is_free
 from uav3d.scene import (
     AABB,
@@ -61,7 +61,7 @@ def test_fingerprint_ignores_obstacle_order() -> None:
         scene.safety_margin,
         scene.metadata,
     )
-    assert scene_fingerprint(scene) == scene_fingerprint(reordered)
+    assert problem_fingerprint(scene) == problem_fingerprint(reordered)
 
 
 @pytest.mark.parametrize(

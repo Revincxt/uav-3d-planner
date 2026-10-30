@@ -1,18 +1,13 @@
 import "./results.css";
 import { loadDataset } from "./data-loader";
-import { analysesFromBundles, type Analysis } from "./results-data";
+import type { Analysis } from "./results-data";
 import { fetchBenchmarkSummary } from "./benchmark-summary";
 import { metricComparisons, renderMetricChart } from "./results-chart";
 import { uiSymbol } from "./ui-symbol";
 
-async function fallback(): Promise<Analysis[]> {
-  const summary = await fetchBenchmarkSummary(new URL(import.meta.env.BASE_URL, document.baseURI).href);
-  if (summary) return summary;
-  const [{ loadDemoBundle }, { loadDynamicBundle }, { loadPredictiveBundle }] = await Promise.all([import("./data"), import("./dynamic-data"), import("./predictive-data")]);
-  return analysesFromBundles(...await Promise.all([loadDemoBundle(), loadDynamicBundle(), loadPredictiveBundle()]));
-}
-export const loadBenchmark = (): Promise<Analysis[]> => loadDataset("results", fallback);
-export function renderStudy(analysis: Analysis): HTMLElement {
+const loadBenchmark = (): Promise<Analysis[]> => loadDataset("results", () =>
+  fetchBenchmarkSummary(new URL(import.meta.env.BASE_URL, document.baseURI).href));
+function renderStudy(analysis: Analysis): HTMLElement {
   const section = document.createElement("section"); section.className = "study-comparison"; section.dataset.study = analysis.id;
   const heading = document.createElement("h2"); heading.className = "study-comparison-heading";
   heading.id = `results-${analysis.id}`; heading.append(uiSymbol(analysis.id), document.createTextNode(analysis.label)); section.setAttribute("aria-labelledby", heading.id);

@@ -119,7 +119,6 @@ def test_open_right_angle_is_rounded_and_certified() -> None:
     assert result.timed_path.arrival_time_s == raw.arrival_time_s
     assert max(result.timed_path.segment_speeds()) <= 4.0 + 1e-9
     assert result.timed_path.is_safe(scenario)
-    assert result.geometry_candidate == result.timed_path
     assert result.execution_status == "qualified"
     assert result.execution_qualified
     assert result.execution_candidate is not None
@@ -259,7 +258,7 @@ def test_u_turn_is_retained_but_reported_as_a_discrete_reversal() -> None:
     )
 
     assert result.method == "raw-no-roundable-corners"
-    assert result.collision_certified
+    assert result.certified
     assert result.timed_path == raw
     assert result.raw_kinematics.reversal_count == 1
     assert result.output_kinematics.reversal_count == 1
@@ -315,8 +314,8 @@ def test_retiming_collision_has_no_silent_execution_fallback() -> None:
         execution_envelope=DiscreteExecutionEnvelope(max_discrete_acceleration_proxy_mps2=1.0),
     )
 
-    assert result.collision_certified
-    assert result.geometry_candidate == raw
+    assert result.certified
+    assert result.timed_path == raw
     assert result.execution_candidate is None
     assert result.execution_status == "dynamic-collision-after-retiming"
     assert not result.execution_qualified

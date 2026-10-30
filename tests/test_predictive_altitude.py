@@ -104,14 +104,14 @@ def test_horizontal_smoothing_keeps_height_peaks_troughs_and_unequal_endpoints(
         preserve_altitude=True,
     )
     assert result.applied
-    assert result.geometry_candidate.is_safe(scenario)
-    assert result.geometry_candidate.start == raw.start
-    assert result.geometry_candidate.goal == raw.goal
-    assert max(result.geometry_candidate.segment_speeds()) <= max(raw.segment_speeds()) + 1e-9
-    _assert_exact_height_profile(raw, result.geometry_candidate)
-    assert _position_at(result.geometry_candidate, 4.0)[:2] != raw.waypoints[1].position[:2]
+    assert result.timed_path.is_safe(scenario)
+    assert result.timed_path.start == raw.start
+    assert result.timed_path.goal == raw.goal
+    assert max(result.timed_path.segment_speeds()) <= max(raw.segment_speeds()) + 1e-9
+    _assert_exact_height_profile(raw, result.timed_path)
+    assert _position_at(result.timed_path, 4.0)[:2] != raw.waypoints[1].position[:2]
     assert result.execution_candidate is not None
-    assert result.execution_candidate.positions == result.geometry_candidate.positions
+    assert result.execution_candidate.positions == result.timed_path.positions
     assert result.to_dict()["altitude_policy"] == "preserve-raw-z-time-profile"
     assert result.to_dict()["optimization_axes"] == ["x", "y"]
 
@@ -139,7 +139,7 @@ def test_original_vertical_intervals_have_no_horizontal_drift_or_added_speed(
         shortcut=shortcut,
         preserve_altitude=True,
     )
-    candidate = result.geometry_candidate
+    candidate = result.timed_path
     _assert_exact_height_profile(raw, candidate)
     assert _position_at(candidate, 0.5)[:2] == raw.start[:2]
     assert _position_at(candidate, 7.5)[:2] == raw.goal[:2]
@@ -158,8 +158,8 @@ def test_pure_vertical_path_and_waits_are_not_rewritten() -> None:
     result = smooth_predictive_timed_path(
         _scenario(raw), raw, preserve_altitude=True, shortcut=True
     )
-    assert result.geometry_candidate == raw
-    assert result.geometry_candidate.wait_time_s == 3.0
+    assert result.timed_path == raw
+    assert result.timed_path.wait_time_s == 3.0
 
 
 def test_wait_absolute_boundaries_are_preserved_between_horizontal_blocks() -> None:
@@ -176,7 +176,7 @@ def test_wait_absolute_boundaries_are_preserved_between_horizontal_blocks() -> N
     result = smooth_predictive_timed_path(
         _scenario(raw), raw, max_speed_mps=15.0, shortcut=True, preserve_altitude=True
     )
-    candidate = result.geometry_candidate
+    candidate = result.timed_path
     _assert_exact_height_profile(raw, candidate)
     wait = next(item for item in candidate.waypoints if item.time_s == 11.0)
     assert wait.action == "wait"
@@ -224,7 +224,7 @@ def test_collision_unsafe_planar_fillets_fall_back_without_altering_height() -> 
         max_speed_mps=8.0,
         preserve_altitude=True,
     )
-    assert result.geometry_candidate == raw
+    assert result.timed_path == raw
     assert not result.applied
     assert result.method == "raw-fallback"
 
@@ -241,7 +241,7 @@ def test_dynamic_collision_after_height_preserving_retiming_is_not_exposed() -> 
         execution_envelope=DiscreteExecutionEnvelope(max_discrete_acceleration_proxy_mps2=1.0),
         preserve_altitude=True,
     )
-    assert result.geometry_candidate == raw
+    assert result.timed_path == raw
     assert result.execution_candidate is None
     assert result.execution_status == "dynamic-collision-after-retiming"
 
@@ -262,14 +262,14 @@ def test_retiming_collision_tries_another_horizontal_radius_with_the_same_height
         "execution-only-gate", conflict_position[:2], 0.08, 0.0, 30.0, 4.19, 4.21
     )
     scenario = _scenario(raw, zones=(zone,))
-    assert first.geometry_candidate.is_safe(scenario)
+    assert first.timed_path.is_safe(scenario)
     assert not first.execution_candidate.is_safe(scenario)
     result = smooth_predictive_timed_path(scenario, raw, **options)
     assert result.applied_radius_m == pytest.approx(2.25)
     assert result.execution_candidate is not None
     assert result.execution_candidate.is_safe(scenario)
-    _assert_exact_height_profile(raw, result.geometry_candidate)
-    assert result.execution_candidate.positions == result.geometry_candidate.positions
+    _assert_exact_height_profile(raw, result.timed_path)
+    assert result.execution_candidate.positions == result.timed_path.positions
 
 
 def test_legacy_default_does_not_advertise_height_preservation() -> None:
@@ -308,9 +308,9 @@ def test_public_planar_fillet_has_no_roundoff_wait_at_the_original_height_peak()
         shortcut=False,
     )
     assert result.applied
-    assert result.geometry_candidate.wait_time_s == 0.0
-    assert all(item.action == "move" for item in result.geometry_candidate.waypoints[1:])
-    _assert_exact_height_profile(raw, result.geometry_candidate)
+    assert result.timed_path.wait_time_s == 0.0
+    assert all(item.action == "move" for item in result.timed_path.waypoints[1:])
+    _assert_exact_height_profile(raw, result.timed_path)
     assert result.execution_candidate is not None
     assert result.execution_candidate.wait_time_s == 0.0
 

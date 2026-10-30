@@ -9,7 +9,7 @@ from dataclasses import replace
 from itertools import pairwise
 from pathlib import Path
 
-from uav3d.benchmark import scene_fingerprint
+from uav3d.benchmark import problem_fingerprint
 from uav3d.collision import point_is_free
 from uav3d.dynamic import DynamicScenario, MovingSphere, TemporaryCylinder, snapshot_scene
 from uav3d.dynamic_collision import spacetime_segment_is_free
@@ -42,28 +42,28 @@ class RequiredStopTests(unittest.TestCase):
             {"position": (50, 10, 20), "serviceDurationS": 8, "label": "Two"},
         ]
         mission = replace(scene, metadata={"missionTaskPoints": tasks})
-        fingerprint = scene_fingerprint(mission)
-        self.assertNotEqual(scene_fingerprint(scene), fingerprint)
+        fingerprint = problem_fingerprint(mission)
+        self.assertNotEqual(problem_fingerprint(scene), fingerprint)
         self.assertNotEqual(
-            scene_fingerprint(replace(mission, metadata={"missionTaskPoints": tasks[::-1]})),
+            problem_fingerprint(replace(mission, metadata={"missionTaskPoints": tasks[::-1]})),
             fingerprint,
         )
         for change in ({"position": (31, 10, 20)}, {"serviceDurationS": 7}):
             changed = [{**tasks[0], **change}, tasks[1]]
             self.assertNotEqual(
-                scene_fingerprint(replace(mission, metadata={"missionTaskPoints": changed})),
+                problem_fingerprint(replace(mission, metadata={"missionTaskPoints": changed})),
                 fingerprint,
             )
         renamed = [{**task, "label": "Renamed"} for task in tasks]
         self.assertEqual(
-            scene_fingerprint(
+            problem_fingerprint(
                 replace(mission, metadata={"missionTaskPoints": renamed, "description": "New text"})
             ),
             fingerprint,
         )
         self.assertEqual(
-            scene_fingerprint(replace(scene, metadata={"description": "Legacy"})),
-            scene_fingerprint(scene),
+            problem_fingerprint(replace(scene, metadata={"description": "Legacy"})),
+            problem_fingerprint(scene),
         )
 
     def test_guard_covers_future_airspace_and_piecewise_motion_extrema(self):

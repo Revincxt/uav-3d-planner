@@ -1,11 +1,8 @@
 """Collision-certified geometric smoothing for timestamped predictive paths.
 
-The smoother rounds eligible polyline corners with sampled circular fillets.  The returned
-trajectory is still a :class:`~uav3d.predictive.TimedPath`: execution between consecutive output
-waypoints is linear, and every such space-time segment is checked by the existing continuous
-collision predicate.  Consequently, this module certifies the dense polyline, not the ideal
-circle from which its samples were obtained.  It intentionally makes no C2, acceleration, or
-jerk claim.
+Local quintic B-splines or circular fillets are sampled into TimedPath waypoints. Every
+piecewise-linear space-time segment is collision-checked. Execution candidates also pass
+retiming and discrete kinematic qualification, without a continuous C2 or jerk guarantee.
 """
 
 from __future__ import annotations
@@ -90,32 +87,20 @@ class PredictiveSmoothingResult:
             raise ValueError("failed execution status must not expose an execution candidate")
 
     @property
-    def collision_certified(self) -> bool:
-        """Compatibility-safe explicit name for the dense-polyline collision certificate."""
-
-        return self.certified
-
-    @property
-    def geometry_candidate(self) -> TimedPath:
-        """Compatibility-safe explicit name for ``timed_path``."""
-
-        return self.timed_path
-
-    @property
     def execution_qualified(self) -> bool:
         return self.execution_status == "qualified"
 
     def to_dict(self) -> dict[str, object]:
         result: dict[str, object] = {
             "timed_path": self.timed_path.to_dict(),
-            "geometry_candidate": self.geometry_candidate.to_dict(),
+            "geometry_candidate": self.timed_path.to_dict(),
             "execution_candidate": (
                 self.execution_candidate.to_dict() if self.execution_candidate is not None else None
             ),
             "method": self.method,
             "applied": self.applied,
             "certified": self.certified,
-            "collision_certified": self.collision_certified,
+            "collision_certified": self.certified,
             "collision_certification_scope": "dense-piecewise-linear-space-time-path",
             "raw_waypoint_count": self.raw_waypoint_count,
             "output_waypoint_count": self.output_waypoint_count,

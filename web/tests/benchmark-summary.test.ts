@@ -28,9 +28,10 @@ describe("compact build-audited benchmark", () => {
     await expect(fetchBenchmarkSummary("https://example.test/uav/")).resolves.toEqual(data().analyses);
     expect(fetcher).toHaveBeenCalledTimes(1); expect(String(fetcher.mock.calls[0]![0])).toBe("https://example.test/uav/benchmark-summary.json");
   });
-  it("falls back only for a missing legacy asset, never for corruption or server failure", async () => {
+  it("reports missing, corrupt or unavailable summaries without downloading full datasets", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 404 })));
-    await expect(fetchBenchmarkSummary("https://example.test/")).resolves.toBeNull();
+    await expect(fetchBenchmarkSummary("https://example.test/")).rejects.toThrow("404");
+    expect(fetch).toHaveBeenCalledTimes(1);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}")));
     await expect(fetchBenchmarkSummary("https://example.test/")).rejects.toThrow("Invalid benchmark");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));

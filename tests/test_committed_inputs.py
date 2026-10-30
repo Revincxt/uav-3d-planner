@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from uav3d.benchmark import scene_fingerprint
+from uav3d.benchmark import problem_fingerprint
 from uav3d.dynamic import DynamicScenario, MovingSphere, dynamic_scenario_fingerprint
 from uav3d.scene import AABB, Bounds3D, Cylinder, Scene
 
@@ -46,13 +46,13 @@ def test_exact_static_inputs_round_trip_without_duplicating_city(inputs, scene):
     saved = json.loads(json.dumps(inputs.input_record(scene)))
     assert "buildings" not in saved
     restored = inputs.restore_input(saved, city, dynamic=False)
-    assert scene_fingerprint(restored) == scene_fingerprint(scene)
+    assert problem_fingerprint(restored) == problem_fingerprint(scene)
     assert restored.start == scene.start
     assert restored.buildings == scene.buildings
     # Even accepted reconstruction roundoff is NOT accepted by the exact fingerprint.
     drifted = replace(scene, start=(scene.start[0] + 6e-10, 10, 20))
     inputs.assert_equivalent(inputs.input_record(drifted), saved)
-    assert scene_fingerprint(drifted) != scene_fingerprint(restored)
+    assert problem_fingerprint(drifted) != problem_fingerprint(restored)
 
 
 def test_exact_dynamic_inputs_keep_obstacle_schedule_and_fingerprint(inputs, scene):

@@ -19,7 +19,7 @@ from typing import Any
 
 from export_manhattan_static_dynamic import mission_scenes, shared_dynamic_scenarios
 
-from uav3d.benchmark import scene_fingerprint
+from uav3d.benchmark import problem_fingerprint
 from uav3d.dynamic import DynamicScenario, dynamic_scenario_fingerprint
 from uav3d.manhattan_city import build_manhattan_city
 from uav3d.manhattan_predictive import build_manhattan_missions
@@ -131,7 +131,7 @@ def main() -> None:
     }
     studies = {}
     for study, scenes in problems.items():
-        fingerprint = scene_fingerprint if study == "static" else dynamic_scenario_fingerprint
+        fingerprint = problem_fingerprint if study == "static" else dynamic_scenario_fingerprint
         for scene, exported in zip(scenes, bundles[study]["scenarios"], strict=True):
             if fingerprint(scene) != exported["fingerprint"]:
                 raise ValueError(f"Cannot snapshot different computation inputs: {study}")

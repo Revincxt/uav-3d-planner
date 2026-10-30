@@ -27,10 +27,9 @@ export function validateBenchmarkSummary(value: unknown): Analysis[] {
   }
   return data.analyses;
 }
-/** A missing summary can be rebuilt from validated runtime data; corruption fails closed. */
-export async function fetchBenchmarkSummary(base: string): Promise<Analysis[] | null> {
+/** Development and production both provide the same build-audited summary. */
+export async function fetchBenchmarkSummary(base: string): Promise<Analysis[]> {
   const response = await fetch(new URL("benchmark-summary.json", base));
-  if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Benchmark request failed (${response.status})`);
   return validateBenchmarkSummary(await response.json());
 }
