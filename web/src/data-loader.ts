@@ -1,8 +1,7 @@
 import type { DemoBundle } from "./schema";
 import type { DynamicBundleV1 } from "./dynamic-schema";
 import type { PredictiveBundleV3 } from "./predictive-schema";
-import type { Analysis } from "./results-data";
-export interface LoadedData { static: DemoBundle; dynamic: DynamicBundleV1; predictive: PredictiveBundleV3; results: Analysis[] }
+export interface LoadedData { static: DemoBundle; dynamic: DynamicBundleV1; predictive: PredictiveBundleV3 }
 const pending = new Map<keyof LoadedData, Promise<LoadedData[keyof LoadedData]>>();
 class WorkerUnavailable extends Error {}
 /** Parsing and unchanged validation run off-thread; terminate after delivery. */

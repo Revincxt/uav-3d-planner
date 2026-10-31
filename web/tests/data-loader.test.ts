@@ -40,32 +40,32 @@ describe("background dataset lifecycle", () => {
   });
   it("rejects validation errors without falling back or retaining a failed cache entry", async () => {
     const { loadDataset } = await import("../src/data-loader"), fallback = vi.fn();
-    const failed = loadDataset("results", fallback);
+    const failed = loadDataset("static", fallback);
     FakeWorker.all[0]!.onmessage!({ data: { error: "Invalid safety envelope" } });
     await expect(failed).rejects.toThrow("Invalid safety envelope");
     expect(fallback).not.toHaveBeenCalled(); expect(FakeWorker.all[0]!.terminate).toHaveBeenCalled();
-    const retry = loadDataset("results", fallback);
+    const retry = loadDataset("static", fallback);
     expect(FakeWorker.all).toHaveLength(2);
-    FakeWorker.all[1]!.onmessage!({ data: { value: [] } }); await expect(retry).resolves.toEqual([]);
+    FakeWorker.all[1]!.onmessage!({ data: { value: { scenarios: [] } } }); await expect(retry).resolves.toEqual({ scenarios: [] });
   });
   it("can fall back to the same validator when workers are absent or forbidden", async () => {
-    const { loadDataset } = await import("../src/data-loader"), fallback = vi.fn().mockResolvedValue([]);
+    const { loadDataset } = await import("../src/data-loader"), fallback = vi.fn().mockResolvedValue({ scenarios: [] });
     vi.stubGlobal("Worker", undefined);
-    await expect(loadDataset("results", fallback)).resolves.toEqual([]);
+    await expect(loadDataset("static", fallback)).resolves.toEqual({ scenarios: [] });
     vi.stubGlobal("Worker", class { constructor() { throw new Error("Blocked by host CSP"); } });
-    await expect(loadDataset("results", fallback)).resolves.toEqual([]);
+    await expect(loadDataset("static", fallback)).resolves.toEqual({ scenarios: [] });
     expect(fallback).toHaveBeenCalledTimes(2);
   });
   it("releases a worker whose script cannot load and retries with validated foreground loading", async () => {
-    const { loadDataset } = await import("../src/data-loader"), fallback = vi.fn().mockResolvedValue([]);
-    const result = loadDataset("results", fallback);
+    const { loadDataset } = await import("../src/data-loader"), fallback = vi.fn().mockResolvedValue({ scenarios: [] });
+    const result = loadDataset("static", fallback);
     FakeWorker.all[0]!.onerror!({ message: "Worker asset unavailable" });
-    await expect(result).resolves.toEqual([]);
+    await expect(result).resolves.toEqual({ scenarios: [] });
     expect(fallback).toHaveBeenCalledTimes(1); expect(FakeWorker.all[0]!.terminate).toHaveBeenCalledTimes(1);
   });
   it("fails closed on an incomplete worker response", async () => {
     const { loadDataset } = await import("../src/data-loader"), fallback = vi.fn();
-    const result = loadDataset("results", fallback);
+    const result = loadDataset("static", fallback);
     FakeWorker.all[0]!.onmessage!({ data: {} });
     await expect(result).rejects.toThrow("Incomplete"); expect(fallback).not.toHaveBeenCalled();
   });

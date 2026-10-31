@@ -398,7 +398,7 @@ export class RouteOverview {
         const frame = route.plannedFrames[waypointIndex(route.plannedFrames, timeS)]!;
         pending.visible &&= frame.path.length >= 2;
         if (pending.visible && frame !== visual.planFrame) {
-          pending.geometry.setPositions(frame.path.flatMap(enuToThree));
+          this.updatePlanPositions(pending.geometry, frame.path);
           pending.computeLineDistances();
           let clock = frame.timeS;
           const times = frame.path.map((point, i) => {
@@ -426,6 +426,19 @@ export class RouteOverview {
         hold.position.copy(vehicle.position);
       }
     }
+  }
+
+  /** Reuse the GPU allocation when the local plan keeps its segment count. */
+  private updatePlanPositions(geometry: LineGeometry, points: readonly RoutePoint[]): void {
+    const start = geometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute;
+    if (start.count !== points.length - 1) { geometry.setPositions(points.flatMap(enuToThree)); return; }
+    const end = geometry.getAttribute("instanceEnd");
+    for (let i = 0; i < start.count; i++) {
+      const a = points[i]!, b = points[i + 1]!;
+      start.setXYZ(i, a[0], a[2], -a[1]); end.setXYZ(i, b[0], b[2], -b[1]);
+    }
+    start.data.needsUpdate = true;
+    geometry.computeBoundingBox(); geometry.computeBoundingSphere();
   }
 
   /** Switch presentation without rebuilding geometry or changing the vehicle clock. */

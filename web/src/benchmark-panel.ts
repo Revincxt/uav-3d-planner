@@ -1,12 +1,9 @@
 import "./results.css";
-import { loadDataset } from "./data-loader";
 import type { Analysis } from "./results-data";
 import { fetchBenchmarkSummary } from "./benchmark-summary";
 import { metricComparisons, renderMetricChart } from "./results-chart";
 import { uiSymbol } from "./ui-symbol";
 
-const loadBenchmark = (): Promise<Analysis[]> => loadDataset("results", () =>
-  fetchBenchmarkSummary(new URL(import.meta.env.BASE_URL, document.baseURI).href));
 function renderStudy(analysis: Analysis): HTMLElement {
   const section = document.createElement("section"); section.className = "study-comparison"; section.dataset.study = analysis.id;
   const heading = document.createElement("h2"); heading.className = "study-comparison-heading";
@@ -18,7 +15,7 @@ function renderStudy(analysis: Analysis): HTMLElement {
 export async function populateBenchmark(panel: HTMLElement): Promise<void> {
   const state = panel.querySelector<HTMLElement>(".benchmark-state")!; panel.setAttribute("aria-busy", "true");
   try {
-    const analyses = await loadBenchmark();
+    const analyses = await fetchBenchmarkSummary(new URL(import.meta.env.BASE_URL, document.baseURI).href);
     panel.querySelector(".results-overview")!.replaceChildren(...analyses.map(renderStudy));
     panel.querySelector(".results-note")!.textContent = analyses.some(a => a.planners.some(p => p.summary.completed < p.summary.attempts))
       ? "Completed mission medians · Incomplete cohort" : "Completed mission medians";

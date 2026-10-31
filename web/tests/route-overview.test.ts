@@ -164,14 +164,19 @@ describe("four routes, one world", () => {
   });
   it("does not recreate or dispose trajectory GPU buffers on focus or 100 time samples", () => {
     const overview = new RouteOverview(), routes = fixtureRoutes();
+    routes[0]!.playbackKind = "reactive";
+    routes[0]!.plannedFrames = Array.from({ length: 40 }, (_, i) => ({ timeS: i / 4, path: routes[0]!.points })) as DynamicRun["frames"];
     overview.setRoutes(routes, routes[0]!.id, 800, 600);
     const line = overview.group.getObjectByName(`overview-trajectory-${routes[0]!.id}`) as Line2;
+    const pending = overview.group.getObjectByName(`overview-plan-${routes[0]!.id}`) as Line2;
+    const planPositions = pending.geometry.getAttribute("instanceStart");
     const dispose = vi.spyOn(line.geometry, "dispose"), upload = vi.spyOn(line.geometry, "setPositions");
     for (let i = 0; i < 100; i++) { overview.setTime(i / 4); overview.setFocus(routes[i % 4]!.id); }
     overview.setRoutes(routes.map(route => ({ ...route })), routes[2]!.id, 600, 400);
     expect(overview.group.getObjectByName(line.name) === line).toBe(true);
     expect(dispose).not.toHaveBeenCalled();
     expect(upload).not.toHaveBeenCalled();
+    expect(pending.geometry.getAttribute("instanceStart")).toBe(planPositions);
     expect(overview.group.children.every(group => group.visible)).toBe(true);
     overview.dispose();
     expect(dispose).toHaveBeenCalledOnce();

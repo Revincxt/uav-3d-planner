@@ -32,7 +32,7 @@ export function packRuntimeData(bundle) {
     });
     return packed;
   });
-  return { runtimeVersion: 1, pool, bundle: { ...bundle, scenarios } };
+  return { pool, bundle: { ...bundle, scenarios } };
 }
 /** Externalize only byte-identical city fields; mission and hazard records stay local. */
 export function splitRuntimeCity(value) {
@@ -49,9 +49,9 @@ export function splitRuntimeCity(value) {
   return { pool, bundle: value.bundle, city };
 }
 export function unpackRuntimeData(value, city) {
-  if (!value || ![1, 2].includes(value.runtimeVersion) || !Array.isArray(value.pool) || !value.bundle || typeof value.bundle !== 'object'
-    || (value.runtimeVersion === 2 && (!/^[a-f\d]{64}$/.test(value.citySha256 ?? '') || !city || typeof city !== 'object'))) throw new Error('Unsupported runtime delivery format');
-  const pool = value.runtimeVersion === 1 ? value.pool : value.pool.map(entry => {
+  if (!value || value.runtimeVersion !== 2 || !Array.isArray(value.pool) || !value.bundle || typeof value.bundle !== 'object'
+    || !/^[a-f\d]{64}$/.test(value.citySha256 ?? '') || !city || typeof city !== 'object') throw new Error('Unsupported runtime delivery format');
+  const pool = value.pool.map(entry => {
     if (!entry || typeof entry !== 'object' || !Object.hasOwn(entry, '$runtimeCity')) return entry;
     if (Object.keys(entry).length !== 1 || !['bounds', 'buildings', 'city'].includes(entry.$runtimeCity)
       || !Object.hasOwn(city, entry.$runtimeCity)) throw new Error('Invalid runtime city reference');

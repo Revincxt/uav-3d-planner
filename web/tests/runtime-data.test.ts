@@ -37,7 +37,7 @@ describe("lossless runtime delivery", () => {
     expect(parsed.scenarios).toHaveLength(8);
     expect(parsed.scenarios[0]!.buildings).toBe(parsed.scenarios[1]!.buildings);
     if (name === "dynamic-data") {
-      const frames = validateDynamicBundle(decoded).scenarios[0]!.runs[0]!.frames;
+      const frames = (parsed as ReturnType<typeof validateDynamicBundle>).scenarios[0]!.runs[0]!.frames;
       expect(frames[0]!.executedPath[0]).toBe(frames.at(-1)!.executedPath[0]);
     }
   }, 60000);
@@ -45,17 +45,17 @@ describe("lossless runtime delivery", () => {
     const original = { scenarios: [{ runs: [{ frames: [
       { executedPath: [[0, 1, 2], [1, 2, 3]] }, { executedPath: [[0, 1, 2], [4, 5, 6]] },
     ] }] }] };
-    expect(unpackRuntimeData(packRuntimeData(original))).toEqual(original);
+    expect(unpackRuntimeData({ runtimeVersion: 2, citySha256: 'a'.repeat(64), ...packRuntimeData(original) }, {})).toEqual(original);
   });
   it("shares repeated history prefixes within a decode, without a persistent slice cache", () => {
-    const input = { runtimeVersion: 1, pool: [[[0, 1, 2], [3, 4, 5]]], bundle: {
+    const input = { runtimeVersion: 2, citySha256: 'a'.repeat(64), pool: [[[0, 1, 2], [3, 4, 5]]], bundle: {
       a: { $runtimeRef: 0, prefix: 1 }, b: { $runtimeRef: 0, prefix: 1 },
       c: { $runtimeRef: 0, prefix: 2 },
     } };
-    const first = unpackRuntimeData(input) as { a: number[][]; b: number[][]; c: number[][] };
+    const first = unpackRuntimeData(input, {}) as { a: number[][]; b: number[][]; c: number[][] };
     expect(first.a).toBe(first.b); expect(first.a).not.toBe(first.c);
     expect(first).toEqual({ a: [[0, 1, 2]], b: [[0, 1, 2]], c: [[0, 1, 2], [3, 4, 5]] });
-    const second = unpackRuntimeData(input) as typeof first;
+    const second = unpackRuntimeData(input, {}) as typeof first;
     expect(second.a).not.toBe(first.a);
     expect(input.pool[0]).toHaveLength(2);
   });
@@ -63,10 +63,10 @@ describe("lossless runtime delivery", () => {
     for (const ref of [{ $runtimeRef: -1 }, { $runtimeRef: 1 }, { $runtimeRef: 0.5 },
       { $runtimeRef: 0, prefix: -1 }, { $runtimeRef: 0, prefix: 2 }, { $runtimeRef: 0, prefix: 0.5 },
       { $runtimeRef: 0, forged: true }]) {
-      expect(() => unpackRuntimeData({ runtimeVersion: 1, pool: [[1]], bundle: { ref } })).toThrow("Invalid runtime");
+      expect(() => unpackRuntimeData({ runtimeVersion: 2, citySha256: 'a'.repeat(64), pool: [[1]], bundle: { ref } }, {})).toThrow("Invalid runtime");
     }
-    expect(() => unpackRuntimeData({ runtimeVersion: 2, pool: [], bundle: {} })).toThrow("Unsupported");
-    expect(() => unpackRuntimeData({ runtimeVersion: 1, pool: [1], bundle: { ref: { $runtimeRef: 0, prefix: 0 } } })).toThrow("prefix");
+    expect(() => unpackRuntimeData({ runtimeVersion: 1, pool: [], bundle: {} }, {})).toThrow("Unsupported");
+    expect(() => unpackRuntimeData({ runtimeVersion: 2, citySha256: 'a'.repeat(64), pool: [1], bundle: { ref: { $runtimeRef: 0, prefix: 0 } } }, {})).toThrow("prefix");
   });
   it('requires matching cities for every task without modifying the original packed data', () => {
     const city = { bounds: {}, buildings: [], city: { id: 'first' } };
