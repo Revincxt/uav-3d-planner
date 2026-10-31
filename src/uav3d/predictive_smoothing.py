@@ -721,12 +721,12 @@ def shortcut_timed_path(
             and not any(almost_equal(raw[block_end].position, p) for p in task_positions)
         ):
             block_end += 1
-        following = index + 1
-        for candidate in range(block_end, index, -1):
-            if almost_equal(raw[index].position, raw[candidate].position):
-                continue  # Do not silently turn a moving loop into an undocumented wait.
+
+        def visible(current: int, candidate: int) -> bool:
+            if almost_equal(raw[current].position, raw[candidate].position):
+                return False  # A movement loop must not become an undocumented wait.
             if max_altitude_deviation_m is not None:
-                start, end = raw[index], raw[candidate]
+                start, end = raw[current], raw[candidate]
                 duration = end.time_s - start.time_s
                 if any(
                     abs(
@@ -739,20 +739,61 @@ def shortcut_timed_path(
                         )
                     )
                     > max_altitude_deviation_m + 1e-9
-                    for p in raw[index + 1 : candidate]
+                    for p in raw[current + 1 : candidate]
                 ):
-                    continue
-            if spacetime_segment_is_free(
+                    return False
+            return spacetime_segment_is_free(
                 scenario,
-                raw[index].position,
+                raw[current].position,
                 raw[candidate].position,
-                raw[index].time_s,
+                raw[current].time_s,
                 raw[candidate].time_s,
-            ):
-                following = candidate
-                break
-        output.append(raw[following])
-        index = following
+            )
+
+        greedy = [index]
+        while greedy[-1] < block_end:
+            following = greedy[-1] + 1
+            for candidate in range(block_end, greedy[-1], -1):
+                if visible(greedy[-1], candidate):
+                    following = candidate
+                    break
+            greedy.append(following)
+        selected = greedy
+        if len(greedy) > 2:
+            # Keep every greedy edge, then allow closer intermediate nodes to
+            # beat the farthest-visible-index detour. Bound the graph on dense
+            # replay inputs rather than doing quadratic full-trajectory audits.
+            stride = max(1, math.ceil((block_end - index) / 64))
+            nodes = sorted(set(greedy) | set(range(index, block_end + 1, stride)))
+            costs = [math.inf] * len(nodes)
+            counts = [len(nodes) + 1] * len(nodes)
+            parents = [-1] * len(nodes)
+            costs[0], counts[0] = 0.0, 1
+            for following in range(1, len(nodes)):
+                for current in range(following):
+                    if not math.isfinite(costs[current]):
+                        continue
+                    cost = costs[current] + distance(
+                        raw[nodes[current]].position, raw[nodes[following]].position
+                    )
+                    count = counts[current] + 1
+                    if cost > costs[following] - 1e-9 and not (
+                        abs(cost - costs[following]) <= 1e-9 and count < counts[following]
+                    ):
+                        continue
+                    if visible(nodes[current], nodes[following]):
+                        costs[following], counts[following], parents[following] = (
+                            cost,
+                            count,
+                            current,
+                        )
+            if parents[-1] >= 0:
+                chain = [len(nodes) - 1]
+                while chain[-1]:
+                    chain.append(parents[chain[-1]])
+                selected = [nodes[i] for i in reversed(chain)]
+        output.extend(raw[i] for i in selected[1:])
+        index = block_end
     candidate_path = TimedPath(tuple(output))
     # Keep the standalone utility fail-closed too, including the original adjacent-segment case.
     if not candidate_path.is_safe(scenario):

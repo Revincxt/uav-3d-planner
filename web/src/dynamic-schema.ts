@@ -15,6 +15,7 @@ export interface DynamicProtocol {
   id: string;
   timeStepS: number;
   replanIntervalS: number;
+  planningGuardS?: number;
   cruiseSpeedMps: number;
   maxTimeS: number;
   resolutionM: number;

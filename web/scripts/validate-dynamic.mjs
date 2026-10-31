@@ -147,6 +147,8 @@ const actualProtocol = [protocol.timeStepS, protocol.replanIntervalS, protocol.c
 if (!expectedProtocol || actualProtocol.some((value, index) => value !== expectedProtocol[index])) {
   fail("protocol does not match the declared deterministic replay configuration");
 }
+if (protocol.id === MANHATTAN_PROTOCOL_ID && protocol.planningGuardS !== protocol.replanIntervalS)
+  fail("protocol.planningGuardS must match the local replanning window");
 if (protocol.verticalCostScale !== undefined) {
   if (positive(protocol.verticalCostScale, "verticalCostScale") < 1) fail("verticalCostScale must be at least one");
   positive(protocol.maxClimbRateMps, "maxClimbRateMps");
@@ -473,12 +475,11 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
       });
       const planned = parsePath(frame.path, `${frameLabel}.path`);
       const executed = parsePath(frame.executedPath, `${frameLabel}.executedPath`);
-      const curvedEscape = parameters.verticalCostScale !== undefined && Array.isArray(run.executionTimedPath);
       const localEscape = protocol.horizontalEscape === 1 && parameters.horizontalEscape === 1 &&
+        protocol.curveDimensions === 3 && parameters.verticalCostScale !== undefined && Array.isArray(run.executionTimedPath) &&
         planned.length >= 2 && frame.replanReason === "safety-gate" &&
-        planned.every(p => Math.abs(p[2] - planned[0][2]) <= 1e-5) &&
-        (curvedEscape ? length(planned) <= protocol.cruiseSpeedMps * protocol.timeStepS * 2 + 1e-5 :
-          planned.length === 2 && length(planned) <= protocol.cruiseSpeedMps * protocol.timeStepS + 1e-5);
+        planned.every(p => Math.abs(p[2] - vehicle[2]) <= 12 + 1e-5) &&
+        length(planned) <= protocol.cruiseSpeedMps * Math.max(2 * protocol.timeStepS, protocol.planningGuardS ?? 0) * 2 + 1e-5;
       if (
         planned.length > 0 &&
         (!samePoint(planned[0], vehicle) || (!localEscape && ![goal, ...(scene.mission?.taskPoints ?? []).map(task => task.position)].some(target => samePoint(planned.at(-1), target))))
@@ -547,7 +548,7 @@ for (const [sceneIndex, rawScene] of scenarios.entries()) {
         }
         replanFrameCount += 1;
       } else if (
-        replanReason !== null || plannerSuccess !== null || planningTime !== null ||
+        (replanReason !== null && !localEscape) || plannerSuccess !== null || planningTime !== null ||
         workUsed !== 0 || changedEdges !== 0
       ) fail(`${frameLabel} non-replanning frame contains planner outcomes`);
       workTotal += workUsed;

@@ -30,6 +30,31 @@ def max_turn(points):
     return max(angles, default=0)
 
 
+@pytest.mark.parametrize("beginning", (True, False))
+def test_shallow_boundary_turn_does_not_overshoot_and_pull_back(beginning: bool):
+    points = ((0.0, 0.0, 20.0), (140.0, -4.0, 20.0))
+    direction = (
+        {"start_direction": (1.0, -0.5, 0.1)} if beginning else {"end_direction": (1.0, -0.5, -0.1)}
+    )
+    curve = smooth_spatial_curves(
+        points,
+        (0.0, 1.0),
+        lambda *_: True,
+        boundary_height_excursion=True,
+        **direction,
+    )
+    assert curve.points[0] == points[0] and curve.points[-1] == points[-1]
+    assert all(b[0] >= a[0] - 1e-9 and b[1] <= a[1] + 1e-9 for a, b in pairwise(curve.points))
+    assert all(-4 - 1e-9 <= p[1] <= 1e-9 for p in curve.points)
+    a, b = curve.points[:2] if beginning else curve.points[-2:]
+    tangent = tuple(b[i] - a[i] for i in range(3))
+    expected = next(iter(direction.values()))
+    cosine = sum(x * y for x, y in zip(tangent, expected, strict=True)) / (
+        math.hypot(*tangent) * math.hypot(*expected)
+    )
+    assert cosine > 0.99
+
+
 def make_scenario(points, *, buildings=(), tasks=()):
     return DynamicScenario(
         "spatial",
@@ -86,6 +111,35 @@ def test_all_three_axes_match_tangents_and_zero_second_derivatives():
         assert 5 * (controls[5][axis] - controls[4][axis]) / 10 == pytest.approx(final[axis])
         assert controls[0][axis] - 2 * controls[1][axis] + controls[2][axis] == pytest.approx(0)
         assert controls[3][axis] - 2 * controls[4][axis] + controls[5][axis] == pytest.approx(0)
+
+
+@pytest.mark.parametrize("parameters", [(0.0, 100.0, 101.0), (0.0, 1.0, 101.0)])
+def test_uneven_parameter_speeds_do_not_leave_a_hard_vertical_corner(parameters):
+    points = ((0.0, 0.0, 100.0), (100.0, 0.0, 100.0), (120.0, 0.0, 80.0))
+    result = smooth_spatial_curves(points, parameters, lambda *_: True, round_reversals=True)
+    assert result.rounded_corners == 1
+    assert points[1] not in result.points
+    assert max_turn(result.points) < 4
+    assert all(80 <= p[2] <= 100 for p in result.points)
+    assert all(b[0] >= a[0] - 1e-9 for a, b in pairwise(result.points))
+    assert result.points[0] == points[0] and result.points[-1] == points[-1]
+
+
+def test_uneven_flythrough_climb_has_no_artificial_height_reversal_or_large_loop():
+    points = ((0.0, 0.0, 20.0), (100.0, 0.0, 30.0), (100.0, 100.0, 100.0))
+    result = smooth_spatial_curves(
+        points,
+        (0.0, 100.0, 101.0),
+        lambda *_: True,
+        protected=frozenset({100.0}),
+        round_reversals=True,
+    )
+    assert result.rounded_corners == 1
+    assert result.points[result.parameters.index(100.0)] == points[1]
+    assert all(b[2] >= a[2] - 1e-9 for a, b in pairwise(result.points))
+    assert min(p[1] for p in result.points) > -1.0
+    assert max(p[0] for p in result.points) < 101.0
+    assert max_turn(result.points) < 4
 
 
 def test_constant_height_and_straight_vertical_flight_remain_exact():

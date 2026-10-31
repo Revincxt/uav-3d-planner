@@ -152,6 +152,26 @@ def test_opt_in_shortcut_reduces_free_zigzag_without_mutating_raw_evidence() -> 
     assert raw.to_dict() == original
 
 
+def test_spacetime_shortcut_minimizes_length_instead_of_the_next_visible_index() -> None:
+    points = ((2, 10, 5), (6, 6, 5), (14, 6, 5), (18, 14, 5), (5, 18, 5), (18, 10, 5))
+    raw = TimedPath(
+        tuple(
+            TimedWaypoint(i * 4.0, p, "start" if i == 0 else "move") for i, p in enumerate(points)
+        )
+    )
+    original = raw.to_dict()
+    scenario = _scenario(raw, buildings=(AABB("barrier", (8, 8, 0), (12, 12, 9)),))
+    result = shortcut_timed_path(scenario, raw, max_altitude_deviation_m=6)
+    assert result.waypoints == tuple(raw.waypoints[i] for i in (0, 1, 2, 5))
+    assert result.is_safe(scenario)
+    greedy_length = distance(points[0], points[4]) + distance(points[4], points[5])
+    assert (
+        sum(distance(a.position, b.position) for a, b in pairwise(result.waypoints))
+        < greedy_length - 4
+    )
+    assert raw.to_dict() == original
+
+
 @pytest.mark.parametrize("hazard", ("building", "sphere", "temporary-cylinder"))
 def test_shortcut_checks_full_static_and_dynamic_chords(hazard: str) -> None:
     raw = _corner()

@@ -57,6 +57,39 @@ describe("recorded Manhattan reactive missions", { timeout: 30000 }, () => {
       .toThrow(/protocol/);
   });
 
+  it("rejects an undeclared avoidance horizon", () => {
+    expect(() => validateDynamicBundle({ ...source, protocol: { ...source.protocol, planningGuardS: 20 } }))
+      .toThrow(/planningGuardS/);
+  });
+
+  it("retains XYZ avoidance without inventing planner outcomes or excessive height excursions", () => {
+    const same = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]!) < 1e-5);
+    let target: { si: number; ri: number; fi: number } | undefined;
+    search: for (const [si, s] of source.scenarios.entries()) {
+      const destinations = [s.goal, ...s.mission.taskPoints.map((t: { position: number[] }) => t.position)];
+      for (const [ri, r] of s.runs.entries()) {
+        for (const [fi, f] of r.frames.entries()) {
+          if (!f.replanned && f.replanReason === "safety-gate" && f.path.length > 2 &&
+            !destinations.some(p => same(f.path.at(-1), p)) &&
+            f.path.some((p: number[]) => Math.abs(p[2]! - f.vehicle[2]) > 1e-4)) {
+            target = { si, ri, fi };
+            break search;
+          }
+        }
+      }
+    }
+    expect(target).toBeDefined();
+    const { si, ri, fi } = target!;
+    const bundle = copyDeclarations(), r = bundle.scenarios[si].runs[ri];
+    const frame = r.frames[fi], path = frame.path.map((p: number[]) => [...p]);
+    expect(path.every((p: number[]) => Math.abs(p[2]! - frame.vehicle[2]) <= 12 + 1e-5)).toBe(true);
+    path[1]![2] = frame.vehicle[2] + 13;
+    r.frames = [...r.frames]; r.frames[fi] = { ...frame, path };
+    expect(() => validateDynamicBundle(bundle)).toThrow(/path endpoints/);
+    r.frames[fi] = { ...frame, workUsed: 1 };
+    expect(() => validateDynamicBundle(bundle)).toThrow(/non-replanning frame contains planner outcomes/);
+  });
+
   it("does not let a local export claim to be a Git commit", () => {
     expect(() => validateDynamicBundle({ ...source, sourceCommit: "a".repeat(40) }))
       .toThrow(/local source snapshot/);

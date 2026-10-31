@@ -474,7 +474,7 @@ def static_result(scene: Scene, algorithm: str, seed: int) -> dict[str, Any]:
         "smoothing": {
             "outcome": smoothing.method,
             "collisionFree": True,
-            "shortcutPolicy": "shortest-xy-visible-preserved-altitude-dag",
+            "shortcutPolicy": "visibility-dag-and-taut-xy-preserved-altitude",
             "sampleSpacingM": 2,
             "optimizationAxes": ["x", "y", "z"],
             "altitudeDeviationLimitM": 12,

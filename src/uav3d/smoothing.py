@@ -80,7 +80,9 @@ def shortest_visible_shortcut(
     The farthest visible *index* can require a larger detour than a closer intermediate waypoint.
     This directed acyclic visibility graph minimizes actual 3D length, using fewer waypoints as
     a deterministic tie-break. Every retained chord uses the unchanged exact collision predicate;
-    no new obstacle model, point displacement, or unverified continuous curve is introduced.
+    no new obstacle model or unverified continuous curve is introduced. The altitude-locked
+    branch additionally tightens interior XY anchors after visibility selection, checking every
+    intervening original height knot rather than keeping avoidable grid-corner detours.
     """
 
     if preserve_altitude:
@@ -209,6 +211,40 @@ def _altitude_preserving_shortcut(
                     following = candidate
                     break
             indices.append(following)
+    if optimize:
+        # Visibility alone can only choose existing grid/search vertices. Pull
+        # interior XY anchors toward their neighbours, retaining every original
+        # height knot and auditing both complete lifted chords after each move.
+        for _ in range(6):
+            improvement = 0.0
+            for order in (range(1, len(indices) - 1), range(len(indices) - 2, 0, -1)):
+                for position in order:
+                    left, middle, right = indices[position - 1 : position + 2]
+                    a, b, c = points[left], points[middle], points[right]
+                    dx, dy = c[0] - a[0], c[1] - a[1]
+                    squared = dx * dx + dy * dy
+                    if squared <= 1e-12:
+                        continue
+                    fraction = max(
+                        0.0, min(1.0, ((b[0] - a[0]) * dx + (b[1] - a[1]) * dy) / squared)
+                    )
+                    target = (a[0] + fraction * dx, a[1] + fraction * dy, b[2])
+                    old_length = math.dist(a[:2], b[:2]) + math.dist(b[:2], c[:2])
+                    for factor in (1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625):
+                        adjusted = lerp(b, target, factor)
+                        new_length = math.dist(a[:2], adjusted[:2]) + math.dist(adjusted[:2], c[:2])
+                        if old_length - new_length < 1e-5:
+                            break
+                        points[middle] = adjusted
+                        if all(
+                            path_is_free(scene, _altitude_chord(points, progress, u, v))
+                            for u, v in ((left, middle), (middle, right))
+                        ):
+                            improvement += old_length - new_length
+                            break
+                        points[middle] = b
+            if improvement < 1e-4:
+                break
     shortcut = [points[0]]
     for current, following in pairwise(indices):
         shortcut.extend(_altitude_chord(points, progress, current, following)[1:])

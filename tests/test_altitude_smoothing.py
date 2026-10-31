@@ -18,6 +18,7 @@ from uav3d.predictive_study import _reactive_timed_path
 from uav3d.replanning import REPLANNING_ALGORITHMS, simulate_replanning
 from uav3d.scene import AABB, Bounds3D, Scene
 from uav3d.smoothing import farthest_visible_shortcut, shortest_visible_shortcut, smooth_path
+from uav3d.validation import audit_path
 
 
 def scene_for_path(path: Sequence[Point3], buildings: tuple[AABB, ...] = ()) -> Scene:
@@ -103,6 +104,21 @@ def test_pure_vertical_segments_and_tiny_nonzero_height_changes_survive() -> Non
     assert_preserved_profile(raw, result)
     assert result.path == tuple(raw)
     assert horizontal_length(result.path) == 0.0
+
+
+def test_taut_shortcut_can_improve_beyond_existing_vertices_without_changing_height() -> None:
+    raw = [(2.0, 10.0, 5.0), (4.0, 3.0, 6.0), (16.0, 3.0, 4.0), (18.0, 10.0, 5.0)]
+    original = list(raw)
+    scene = scene_for_path(raw, (AABB("barrier", (8.0, 8.0, 0.0), (12.0, 12.0, 9.0)),))
+    vertex_only = farthest_visible_shortcut(scene, raw, preserve_altitude=True)
+    result = smooth_path(
+        scene, raw, optimize_shortcuts=True, preserve_altitude=True, round_corners=False
+    )
+    assert horizontal_length(result.path) < horizontal_length(vertex_only) - 2.0
+    assert any(point not in raw for point in result.path[1:-1])
+    assert_preserved_profile(raw, result)
+    assert audit_path(scene, result.path).valid
+    assert raw == original
 
 
 def test_xy_spline_inserts_every_raw_height_breakpoint_and_never_overshoots() -> None:

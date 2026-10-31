@@ -276,10 +276,21 @@ def smooth_curves(
         v1 = cast_vector(
             tuple(value / (parameters[right] - parameters[middle]) for value in outgoing)
         )
-        vm = cast_vector(tuple((v0[i] + v1[i]) / 2 for i in range(3)))
+        speed_a, speed_b = math.hypot(*v0), math.hypot(*v1)
+        vm = cast_vector(
+            tuple(min(speed_a, speed_b) * (v0[i] / speed_a + v1[i] / speed_b) / 2 for i in range(3))
+        )
         if not preserve_altitude and v0[2] * v1[2] <= 0:
             # A protected height extremum requires a horizontal vertical tangent.
             vm = (vm[0], vm[1], 0.0)
+        elif not preserve_altitude:
+            # A fast adjoining leg must not pull a fly-through gate approach
+            # down then back up (or vice versa) just to match its clock speed.
+            vm = (
+                vm[0],
+                vm[1],
+                math.copysign(min(abs(vm[2]), 1.5 * min(abs(v0[2]), abs(v1[2]))), vm[2]),
+            )
         factors: tuple[float, ...] = (1.0, 0.75, 0.5, 0.25, 0.125, 0.0625, 0.03125)
         if round_reversals:
             factors += (0.015625, 0.0078125, 0.00390625, 0.001953125)
@@ -287,10 +298,16 @@ def smooth_curves(
             extent = trim * factor
             if extent < (0.0001 if round_reversals else 0.1):
                 break
-            entry = parameters[middle] - (parameters[middle] - parameters[left]) * extent / length_a
-            exit_ = (
-                parameters[middle] + (parameters[right] - parameters[middle]) * extent / length_b
+            # Equal spatial trims can cover very different parameter intervals.
+            # Their quintic handles then overshoot a height extremum or fold back;
+            # shrinking the same ratio never fixes that shape. Balance intervals
+            # instead, keeping unprotected controls inside the original corner.
+            interval = min(
+                (parameters[middle] - parameters[left]) * extent / length_a,
+                (parameters[right] - parameters[middle]) * extent / length_b,
             )
+            entry, exit_ = parameters[middle] - interval, parameters[middle] + interval
+            extent = min(math.hypot(*v0), math.hypot(*v1)) * interval
             e, x = shape(reference(entry)), shape(reference(exit_))
             if round_reversals and (
                 angle > math.radians(175)
@@ -301,7 +318,7 @@ def smooth_curves(
             ):
                 # A collinear 180-degree spline has a zero-velocity cusp. Use
                 # two spans with a nonzero lateral tangent, testing both sides.
-                speed = (math.hypot(*v0) + math.hypot(*v1)) / 2
+                speed = min(speed_a, speed_b)
                 accepted = False
                 for side in (1, -1):
                     lateral = tuple(value * side for value in _lateral(cast_vector(incoming)))
@@ -378,6 +395,22 @@ def smooth_curves(
             angle > math.radians(175) and not round_reversals
         ):
             continue
+        # Equal handle speeds can overshoot a shallow coordinate change and
+        # pull back into the chord, creating an artificial S-turn at a replan.
+        # Bound the handle length, preserving the complete incoming XYZ direction.
+        # For same-sign components this orders the quintic control points in
+        # that coordinate; arc-length execution still uses the flight clock.
+        handle_scale = min(
+            (
+                1.0,
+                *(
+                    1.5 * abs(velocity[i] / desired[i])
+                    for i in range(3)
+                    if velocity[i] * desired[i] > 1e-12
+                ),
+            )
+        )
+        desired = cast_vector(tuple(value * handle_scale for value in desired))
         factors = (1.0, 0.5, 0.25, 0.125, 0.0625)
         if round_reversals:
             factors += (0.03125, 0.015625, 0.0078125)

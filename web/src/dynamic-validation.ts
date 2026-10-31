@@ -181,8 +181,13 @@ function protocol(value: unknown): DynamicProtocol {
   }
   if (item.horizontalEscape !== undefined) {
     if (item.horizontalEscape !== 1 || parsed.id !== MANHATTAN_PROTOCOL_ID)
-      fail("protocol.horizontalEscape must declare the Manhattan level avoidance controller");
+      fail("protocol.horizontalEscape must declare the Manhattan local avoidance controller");
     parsed.horizontalEscape = 1;
+  }
+  if (parsed.id === MANHATTAN_PROTOCOL_ID && item.planningGuardS !== parsed.replanIntervalS)
+    fail("protocol.planningGuardS must match the local replanning window");
+  if (item.planningGuardS !== undefined) {
+    parsed.planningGuardS = positive(item.planningGuardS, "protocol.planningGuardS");
   }
   if (item.verticalCostScale !== undefined) {
     parsed.verticalCostScale = positive(item.verticalCostScale, "protocol.verticalCostScale");
@@ -366,7 +371,6 @@ function frame(
     "bounds" | "start" | "goal" | "temporaryNoFlyZones" | "movingSpheres" | "mission"
   >,
   escapeSpanM = 0,
-  curvedEscape = false,
 ): DynamicFrame {
   const item = record(value, label);
   const timeS = nonNegative(item.timeS, `${label}.timeS`);
@@ -381,9 +385,8 @@ function frame(
     fail(`${label}.executedPath must end at the vehicle position`);
   }
   const localEscape = escapeSpanM > 0 && plannedPath.length >= 2 && item.replanReason === "safety-gate" &&
-    plannedPath.every(p => Math.abs(p[2] - plannedPath[0]![2]) <= 1e-5) &&
-    (curvedEscape ? polylineLength(plannedPath) <= escapeSpanM * 2 + 1e-5 :
-      plannedPath.length === 2 && polylineLength(plannedPath) <= escapeSpanM + 1e-5);
+    plannedPath.every(p => Math.abs(p[2] - vehicle[2]) <= 12 + 1e-5) &&
+    polylineLength(plannedPath) <= escapeSpanM * 2 + 1e-5;
   if (
     plannedPath.length > 0 &&
     (!samePoint(plannedPath[0]!, vehicle) || (!localEscape && ![scenario.goal, ...(scenario.mission?.taskPoints?.map(task => task.position) ?? [])].some(target => samePoint(plannedPath.at(-1)!, target))))
@@ -442,7 +445,9 @@ function frame(
   if (replanned && (replanReason === null || plannerSuccess === null)) {
     fail(`${label} replanning frames require reason and plannerSuccess`);
   }
-  if (!replanned && (replanReason !== null || plannerSuccess !== null || workUsed !== 0 || changedEdges !== 0)) {
+  // A retained escape carries its safety-gate origin; it does not invoke a new search.
+  if (!replanned && ((replanReason !== null && !localEscape) || plannerSuccess !== null ||
+    planningTimeMs !== null || workUsed !== 0 || changedEdges !== 0)) {
     fail(`${label} non-replanning frame contains planner outcomes`);
   }
   if (event?.kind === "goal-reached" && !samePoint(vehicle, scenario.goal)) {
@@ -533,8 +538,8 @@ function run(value: unknown, label: string, scenario: DynamicScenario, escapeSpa
 
   const parsedFrames = array(item.frames, `${label}.frames`).map((entry, index) =>
     frame(entry, `${label}.frames[${index}]`, scenario,
-      parameters.horizontalEscape === 1 ? escapeSpanM : 0,
-      parameters.verticalCostScale !== undefined && Array.isArray(item.executionTimedPath)),
+      parameters.horizontalEscape === 1 && parameters.verticalCostScale !== undefined
+        && Array.isArray(item.executionTimedPath) ? escapeSpanM : 0),
   );
   if (parsedFrames.length === 0 || parsedFrames[0]!.timeS !== 0) {
     fail(`${label}.frames must be non-empty and start at time 0`);
@@ -813,7 +818,7 @@ function parseDynamicBundle(value: unknown): DynamicBundleV1 {
 
   const scenarios = array(item.scenarios, "scenarios").map((entry, index) =>
     scenario(entry, `scenarios[${index}]`, parsedProtocol.horizontalEscape === 1
-      ? parsedProtocol.cruiseSpeedMps * parsedProtocol.timeStepS : 0),
+      ? parsedProtocol.cruiseSpeedMps * Math.max(2 * parsedProtocol.timeStepS, parsedProtocol.planningGuardS ?? 0) : 0),
   );
   if (scenarios.length === 0) fail("at least one scenario is required");
   if (new Set(scenarios.map((entry) => entry.id)).size !== scenarios.length) {
