@@ -6,6 +6,7 @@ import { createDrone, orientDrone, sizeDrone } from "../src/drone-model";
 import { configureMapNavigation } from "../src/map-navigation";
 import { disposeRenderObject } from "../src/render-resources";
 import { avoidDroneMarkerOverlap } from "../src/mission-tasks";
+import { displayHeading, timedPosition, type RouteWaypoint } from "../src/route-overview";
 
 function fixture() {
   const camera = new THREE.OrthographicCamera(-1000, 1000, 600, -600, -10000, 10000);
@@ -161,6 +162,30 @@ describe("centered close chase camera", () => {
       follow.update(position, east, 100, 5016);
       const direction = follow.camera.getWorldDirection(new THREE.Vector3());
       expect(direction.x).toBeCloseTo(Math.cos(Math.PI / 12)); expect(direction.z).toBeCloseTo(0);
+    }
+  });
+  it("brakes at recorded turns without swinging past the outgoing heading at any replay rate", () => {
+    for (const reversal of [false, true]) {
+      const path: RouteWaypoint[] = [{ timeS: 0, position: [0, 0, 30] }, { timeS: 2, position: [0, 20, 30] },
+        { timeS: 4, position: reversal ? [0, 0, 30] : [20, 20, 30] },
+        { timeS: 8, position: reversal ? [0, -40, 30] : [60, 20, 30] }];
+      const original = structuredClone(path), outgoing = reversal ? Math.PI : -Math.PI / 2, direction = Math.sign(outgoing);
+      for (const hz of [30, 60, 120]) for (const rate of [2, 4, 8]) {
+        const { follow } = fixture(), position = new THREE.Vector3(0, 30, 0);
+        follow.start("uav-1", position, displayHeading(path, 0), 1200, 600);
+        follow.update(position, displayHeading(path, 0), 0, 1000, path);
+        for (let frame = 1; frame <= hz * 5; frame++) {
+          const time = frame * rate / hz, point = timedPosition(path, time);
+          position.set(point[0], point[2], -point[1]);
+          follow.update(position, displayHeading(path, time), time, 1000 + frame * 1000 / hz, path);
+          expect(direction * follow.camera.rotation.y).toBeLessThan(Math.abs(outgoing) + .5 * Math.PI / 180);
+          expect(direction * follow.camera.rotation.y).toBeGreaterThan(-.5 * Math.PI / 180);
+          const center = position.clone().project(follow.camera);
+          expect(center.x).toBeCloseTo(0); expect(center.y).toBeCloseTo(0);
+        }
+        expect(Math.abs(follow.camera.rotation.y - outgoing)).toBeLessThan(.5 * Math.PI / 180);
+      }
+      expect(path).toEqual(original);
     }
   });
   it("does not treat a slow frame at 2× playback as a seek, while real seeks still snap", () => {
