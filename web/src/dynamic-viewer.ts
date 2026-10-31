@@ -27,7 +27,6 @@ type ViewPreset = "isometric" | "top" | "reset";
 
 const SCENE_PALETTE = {
   background: 0xffffff,
-  movingSphere: 0x98535b,
 };
 
 export class DynamicViewer {
@@ -126,11 +125,9 @@ export class DynamicViewer {
     if (!this.scenario) return;
     this.playbackTimeS = timeS;
     this.overview?.setTime(timeS);
-    let animatedShadows = false;
     for (const zone of this.scenario.temporaryNoFlyZones) {
       const visual = this.temporaryZones.get(zone.id);
       if (!visual) continue;
-      animatedShadows ||= visual.fill.castShadow;
       const active = zone.activeFromS <= timeS && timeS < zone.activeUntilS;
       if (visual.fill.visible === active && visual.outline.visible === active
         && visual.fill.material.opacity === (active ? 0.18 : 0.025)) continue;
@@ -146,12 +143,10 @@ export class DynamicViewer {
     for (const definition of this.scenario.movingSpheres) {
       const mesh = this.movingSpheres.get(definition.id);
       if (!mesh) continue;
-      animatedShadows ||= mesh.castShadow;
       mesh.visible = true;
       updateTrafficAircraft(mesh, definition, timeS);
     }
 
-    if (animatedShadows) this.renderer.shadowMap.needsUpdate = true;
     this.render();
   }
 
@@ -216,13 +211,7 @@ export class DynamicViewer {
       this.temporaryZones.set(zone.id, this.addZone(zone, "temporary"));
     }
     for (const definition of this.scenario.movingSpheres) {
-      const mesh = this.scenario.city ? createTrafficAircraft(definition) : new THREE.Mesh(
-        new THREE.SphereGeometry(definition.radiusM, 22, 14),
-        new THREE.MeshStandardMaterial({
-          color: palette.movingSphere,
-          roughness: 0.75,
-        }),
-      );
+      const mesh = createTrafficAircraft(definition);
       mesh.visible = false;
       mesh.receiveShadow = true;
       mesh.position.fromArray(enuToThree(definition.keyframes[0]!.position));
@@ -292,53 +281,21 @@ export class DynamicViewer {
 
   private missionBounds(): THREE.Box3 {
     if (!this.scenario) return new THREE.Box3();
-    if (this.scenario.city) {
-      let bounds = this.routeBounds.get(this.scenario);
-      if (!bounds) {
-        const scenario = this.scenario;
-        function* points() {
-          for (const run of scenario.runs) for (const frame of run.frames) {
-            yield frame.vehicle; yield* frame.path;
-          }
-          // Validated histories are cumulative prefixes of the final trace.
-          // Its bounds include every earlier execution without scanning them all.
-          for (const run of scenario.runs) yield* run.frames.at(-1)!.executedPath;
+    let bounds = this.routeBounds.get(this.scenario);
+    if (!bounds) {
+      const scenario = this.scenario;
+      function* points() {
+        for (const run of scenario.runs) for (const frame of run.frames) {
+          yield frame.vehicle; yield* frame.path;
         }
-        bounds = cityMissionBounds(scenario, points());
-        this.routeBounds.set(scenario, bounds);
+        // Validated histories are cumulative prefixes of the final trace.
+        // Its bounds include every earlier execution without scanning them all.
+        for (const run of scenario.runs) yield* run.frames.at(-1)!.executedPath;
       }
-      return bounds.clone();
+      bounds = cityMissionBounds(scenario, points());
+      this.routeBounds.set(scenario, bounds);
     }
-    const { min, max } = this.scenario.bounds;
-    const bounds = new THREE.Box3(
-      new THREE.Vector3(min[0], min[2], -max[1]),
-      new THREE.Vector3(max[0], max[2], -min[1]),
-    );
-    for (const building of this.scenario.buildings) {
-      bounds.expandByPoint(new THREE.Vector3(building.min[0], building.min[2], -building.max[1]));
-      bounds.expandByPoint(new THREE.Vector3(building.max[0], building.max[2], -building.min[1]));
-    }
-    for (const zone of [...this.scenario.staticNoFlyZones, ...this.scenario.temporaryNoFlyZones]) {
-      bounds.expandByPoint(new THREE.Vector3(zone.center[0] - zone.radiusM, zone.zMinM, -zone.center[1] - zone.radiusM));
-      bounds.expandByPoint(new THREE.Vector3(zone.center[0] + zone.radiusM, zone.zMaxM, -zone.center[1] + zone.radiusM));
-    }
-    bounds.expandByPoint(new THREE.Vector3(...enuToThree(this.scenario.start)));
-    bounds.expandByPoint(new THREE.Vector3(...enuToThree(this.scenario.goal)));
-    for (const sphere of this.scenario.movingSpheres) {
-      for (const keyframe of sphere.keyframes) {
-        const position = new THREE.Vector3(...enuToThree(keyframe.position));
-        bounds.expandByPoint(position.clone().addScalar(sphere.radiusM));
-        bounds.expandByPoint(position.clone().addScalar(-sphere.radiusM));
-      }
-    }
-    for (const run of this.scenario.runs) {
-      for (const frame of run.frames) {
-        bounds.expandByPoint(new THREE.Vector3(...enuToThree(frame.vehicle)));
-        for (const point of frame.path) bounds.expandByPoint(new THREE.Vector3(...enuToThree(point)));
-        for (const point of frame.executedPath) bounds.expandByPoint(new THREE.Vector3(...enuToThree(point)));
-      }
-    }
-    return bounds;
+    return bounds.clone();
   }
 
   private render(): void { this.frames.request(); }

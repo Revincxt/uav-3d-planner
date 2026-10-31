@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import { enuToThree } from "./coordinates";
 import { addZoneVisual, fitMapCamera } from "./viewer-geometry";
 import { cityMissionBounds } from "./city-scene";
 import { RetainedCity } from "./retained-city";
@@ -225,40 +224,17 @@ export class SceneViewer {
 
   private missionBounds(): THREE.Box3 {
     if (!this.scenario) return new THREE.Box3();
-    if (this.scenario.city) {
-      let bounds = this.routeBounds.get(this.scenario);
-      if (!bounds) {
-        const scenario = this.scenario;
-        function* points() {
-          for (const result of scenario.results) if (result.paths) {
-            yield* result.paths.raw; yield* result.paths.smoothed;
-          }
+    let bounds = this.routeBounds.get(this.scenario);
+    if (!bounds) {
+      const scenario = this.scenario;
+      function* points() {
+        for (const result of scenario.results) if (result.paths) {
+          yield* result.paths.raw; yield* result.paths.smoothed;
         }
-        bounds = cityMissionBounds(scenario, points()); this.routeBounds.set(scenario, bounds);
       }
-      return bounds.clone();
+      bounds = cityMissionBounds(scenario, points()); this.routeBounds.set(scenario, bounds);
     }
-    const { min, max } = this.scenario.bounds;
-    const bounds = new THREE.Box3(
-      new THREE.Vector3(min[0], min[2], -max[1]),
-      new THREE.Vector3(max[0], max[2], -min[1]),
-    );
-    for (const building of this.scenario.buildings) {
-      bounds.expandByPoint(new THREE.Vector3(building.min[0], building.min[2], -building.max[1]));
-      bounds.expandByPoint(new THREE.Vector3(building.max[0], building.max[2], -building.min[1]));
-    }
-    for (const zone of this.scenario.noFlyZones) {
-      bounds.expandByPoint(new THREE.Vector3(zone.center[0] - zone.radiusM, zone.zMinM, -zone.center[1] - zone.radiusM));
-      bounds.expandByPoint(new THREE.Vector3(zone.center[0] + zone.radiusM, zone.zMaxM, -zone.center[1] + zone.radiusM));
-    }
-    bounds.expandByPoint(new THREE.Vector3(...enuToThree(this.scenario.start)));
-    bounds.expandByPoint(new THREE.Vector3(...enuToThree(this.scenario.goal)));
-    for (const result of this.scenario.results) {
-      for (const path of result.paths ? [result.paths.raw, result.paths.smoothed] : []) {
-        for (const point of path) bounds.expandByPoint(new THREE.Vector3(...enuToThree(point)));
-      }
-    }
-    return bounds;
+    return bounds.clone();
   }
 
   private render(): void { this.frames.request(); }

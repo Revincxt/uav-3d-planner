@@ -39,10 +39,13 @@ describe("faithful temporal route presentation", () => {
     const geometry = new LineGeometry(); geometry.setPositions([0, 0, 0, 100, 0, 0]);
     const material = new LineMaterial();
     const first = revealReplayWindow(geometry, [0, 10], material);
+    const starts = geometry.getAttribute("instanceTimeStart"), ends = geometry.getAttribute("instanceTimeEnd");
     const shader = material.vertexShader;
     const second = revealReplayWindow(geometry, [20, 30], material);
     expect(second.start).toBe(first.start); expect(second.end).toBe(first.end);
     expect(material.vertexShader).toBe(shader);
+    expect(geometry.getAttribute("instanceTimeStart")).toBe(starts);
+    expect(geometry.getAttribute("instanceTimeEnd")).toBe(ends);
     expect(geometry.getAttribute("instanceTimeStart").getX(0)).toBe(20);
     geometry.dispose(); material.dispose();
   });

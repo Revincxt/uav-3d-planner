@@ -8,7 +8,7 @@ import { validatePredictiveBundle } from "../src/predictive-validation";
 import { RetainedCity } from "../src/retained-city";
 import {
   RouteOverview, dynamicRoutes, overviewDuration, predictiveRoutes,
-  displayHeading, flightHeading, reactiveTrace, routeColor, routeColorCSS, staticRoutes, timedPosition, waypointIndex,
+  displayHeading, flightHeading, routeColor, routeColorCSS, staticRoutes, timedPosition, waypointIndex,
   type OverviewRoute, type RouteWaypoint,
 } from "../src/route-overview";
 import type { DynamicRun } from "../src/dynamic-schema";
@@ -121,17 +121,6 @@ describe("shared mission clock", () => {
     expect(flightHeading([], 0).toArray()).toEqual([0, 0, -1]);
     expect(flightHeading(vertical.slice(0, 2), 1).toArray()).toEqual([0, 0, -1]);
   });
-  it("retains within-frame corners instead of cutting a diagonal across an obstacle", () => {
-    const frames = [
-      { timeS: 0, vehicle: [0, 0, 20], executedPath: [[0, 0, 20]] },
-      { timeS: 2, vehicle: [10, 10, 20], executedPath: [[0, 0, 20], [10, 0, 20], [10, 10, 20]] },
-      { timeS: 8, vehicle: [10, 10, 20], executedPath: [[0, 0, 20], [10, 0, 20], [10, 10, 20]] },
-    ] as DynamicRun["frames"];
-    const trace = reactiveTrace({ frames });
-    expect(trace.map(w => w.timeS)).toEqual([0, 1, 2, 8]);
-    expect(timedPosition(trace, 1)).toEqual([10, 0, 20]);
-    expect(timedPosition(trace, 5)).toEqual([10, 10, 20]);
-  });
 });
 
 describe("four routes, one world", () => {
@@ -165,11 +154,15 @@ describe("four routes, one world", () => {
   it("does not recreate or dispose trajectory GPU buffers on focus or 100 time samples", () => {
     const overview = new RouteOverview(), routes = fixtureRoutes();
     routes[0]!.playbackKind = "reactive";
-    routes[0]!.plannedFrames = Array.from({ length: 40 }, (_, i) => ({ timeS: i / 4, path: routes[0]!.points })) as DynamicRun["frames"];
+    routes[0]!.plannedFrames = Array.from({ length: 40 }, (_, i) => ({ timeS: i / 4,
+      path: i % 2 ? routes[0]!.points : [routes[0]!.points[0], [0, 40, 30], routes[0]!.points[1]],
+    })) as DynamicRun["frames"];
     overview.setRoutes(routes, routes[0]!.id, 800, 600);
     const line = overview.group.getObjectByName(`overview-trajectory-${routes[0]!.id}`) as Line2;
     const pending = overview.group.getObjectByName(`overview-plan-${routes[0]!.id}`) as Line2;
     const planPositions = pending.geometry.getAttribute("instanceStart");
+    const planBuffers = ["instanceEnd", "instanceDistanceStart", "instanceDistanceEnd", "instanceTimeStart", "instanceTimeEnd"]
+      .map(name => [name, pending.geometry.getAttribute(name)] as const);
     const dispose = vi.spyOn(line.geometry, "dispose"), upload = vi.spyOn(line.geometry, "setPositions");
     for (let i = 0; i < 100; i++) { overview.setTime(i / 4); overview.setFocus(routes[i % 4]!.id); }
     overview.setRoutes(routes.map(route => ({ ...route })), routes[2]!.id, 600, 400);
@@ -177,6 +170,7 @@ describe("four routes, one world", () => {
     expect(dispose).not.toHaveBeenCalled();
     expect(upload).not.toHaveBeenCalled();
     expect(pending.geometry.getAttribute("instanceStart")).toBe(planPositions);
+    for (const [name, buffer] of planBuffers) expect(pending.geometry.getAttribute(name)).toBe(buffer);
     expect(overview.group.children.every(group => group.visible)).toBe(true);
     overview.dispose();
     expect(dispose).toHaveBeenCalledOnce();
@@ -301,6 +295,7 @@ describe("real eight-route records", () => {
       const run = dynamicBundle.scenarios[i]!.runs.find(r => r.plannerId === planner.id)!;
       expect(route.points === run.frames.at(-1)!.executedPath).toBe(true);
       const timed = route.timedPath!;
+      expect(timed).toBe(run.executionTimedPath);
       auditMissionTaskVisits(timed.map(w => w.position), route.mission, timed.map(w => w.timeS));
       expect(timed.every((w, i) => !i || w.timeS > timed[i - 1]!.timeS)).toBe(true);
       for (const frame of run.frames) {
@@ -324,19 +319,6 @@ describe("real eight-route records", () => {
     expect(() => predictiveRoutes([{ ...scenario, runs: [{ ...run, executionTimedPath: null }] }], run.plannerId)).toThrow("validated flight");
     const unqualified = { ...run, smoothing: { ...run.smoothing, execution: { ...run.smoothing.execution, qualified: false } } };
     expect(() => predictiveRoutes([{ ...scenario, runs: [unqualified] }], run.plannerId)).toThrow("validated flight");
-  });
-});
-
-describe("exact reactive clock", () => {
-  it("uses native climb-constrained timing instead of redistributing time by distance", () => {
-    const executionTimedPath: NonNullable<DynamicRun["executionTimedPath"]> = [
-      { timeS: 0, position: [0, 0, 0], action: "start" },
-      { timeS: 10, position: [0, 0, 30], action: "move" },
-      { timeS: 12, position: [30, 0, 30], action: "move" },
-    ];
-    expect(reactiveTrace({ frames: [], executionTimedPath })).toBe(executionTimedPath);
-    expect(timedPosition(executionTimedPath, 5)).toEqual([0, 0, 15]);
-    expect(timedPosition(executionTimedPath, 11)).toEqual([15, 0, 30]);
   });
 });
 

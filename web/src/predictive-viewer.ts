@@ -5,11 +5,11 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
-import { addZoneVisual, fitMapCamera, ringPoints, type ZoneVisual } from "./viewer-geometry";
+import { addZoneVisual, fitMapCamera, type ZoneVisual } from "./viewer-geometry";
 import { cityMissionBounds } from "./city-scene";
 import { enuToThree } from "./coordinates";
 import { RetainedCity } from "./retained-city";
-import { RouteOverview, routeColor, timedPosition, type OverviewRoute } from "./route-overview";
+import { RouteOverview, routeColor, type OverviewRoute } from "./route-overview";
 import { DroneFollow } from "./drone-follow";
 import { positionEncounterCamera } from "./encounter-view";
 import { createTrafficAircraft, sizeTrafficAircraft, updateTrafficAircraft } from "./traffic-aircraft";
@@ -69,7 +69,6 @@ export function isMinimumSeparationEvidenceTime(
 
 const SCENE_PALETTE = {
   background: 0xffffff,
-  movingSphere: 0x98535b,
   witnessVehicle: 0x12722e,
   witnessSurface: 0xcc4545,
   witnessConnector: 0xb67d3f,
@@ -205,7 +204,6 @@ export class PredictiveViewer {
     if (!this.scenario || !this.run) return;
     this.playbackTimeS = timeS;
     this.overview?.setTime(timeS);
-    let animatedShadows = false;
     const path = this.activePath;
     const duration = path.at(-1)!.timeS;
     this.currentTimeS = Math.max(0, Math.min(timeS, duration));
@@ -214,7 +212,6 @@ export class PredictiveViewer {
     for (const zone of this.scenario.temporaryNoFlyZones) {
       const visual = this.temporaryZones.get(zone.id);
       if (!visual) continue;
-      animatedShadows ||= this.zonesGroup.visible && visual.fill.castShadow;
       const active = zone.activeFromS <= hazardTime && hazardTime < zone.activeUntilS;
       if (visual.fill.visible === active && visual.outline.visible === active
         && visual.fill.material.opacity === (active ? 0.18 : 0.025)) continue;
@@ -228,20 +225,16 @@ export class PredictiveViewer {
     }
 
     for (const definition of this.scenario.movingSpheres) {
-      const forecast = this.trafficForecasts?.get(definition.id);
+      const forecast = this.trafficForecasts.get(definition.id);
       if (forecast) {
-        const window = this.forecastWindows?.get(definition.id);
+        const window = this.forecastWindows.get(definition.id);
         const end = Math.min(hazardTime + 20, definition.keyframes.at(-1)!.timeS);
         forecast.visible = this.run.predictive && (Boolean(this.scenario.mission?.sharedWorld) || this.currentTimeS < duration) && end > hazardTime;
         if (window) { window.start.value = hazardTime; window.end.value = end; }
       }
       const mesh = this.movingSpheres.get(definition.id);
       if (mesh) {
-        if (this.scenario.city) updateTrafficAircraft(mesh, definition, hazardTime);
-        else mesh.position.fromArray(enuToThree(timedPosition(definition.keyframes, hazardTime)));
-        if (this.dynamicGroup.visible) {
-          mesh.traverseVisible((child) => { animatedShadows ||= child.castShadow; });
-        }
+        updateTrafficAircraft(mesh, definition, hazardTime);
       }
     }
 
@@ -249,7 +242,6 @@ export class PredictiveViewer {
       minimumSeparationEvidence(this.scenario, this.run),
       this.currentTimeS,
     );
-    if (animatedShadows) this.renderer.shadowMap.needsUpdate = true;
     this.render();
   }
 
@@ -384,56 +376,18 @@ export class PredictiveViewer {
   }
 
   private addMovingSphere(definition: MovingSphereDefinition): void {
-    if (this.scenario?.city) {
-      const aircraft = createTrafficAircraft(definition);
-      updateTrafficAircraft(aircraft, definition, 0);
-      this.movingSpheres.set(definition.id, aircraft);
-      this.dynamicGroup.add(aircraft);
-      const forecast = this.addLine(this.dynamicGroup,
-        definition.keyframes.map(point => point.position),
-        0xb56d32, 2.2, true, 0.55)!;
-      forecast.name = `traffic-forecast:${definition.id}`;
-      forecast.visible = false;
-      (this.forecastWindows ??= new Map()).set(definition.id, revealReplayWindow(forecast.geometry,
-        definition.keyframes.map(point => point.timeS), forecast.material));
-      (this.trafficForecasts ??= new Map()).set(definition.id, forecast);
-      return;
-    }
-    const palette = SCENE_PALETTE;
-    const visual = new THREE.Group();
-    const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(definition.radiusM, 24, 16),
-      new THREE.MeshStandardMaterial({
-        color: palette.movingSphere,
-        roughness: 0.72,
-      }),
-    );
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    visual.add(mesh);
-    const haloMaterial = new THREE.LineBasicMaterial({
-      color: palette.movingSphere,
-      transparent: true,
-      opacity: 0.5,
-      depthTest: true,
-      depthWrite: false,
-    });
-    const horizontalHalo = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(ringPoints(definition.radiusM * 1.45, 0, 48)),
-      haloMaterial,
-    );
-    visual.add(horizontalHalo);
-    visual.position.fromArray(enuToThree(definition.keyframes[0]!.position));
-    this.movingSpheres.set(definition.id, visual);
-    this.dynamicGroup.add(visual);
-    this.addLine(
-      this.dynamicGroup,
-      definition.keyframes.map((keyframe) => keyframe.position),
-      palette.movingSphere,
-      1.15,
-      true,
-      0.22,
-    );
+    const aircraft = createTrafficAircraft(definition);
+    updateTrafficAircraft(aircraft, definition, 0);
+    this.movingSpheres.set(definition.id, aircraft);
+    this.dynamicGroup.add(aircraft);
+    const forecast = this.addLine(this.dynamicGroup,
+      definition.keyframes.map(point => point.position),
+      0xb56d32, 2.2, true, 0.55)!;
+    forecast.name = `traffic-forecast:${definition.id}`;
+    forecast.visible = false;
+    this.forecastWindows.set(definition.id, revealReplayWindow(forecast.geometry,
+      definition.keyframes.map(point => point.timeS), forecast.material));
+    this.trafficForecasts.set(definition.id, forecast);
   }
 
 
@@ -564,44 +518,17 @@ export class PredictiveViewer {
   private sceneBounds(): THREE.Box3 {
     if (this.observationBounds) return this.observationBounds.clone();
     if (!this.scenario) return new THREE.Box3(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 50, 50));
-    if (this.scenario.city) {
-      let retained = this.routeBounds.get(this.scenario);
-      if (!retained) {
-        const scenario = this.scenario;
-        function* points() {
-          for (const run of scenario.runs) for (const waypoint of run.executionTimedPath ?? []) yield waypoint.position;
-        }
-        retained = cityMissionBounds(scenario, points()); this.routeBounds.set(scenario, retained);
+    let retained = this.routeBounds.get(this.scenario);
+    if (!retained) {
+      const scenario = this.scenario;
+      function* points() {
+        for (const run of scenario.runs) for (const waypoint of run.executionTimedPath ?? []) yield waypoint.position;
       }
-      const bounds = retained.clone();
-      bounds.union(this.cityBounds);
-      if (this.overview) bounds.union(this.overview.bounds);
-      return bounds;
+      retained = cityMissionBounds(scenario, points()); this.routeBounds.set(scenario, retained);
     }
-    const { min, max } = this.scenario.bounds;
-    const bounds = new THREE.Box3(
-      new THREE.Vector3(min[0], min[2], -max[1]),
-      new THREE.Vector3(max[0], max[2], -min[1]),
-    );
-    for (const building of this.scenario.buildings) {
-      bounds.expandByPoint(new THREE.Vector3(building.min[0], building.min[2], -building.max[1]));
-      bounds.expandByPoint(new THREE.Vector3(building.max[0], building.max[2], -building.min[1]));
-    }
-    for (const zone of [...this.scenario.staticNoFlyZones, ...this.scenario.temporaryNoFlyZones]) {
-      bounds.expandByPoint(new THREE.Vector3(zone.center[0] - zone.radiusM, zone.zMinM, -zone.center[1] - zone.radiusM));
-      bounds.expandByPoint(new THREE.Vector3(zone.center[0] + zone.radiusM, zone.zMaxM, -zone.center[1] + zone.radiusM));
-    }
-    for (const sphere of this.scenario.movingSpheres) {
-      for (const keyframe of sphere.keyframes) {
-        const position = new THREE.Vector3(...enuToThree(keyframe.position));
-        bounds.expandByPoint(position.clone().addScalar(sphere.radiusM * 1.45));
-        bounds.expandByPoint(position.clone().addScalar(-sphere.radiusM * 1.45));
-      }
-    }
-    for (const run of this.scenario.runs) {
-      for (const waypoint of run.executionTimedPath ?? []) bounds.expandByPoint(new THREE.Vector3(...enuToThree(waypoint.position)));
-    }
+    const bounds = retained.clone();
     bounds.union(this.cityBounds);
+    if (this.overview) bounds.union(this.overview.bounds);
     return bounds;
   }
 

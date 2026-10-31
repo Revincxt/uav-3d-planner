@@ -71,6 +71,8 @@ function viewerHarness(Viewer: typeof SceneViewer | typeof DynamicViewer | typeo
   viewer.container = { clientWidth: 900, clientHeight: 600 };
   viewer.temporaryZones = new Map();
   viewer.movingSpheres = new Map();
+  viewer.trafficForecasts = new Map();
+  viewer.forecastWindows = new Map();
   viewer.layerVisibility = { buildings: true, zones: true, dynamic: true };
   for (const name of [
     "buildingsGroup", "zonesGroup", "dynamicGroup",
@@ -383,28 +385,12 @@ describe("cached viewer shadows", () => {
     expect(viewer.content.getObjectByName("trajectory-executed")).toBeUndefined();
   });
 
-  it("invalidates dynamic shadows if a moving traffic mesh actually casts a shadow", () => {
-    const viewer = dynamicHarness();
-    viewer.movingSpheres.get("traffic").castShadow = true;
-    viewer.setTime(2);
-    expect(viewer.renderer.shadowMap.needsUpdate).toBe(true);
-  });
-
   it("does not allocate a hidden predictive cone vehicle", () => {
     const viewer = predictiveHarness();
     expect(viewer.content.getObjectByName("vehicle")).toBeUndefined();
     viewer.dynamicGroup.traverse((child: THREE.Object3D) => { child.castShadow = false; });
     viewer.setTime(2);
     expect(viewer.renderer.shadowMap.needsUpdate).toBe(false);
-  });
-
-  it("detects a predictive caster inside its moving traffic group", () => {
-    const viewer = predictiveHarness();
-    const traffic = viewer.movingSpheres.get("traffic");
-    expect(traffic.castShadow).toBe(false);
-    expect(traffic.children[0].castShadow).toBe(true);
-    viewer.setTime(2);
-    expect(viewer.renderer.shadowMap.needsUpdate).toBe(true);
   });
 
   it("reuses predictive shadows when no animated object casts one", () => {

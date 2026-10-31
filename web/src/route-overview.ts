@@ -5,7 +5,7 @@ import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { enuToThree } from "./coordinates";
 import type { CityMission } from "./city-schema";
 import type { DemoScenario, PlannerId } from "./schema";
-import type { DynamicRun, DynamicScenario } from "./dynamic-schema";
+import type { DynamicScenario } from "./dynamic-schema";
 import type { PredictiveScenario } from "./predictive-schema";
 import { finalFlight } from "./final-flight";
 import { createEndpointMarker } from "./scene-style";
@@ -179,27 +179,6 @@ export function staticRoutes(scenarios: DemoScenario[], planner: PlannerId): Ove
 }
 
 const dynamicRouteCache = new WeakMap<DynamicScenario, Map<string, OverviewRoute>>();
-/** Recover within-frame corners from the cumulative execution, never join telemetry by a chord. */
-export function reactiveTrace(run: Pick<DynamicRun, "frames" | "executionTimedPath">): RouteWaypoint[] {
-  if (run.executionTimedPath) return run.executionTimedPath;
-  const first = run.frames[0];
-  if (!first) throw new Error("Empty reactive trace");
-  const trace: RouteWaypoint[] = [{ timeS: first.timeS, position: first.vehicle }];
-  for (let index = 1; index < run.frames.length; index += 1) {
-    const left = run.frames[index - 1]!, right = run.frames[index]!;
-    const points = right.executedPath.slice(left.executedPath.length - 1);
-    const lengths = points.slice(1).map((point, i) => Math.hypot(...point.map((value, axis) => value - points[i]![axis]!)));
-    const total = lengths.reduce((sum, length) => sum + length, 0);
-    if (total === 0) { trace.push({ timeS: right.timeS, position: right.vehicle }); continue; }
-    let traversed = 0;
-    points.slice(1).forEach((position, i) => {
-      traversed += lengths[i]!;
-      trace.push({ timeS: i === lengths.length - 1 ? right.timeS : left.timeS + traversed / total * (right.timeS - left.timeS), position });
-    });
-  }
-  return trace;
-}
-
 export function dynamicRoutes(scenarios: DynamicScenario[], planner: string): OverviewRoute[] {
   return scenarios.map(s => {
     let cache = dynamicRouteCache.get(s);
@@ -208,7 +187,8 @@ export function dynamicRoutes(scenarios: DynamicScenario[], planner: string): Ov
     if (cached) return cached;
     const run = s.runs.find(r => r.plannerId === planner);
     if (!run || run.status !== "success") throw new Error(`Missing successful ${planner} trace in ${s.id}`);
-    const timedPath = reactiveTrace(run);
+    const timedPath = run.executionTimedPath;
+    if (!timedPath?.length) throw new Error(`Missing exact ${planner} trace in ${s.id}`);
     const route: OverviewRoute = { id: s.id, plannerId: planner, label: s.label, mission: s.mission, points: run.frames.at(-1)!.executedPath, timedPath,
       playbackKind: "reactive", plannedFrames: run.frames, cruiseSpeedMps: Number(run.parameters.cruiseSpeedMps),
       maxClimbRateMps: run.parameters.maxClimbRateMps };
@@ -241,6 +221,7 @@ export function overviewDuration(routes: readonly OverviewRoute[]): number {
 interface RouteVisual {
   route: OverviewRoute; group: THREE.Group; line: Line2; halo: Line2; vehicle?: THREE.Group;
   clock?: { value: number }; pending?: Line2; planFrame?: DynamicFrame;
+  planTimes?: Float64Array;
   window?: ReturnType<typeof revealReplayWindow>; hold?: THREE.Group;
   tasks?: THREE.InstancedMesh; start: THREE.Object3D; goal: THREE.Object3D;
 }
@@ -297,11 +278,16 @@ export class RouteOverview {
       const clock = reveal ? revealReplayLine(geometry, route.timedPath!.map(w => w.timeS), [material, haloMaterial]) : undefined;
       let pending: Line2 | undefined;
       let window: RouteVisual["window"];
+      const planTimes = route.plannedFrames
+        ? new Float64Array(Math.max(2, ...route.plannedFrames.map(frame => frame.path.length))) : undefined;
       if (route.playbackKind) {
         const meaning = planMeaning(route);
         const pendingGeometry = new LineGeometry();
         if (!route.plannedFrames) pendingGeometry.setPositions(route.timedPath!.flatMap(w => enuToThree(w.position)));
-        if (route.plannedFrames) pendingGeometry.setPositions([0, 0, 0, 1, 0, 0]);
+        if (planTimes) {
+          pendingGeometry.setPositions(new Float32Array(planTimes.length * 3));
+          (pendingGeometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute).data.setUsage(THREE.DynamicDrawUsage);
+        }
         const pendingMaterial = new LineMaterial({ linewidth: 3, worldUnits: false,
           color, dashed: meaning !== "fixed", dashSize: 14, gapSize: 9,
           transparent: true, opacity: 0.85, depthTest: true, depthWrite: false });
@@ -310,7 +296,7 @@ export class RouteOverview {
         pending.name = `overview-plan-${route.id}`; pending.renderOrder = 1;
         pending.userData.meaning = meaning;
         pending.computeLineDistances();
-        window = revealReplayWindow(pendingGeometry, route.plannedFrames ? [0, 1] : route.timedPath!.map(w => w.timeS), pendingMaterial);
+        window = revealReplayWindow(pendingGeometry, planTimes ?? route.timedPath!.map(w => w.timeS), pendingMaterial);
         group.add(pending);
       }
       const endpoints = {} as { start: THREE.Object3D; goal: THREE.Object3D };
@@ -349,7 +335,7 @@ export class RouteOverview {
         }
         group.add(hold);
       }
-      this.visuals.push({ route, group, line, halo, vehicle, clock, pending, window, hold, tasks: markers, ...endpoints });
+      this.visuals.push({ route, group, line, halo, vehicle, clock, pending, window, planTimes, hold, tasks: markers, ...endpoints });
       this.group.add(group);
       for (const point of route.points) this.bounds.expandByPoint(this.point.set(point[0], point[2], -point[1]));
     });
@@ -404,12 +390,13 @@ export class RouteOverview {
         pending.visible &&= frame.path.length >= 2;
         if (pending.visible && frame !== visual.planFrame) {
           this.updatePlanPositions(pending.geometry, frame.path);
-          pending.computeLineDistances();
           let clock = frame.timeS;
-          const times = frame.path.map((point, i) => {
-            if (i) clock += flightDuration(frame.path[i - 1]!, point, route.cruiseSpeedMps || 15, route.maxClimbRateMps);
-            return clock;
-          });
+          const times = visual.planTimes!;
+          for (let i = 0; i < frame.path.length; i++) {
+            if (i) clock += flightDuration(frame.path[i - 1]!, frame.path[i]!, route.cruiseSpeedMps || 15, route.maxClimbRateMps);
+            times[i] = clock;
+          }
+          times.fill(clock, frame.path.length);
           visual.window = revealReplayWindow(pending.geometry, times, pending.material);
           visual.window.start.value = timeS;
           visual.window.end.value = times.at(-1)!;
@@ -433,16 +420,24 @@ export class RouteOverview {
     }
   }
 
-  /** Reuse the GPU allocation when the local plan keeps its segment count. */
+  /** Fixed mission capacity keeps positions, dash distances and clocks on the GPU. */
   private updatePlanPositions(geometry: LineGeometry, points: readonly RoutePoint[]): void {
     const start = geometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute;
-    if (start.count !== points.length - 1) { geometry.setPositions(points.flatMap(enuToThree)); return; }
     const end = geometry.getAttribute("instanceEnd");
+    const distanceStart = geometry.getAttribute("instanceDistanceStart") as THREE.InterleavedBufferAttribute;
+    const distanceEnd = geometry.getAttribute("instanceDistanceEnd");
+    let distance = 0;
     for (let i = 0; i < start.count; i++) {
-      const a = points[i]!, b = points[i + 1]!;
+      const a = points[Math.min(i, points.length - 1)]!, b = points[Math.min(i + 1, points.length - 1)]!;
       start.setXYZ(i, a[0], a[2], -a[1]); end.setXYZ(i, b[0], b[2], -b[1]);
+      const dx = end.getX(i) - start.getX(i), dy = end.getY(i) - start.getY(i), dz = end.getZ(i) - start.getZ(i);
+      distanceStart.setX(i, distance);
+      distanceEnd.setX(i, distance + Math.sqrt(dx * dx + dy * dy + dz * dz));
+      distance = distanceEnd.getX(i);
     }
+    geometry.instanceCount = points.length - 1;
     start.data.needsUpdate = true;
+    distanceStart.data.needsUpdate = true;
     geometry.computeBoundingBox(); geometry.computeBoundingSphere();
   }
 

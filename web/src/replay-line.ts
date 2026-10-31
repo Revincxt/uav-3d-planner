@@ -2,10 +2,23 @@ import * as THREE from "three";
 import type { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import type { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
+function writeReplayTimes(geometry: LineGeometry, times: ArrayLike<number>): void {
+  const count = times.length - 1;
+  if (count !== geometry.getAttribute("instanceStart").count) throw new Error("Replay clocks must match segment capacity");
+  for (const [name, offset] of [["instanceTimeStart", 0], ["instanceTimeEnd", 1]] as const) {
+    let attribute = geometry.getAttribute(name) as THREE.InstancedBufferAttribute | undefined;
+    if (!attribute) {
+      attribute = new THREE.InstancedBufferAttribute(new Float32Array(count), 1).setUsage(THREE.DynamicDrawUsage);
+      geometry.setAttribute(name, attribute);
+    }
+    for (let i = 0; i < count; i++) attribute.setX(i, times[i + offset]!);
+    attribute.needsUpdate = true;
+  }
+}
+
 /** Retained known traffic, clipped at both ends in world space with two uniforms. */
-export function revealReplayWindow(geometry: LineGeometry, times: readonly number[], material: LineMaterial): { start: { value: number }; end: { value: number } } {
-  geometry.setAttribute("instanceTimeStart", new THREE.InstancedBufferAttribute(new Float32Array(times.slice(0, -1)), 1));
-  geometry.setAttribute("instanceTimeEnd", new THREE.InstancedBufferAttribute(new Float32Array(times.slice(1)), 1));
+export function revealReplayWindow(geometry: LineGeometry, times: ArrayLike<number>, material: LineMaterial): { start: { value: number }; end: { value: number } } {
+  writeReplayTimes(geometry, times);
   // A reactive plan replaces its positions/times, not the compiled shader program.
   if (material.uniforms.windowStart && material.uniforms.windowEnd)
     return { start: material.uniforms.windowStart, end: material.uniforms.windowEnd };
@@ -33,10 +46,9 @@ varying float windowVisible;\n` + material.vertexShader;
 
 /** Trim the current segment in world space. Playback updates one uniform, never route buffers. */
 export function revealReplayLine(
-  geometry: LineGeometry, times: readonly number[], materials: LineMaterial[],
+  geometry: LineGeometry, times: ArrayLike<number>, materials: LineMaterial[],
 ): { value: number } {
-  geometry.setAttribute("instanceTimeStart", new THREE.InstancedBufferAttribute(new Float32Array(times.slice(0, -1)), 1));
-  geometry.setAttribute("instanceTimeEnd", new THREE.InstancedBufferAttribute(new Float32Array(times.slice(1)), 1));
+  writeReplayTimes(geometry, times);
   const clock = { value: 0 };
   for (const material of materials) {
     material.uniforms.replayTime = clock;
