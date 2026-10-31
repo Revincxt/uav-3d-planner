@@ -391,7 +391,12 @@ export class RouteOverview {
       const { route, vehicle, clock, pending, window, hold } = visual;
       // Only the initial map is a result preview. Pause/seek retain the actual
       // elapsed/future split, rather than revealing all eight futures as flown.
-      if (clock) clock.value = preview ? route.timedPath!.at(-1)!.timeS : timeS;
+      if (clock) {
+        clock.value = preview ? route.timedPath!.at(-1)!.timeS : timeS;
+        // Skip the unreached suffix before vertex shading. Keep a boundary segment
+        // for Float32 clock rounding; the existing shader still trims it exactly.
+        visual.line.geometry.instanceCount = Math.min(route.timedPath!.length - 1, waypointIndex(route.timedPath!, clock.value) + 2);
+      }
       if (pending) pending.visible = !preview && timeS < route.timedPath!.at(-1)!.timeS;
       if (window) { window.start.value = timeS; window.end.value = route.timedPath!.at(-1)!.timeS; }
       if (pending && route.plannedFrames) {

@@ -47,6 +47,46 @@ describe("real planning city presentation", () => {
     expect(ray.intersectObject(mesh).length).toBeGreaterThan(0);
   });
 
+  it("indexes repeated vertices losslessly, removes ground undersides and retains elevated undersides", () => {
+    const host = new THREE.Group();
+    const buildings = Array.from({ length: 7 }, (_, index) => {
+      const x = index * 50;
+      return { min: [x, 0, index ? 10 : 0], max: [x + 20, 20, 40], footprint: [
+        [[x, 0], [x + 20, 0], [x + 20, 20], [x, 20], [x, 0]],
+      ] };
+    });
+    addCityBuildings(host, buildings);
+    for (let shade = 0; shade < 6; shade++) {
+      const mesh = host.getObjectByName(`planning-city-buildings-${shade}`) as THREE.Mesh;
+      const expectedPositions: number[] = [], expectedNormals: number[] = [];
+      buildings.forEach((building, index) => {
+        if (index % 6 !== shade) return;
+        const shape = new THREE.Shape(building.footprint[0]!.map(point => new THREE.Vector2(point[0], point[1])));
+        const original = new THREE.ExtrudeGeometry(shape, { depth: building.max[2]! - building.min[2]!, bevelEnabled: false, curveSegments: 1, steps: 1 });
+        original.rotateX(-Math.PI / 2); original.translate(0, building.min[2]!, 0);
+        const position = original.getAttribute("position"), normal = original.getAttribute("normal");
+        for (let i = 0; i < position.count; i++) {
+          if (building.min[2] === 0 && normal.getY(i) === -1) continue;
+          expectedPositions.push(position.getX(i), position.getY(i), position.getZ(i));
+          expectedNormals.push(normal.getX(i), normal.getY(i), normal.getZ(i));
+        }
+        original.dispose();
+      });
+      expect(mesh.castShadow && mesh.receiveShadow).toBe(true);
+      expect(mesh.geometry.index).not.toBeNull();
+      expect(mesh.geometry.getAttribute("position").count).toBeLessThan(expectedPositions.length / 3);
+      const expanded = mesh.geometry.toNonIndexed();
+      expect(Array.from(expanded.getAttribute("position").array)).toEqual(expectedPositions);
+      expect(Array.from(expanded.getAttribute("normal").array)).toEqual(expectedNormals);
+      expanded.dispose();
+      if (shade === 0) {
+        expect(mesh.userData.buildingCount).toBe(2);
+        expect(expectedNormals.filter((_, i) => i % 3 === 1 && expectedNormals[i] === -1)).toHaveLength(6);
+      }
+    }
+    expect(host.getObjectByName("planning-city-facades")).toBeDefined();
+  });
+
   it("focuses the mission rather than fitting the entire city's limits", () => {
     const bounds = cityMissionBounds(cityScenario, [[300, 400, 65], [600, 700, 95]]);
     expect(bounds.getSize(new THREE.Vector3()).x).toBeLessThan(1000);

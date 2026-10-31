@@ -111,6 +111,29 @@ export function addCityBuilding(
   return mesh;
 }
 
+/** Share exact position/normal pairs; ground-level undersides are never visible. */
+function indexBuildingGeometry(geometry: THREE.BufferGeometry, groundLevel: boolean): void {
+  const position = geometry.getAttribute("position"), normal = geometry.getAttribute("normal");
+  const positions: number[] = [], normals: number[] = [], indices: number[] = [];
+  const vertices = new Map<string, number>();
+  for (let i = 0; i < position.count; i++) {
+    if (groundLevel && normal.getY(i) === -1) continue;
+    const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+    const nx = normal.getX(i), ny = normal.getY(i), nz = normal.getZ(i);
+    const key = `${x},${y},${z},${nx},${ny},${nz}`;
+    let index = vertices.get(key);
+    if (index === undefined) {
+      index = positions.length / 3; vertices.set(key, index);
+      positions.push(x, y, z); normals.push(nx, ny, nz);
+    }
+    indices.push(index);
+  }
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setIndex(indices);
+  geometry.clearGroups();
+}
+
 /** Thousands of sourced footprint prisms share a handful of GPU draw calls. */
 export function addCityBuildings(host: THREE.Group, buildings: readonly CityBox[]): void {
   if (!buildings.some((building) => building.footprint)) {
@@ -156,6 +179,7 @@ export function addCityBuildings(host: THREE.Group, buildings: readonly CityBox[
         (building.min[2]! + building.max[2]!) / 2, -(building.min[1]! + building.max[1]!) / 2);
     }
     geometry.deleteAttribute("uv");
+    indexBuildingGeometry(geometry, building.min[2]! <= 0);
     batches[index % shades.length]!.push(geometry);
   });
   batches.forEach((geometries, index) => {

@@ -48,13 +48,25 @@ describe("faithful temporal route presentation", () => {
   });
 
   it.each(["fixed", "reactive", "predictive"] as const)("keeps %s geometry retained across playback and rewind", kind => {
-    const route: OverviewRoute = { id: "one", label: "One", points: [[0, 0, 10], [100, 0, 10], [100, 100, 10]],
-      timedPath: [{ timeS: 0, position: [0, 0, 10] }, { timeS: 10, position: [100, 0, 10] }, { timeS: 20, position: [100, 100, 10] }],
+    const timedPath: NonNullable<OverviewRoute["timedPath"]> = Array.from({ length: 21 }, (_, timeS) => ({
+      timeS, position: timeS <= 10 ? [timeS * 10, 0, 10] : [100, (timeS - 10) * 10, 10],
+    }));
+    const route: OverviewRoute = { id: "one", label: "One", points: timedPath.map(waypoint => waypoint.position), timedPath,
       playbackKind: kind };
     const overview = new RouteOverview(); overview.setRoutes([route], route.id, 800, 600);
     const line = overview.group.getObjectByName("overview-trajectory-one") as Line2;
+    const halo = overview.group.getObjectByName("overview-outline-one") as Line2;
+    expect(halo.geometry).toBe(line.geometry);
+    expect(line.geometry.instanceCount).toBe(20);
+    overview.setPlaying(true);
     const upload = vi.spyOn(line.geometry, "setPositions");
-    for (const t of [5, 10, 15, 20, 0]) overview.setTime(t);
+    const positions = line.geometry.getAttribute("instanceStart");
+    for (const t of [5.5, 10, 15, 20, 0]) {
+      overview.setTime(t);
+      expect(line.geometry.instanceCount).toBe(Math.min(20, Math.floor(t) + 2));
+      expect(line.material.uniforms.replayTime!.value).toBe(t);
+      expect(line.geometry.getAttribute("instanceStart")).toBe(positions);
+    }
     expect(upload).not.toHaveBeenCalled();
     expect(Boolean(line.material.uniforms.replayTime)).toBe(true);
     expect(Boolean(overview.group.getObjectByName("overview-plan-one"))).toBe(true);
