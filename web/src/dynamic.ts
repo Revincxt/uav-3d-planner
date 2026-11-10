@@ -175,7 +175,8 @@ async function start(): Promise<void> {
     frameIndex = waypointIndex(currentRun.frames, currentTimeS);
     const frame = currentRun.frames[frameIndex]!;
     timeline.value = String(currentTimeS);
-    timelineValue.value = `${currentTimeS.toFixed(1)} s`;
+    const label = `${currentTimeS.toFixed(1)} s`;
+    if (timelineValue.value !== label) timelineValue.value = label;
     previous.disabled = currentTimeS === 0;
     next.disabled = currentTimeS === duration();
     viewer?.setTime(currentTimeS);

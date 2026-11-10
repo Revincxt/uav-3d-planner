@@ -94,6 +94,13 @@ describe("retained flight HUD", () => {
     expect(f.fields.get('[data-readout="altitude"]')!.textContent).toBe("50.0");
     f.advance(50); f.hud.update(route, 16, 0);
     expect(f.fields.get('[data-readout="altitude"]')!.textContent).toBe("70.0");
+    const writes = f.root.style.setProperty.mock.calls.length;
+    for (let frame = 0; frame < 60; frame++) {
+      f.advance(100); f.hud.update(route, 16 + frame / 40, 0);
+    }
+    expect(f.fields.get('[data-readout="speed"]')!.textContent).toBe("10.0");
+    expect(f.fields.get('[data-readout="heading"]')!.textContent).toBe("000");
+    expect(f.root.style.setProperty).toHaveBeenCalledTimes(writes);
     expect(f.createElement).toHaveBeenCalledOnce(); expect(f.append).toHaveBeenCalledOnce();
     f.hud.dispose(); expect(f.root.remove).toHaveBeenCalledOnce();
   });
@@ -126,6 +133,7 @@ describe("retained flight HUD", () => {
     f.hud.update(route, 7.5, 0); f.hud.update(route, 18, 0, true);
     expect(f.root.append).toHaveBeenCalledExactlyOnceWith(playback);
     expect(timeline.style.setProperty).toHaveBeenLastCalledWith("--timeline-progress", "25%");
+    expect(timeline.style.setProperty).toHaveBeenCalledOnce();
     timeline.value = "50"; f.hud.update(route, 18, 0);
     expect(timeline.style.setProperty).toHaveBeenLastCalledWith("--timeline-progress", "50%");
     expect(f.createElement).toHaveBeenCalledOnce();

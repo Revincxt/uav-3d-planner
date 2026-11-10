@@ -113,6 +113,9 @@ async function start(): Promise<void> {
   let cameraView: "isometric" | "top" = "isometric";
   let viewer: SceneViewer | null = null;
   const timeline = element<HTMLInputElement>("#timeline");
+  const timelineValue = element<HTMLOutputElement>("#timeline-value");
+  const previous = element<HTMLButtonElement>("#previous-frame");
+  const next = element<HTMLButtonElement>("#next-frame");
   const playPause = element<HTMLButtonElement>("#play-pause");
   let routes = staticRoutes(bundle.scenarios, selectedPlanner);
   let currentTimeS = 0;
@@ -161,9 +164,10 @@ async function start(): Promise<void> {
     const duration = overviewDuration(routes);
     currentTimeS = Math.max(0, Math.min(timeS, duration));
     timeline.value = String(currentTimeS);
-    element<HTMLOutputElement>("#timeline-value").value = `${currentTimeS.toFixed(1)} s`;
-    element<HTMLButtonElement>("#previous-frame").disabled = currentTimeS === 0;
-    element<HTMLButtonElement>("#next-frame").disabled = currentTimeS === duration;
+    const label = `${currentTimeS.toFixed(1)} s`;
+    if (timelineValue.value !== label) timelineValue.value = label;
+    previous.disabled = currentTimeS === 0;
+    next.disabled = currentTimeS === duration;
     viewer?.setTime(currentTimeS);
     if (notify) taskNotice.advance(routes.find(route => route.id === viewer?.followedRouteId), previousTimeS, currentTimeS);
     else taskNotice.reset();
@@ -249,8 +253,8 @@ async function start(): Promise<void> {
   });
   timeline.addEventListener("input", () => { setPlaying(false); renderTime(Number(timeline.value)); });
   playPause.addEventListener("click", () => { if (animationFrame === null) beginPlayback(); else setPlaying(false); });
-  element("#previous-frame").addEventListener("click", () => { setPlaying(false); renderTime(currentTimeS - 2); });
-  element("#next-frame").addEventListener("click", () => { setPlaying(false); renderTime(currentTimeS + 2); });
+  previous.addEventListener("click", () => { setPlaying(false); renderTime(currentTimeS - 2); });
+  next.addEventListener("click", () => { setPlaying(false); renderTime(currentTimeS + 2); });
   mountPlaybackSpeedControls(playbackClock, () => currentTimeS);
   mountPageLifecycle({ pause: () => setPlaying(false), restore: () => renderTime(currentTimeS),
     dispose: () => { routeInteraction.dispose(); taskNotice.dispose(); flightHud.dispose(); viewer?.dispose(); } });

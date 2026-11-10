@@ -387,6 +387,9 @@ export class TerrainMapLayer extends THREE.Group {
   }
 
   private trimCache(): void {
+    if (this.tiles.size <= MAP_SURROUND.maxResidentTiles) {
+      this.userData.residentTileCount = this.tiles.size; return;
+    }
     const unused = [...this.tiles.values()].filter(item => !this.wanted.has(item.tile.key) && !item.mesh.visible)
       .sort((a, b) => a.lastUsed - b.lastUsed);
     for (const item of unused) {

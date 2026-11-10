@@ -30,6 +30,9 @@ export class RouteInteraction {
   private readonly resize: ResizeObserver;
   private readonly canvas: HTMLCanvasElement | null;
   private readonly overlay: HTMLElement;
+  private readonly status: HTMLElement;
+  private readonly stops: HTMLElement;
+  private chips: HTMLElement[] = [];
   private route?: OverviewRoute;
   private anchor = { x: 0, y: 0 };
   private timeS = 0;
@@ -47,6 +50,8 @@ export class RouteInteraction {
       <dl class="route-card-metrics"><div><dt>Path</dt><dd data-field="length"></dd></div><div><dt>Flight</dt><dd data-field="duration"></dd></div><div><dt>Stops</dt><dd data-field="stops"></dd></div></dl>
       <div class="route-card-stops" aria-label="Required checkpoint progress"></div>
       <button type="button" class="route-card-follow"><span>Follow UAV</span></button>`;
+    this.status = this.root.querySelector<HTMLElement>(".route-card-phase")!;
+    this.stops = this.root.querySelector<HTMLElement>(".route-card-stops")!;
     this.root.querySelector(".route-card-aircraft")!.prepend(uiSymbol("route"));
     this.root.querySelector(".route-card-close")!.append(uiSymbol("close"));
     this.root.querySelector(".route-card-follow")!.prepend(uiSymbol("follow"));
@@ -115,18 +120,22 @@ export class RouteInteraction {
       field("length", `${(summary.lengthM / 1000).toFixed(2)} km`); field("duration", route.timedPath?.length ? flightDuration(summary.durationS) : "—"); field("stops", String(route.mission?.taskPoints?.length ?? 0));
       this.root.querySelector<HTMLElement>(".route-card-title")!.textContent = route.label;
       const purpose = this.root.querySelector<HTMLElement>(".route-card-purpose")!; purpose.textContent = purpose.title = route.mission?.purpose ?? ""; purpose.hidden = !purpose.textContent;
-      const stops = this.root.querySelector<HTMLElement>(".route-card-stops")!;
-      stops.replaceChildren(...taskArrivals(route).map(({ task }) => {
+      this.chips = taskArrivals(route).map(({ task }) => {
         const chip = document.createElement("span"); chip.textContent = String(task.order).padStart(2, "0"); chip.title = task.label; chip.dataset.taskId = task.id; return chip;
-      })); stops.hidden = !stops.children.length;
+      });
+      this.stops.replaceChildren(...this.chips); this.stops.hidden = !this.chips.length;
       this.root.querySelector<HTMLElement>(".route-card-follow")!.title = `Follow ${route.label} · Or click this route again`;
     }
-    const phase = flightPhase(route, timeS), status = this.root.querySelector<HTMLElement>(".route-card-phase")!;
-    status.textContent = phaseLabel(phase); status.title = phase.reason ?? phaseLabel(phase); status.dataset.phase = phase.kind;
+    const phase = flightPhase(route, timeS), label = phaseLabel(phase), title = phase.reason ?? label;
+    if (this.status.textContent !== label) this.status.textContent = label;
+    if (this.status.title !== title) this.status.title = title;
+    if (this.status.dataset.phase !== phase.kind) this.status.dataset.phase = phase.kind;
     const arrivals = taskArrivals(route), next = arrivals.findIndex(a => a.timeS > timeS);
-    this.root.querySelectorAll<HTMLElement>(".route-card-stops span").forEach((chip, i) => {
+    this.chips.forEach((chip, i) => {
       const state = arrivals[i]!.timeS <= timeS ? "passed" : i === next ? "next" : "pending";
-      chip.dataset.state = state; chip.setAttribute("aria-label", `${arrivals[i]!.task.label}: ${state}`);
+      if (chip.dataset.state !== state) {
+        chip.dataset.state = state; chip.setAttribute("aria-label", `${arrivals[i]!.task.label}: ${state}`);
+      }
     });
   }
   private place(): void {

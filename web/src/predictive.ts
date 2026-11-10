@@ -575,7 +575,7 @@ async function start(): Promise<void> {
     timelineValue.value = `${currentTimeS.toFixed(2)} s`;
     showPlaybackState(element("#playback-state"), currentRun.predictive ? "predictive" : "reactive",
       playbackAction(path, currentTimeS, currentScenario.mission), !currentRun.predictive, flightPhase(focusedRoute, currentTimeS));
-    witnessReadout.hidden = !witnessIsVisible;
+    if (witnessReadout.hidden !== !witnessIsVisible) witnessReadout.hidden = !witnessIsVisible;
     if (witnessIsVisible && evidence !== null) {
       const { witness } = evidence;
       witnessReadout.dataset.quality = witness.exact ? "exact" : "approximate";
@@ -594,8 +594,10 @@ async function start(): Promise<void> {
           `shows ${evidence.witness.separationM.toFixed(2)} metres of surface separation to ` +
           `${evidence.witness.obstacleId}.`
         : "");
-    previous.disabled = !events.some(({ frame }) => frame.timeS < currentTimeS - EPSILON);
-    next.disabled = !events.some(({ frame }) => frame.timeS > currentTimeS + EPSILON);
+    const first = !events.some(({ frame }) => frame.timeS < currentTimeS - EPSILON);
+    const last = !events.some(({ frame }) => frame.timeS > currentTimeS + EPSILON);
+    if (previous.disabled !== first) previous.disabled = first;
+    if (next.disabled !== last) next.disabled = last;
     if (shouldAnnounce) announce(`Showing ${currentTimeS.toFixed(1)} seconds`);
     updateUrl();
   };

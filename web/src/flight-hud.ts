@@ -66,6 +66,8 @@ export class FlightHud {
   private trend: AltitudeTrend = null;
   private lastUpdateMs = -Infinity;
   private routeId = "";
+  private lastReadout?: FlightReadout;
+  private progress = NaN;
   constructor(container: HTMLElement, playback?: HTMLElement) {
     this.root.className = "flight-hud";
     this.root.setAttribute("aria-label", "Recorded flight telemetry");
@@ -106,14 +108,17 @@ export class FlightHud {
     // text below retains its 10 Hz budget. The original input/listeners survive.
     if (this.timeline) {
       const min = Number(this.timeline.min), max = Number(this.timeline.max);
-      const progress = max > min ? 100 * (Number(this.timeline.value) - min) / (max - min) : 0;
-      this.timeline.style.setProperty("--timeline-progress", `${Math.max(0, Math.min(100, progress))}%`);
+      const progress = Math.max(0, Math.min(100, max > min ? 100 * (Number(this.timeline.value) - min) / (max - min) : 0));
+      if (progress !== this.progress) {
+        this.progress = progress;
+        this.timeline.style.setProperty("--timeline-progress", `${progress}%`);
+      }
     }
     const now = performance.now(), changed = this.routeId !== route.id;
     if (!force && !changed && now - this.lastUpdateMs < 100) return;
     this.lastUpdateMs = now;
     const readout = flightReadout(route, timeS);
-    this.root.hidden = readout === null;
+    if (this.root.hidden !== (readout === null)) this.root.hidden = readout === null;
     if (!readout) return;
     const trend = altitudeTrend(route, timeS, force || changed ? null : this.trend);
     if (trend !== this.trend) {
@@ -124,14 +129,17 @@ export class FlightHud {
       else delete this.altitudeHint.dataset.direction;
     }
     const meaning = planMeaning(route);
-    this.historyKey.textContent = timeS <= 0 ? "Result" : "Flown";
-    this.root.dataset.planMeaning = meaning;
-    if (this.key.textContent !== PLAN_LABELS[meaning]) this.key.textContent = PLAN_LABELS[meaning];
-    this.key.title = meaning === "recorded"
-      ? "Future recorded result for comparison, not knowledge available to the reactive planner."
-      : meaning === "local" ? "Latest recorded local plan; replaced when the UAV replans."
-      : meaning === "scheduled" ? "Preplanned space-time route checked against known traffic schedules."
-      : "Fixed route around static obstacles; playback does not replan.";
+    const history = timeS <= 0 ? "Result" : "Flown";
+    if (this.historyKey.textContent !== history) this.historyKey.textContent = history;
+    if (this.root.dataset.planMeaning !== meaning) {
+      this.root.dataset.planMeaning = meaning;
+      if (this.key.textContent !== PLAN_LABELS[meaning]) this.key.textContent = PLAN_LABELS[meaning];
+      this.key.title = meaning === "recorded"
+        ? "Future recorded result for comparison, not knowledge available to the reactive planner."
+        : meaning === "local" ? "Latest recorded local plan; replaced when the UAV replans."
+        : meaning === "scheduled" ? "Preplanned space-time route checked against known traffic schedules."
+        : "Fixed route around static obstacles; playback does not replan.";
+    }
     if (changed) {
       this.routeId = route.id; this.root.dataset.routeId = route.id;
       this.name.textContent = `UAV ${String(index + 1).padStart(2, "0")}`;
@@ -140,9 +148,14 @@ export class FlightHud {
     }
     const values = [readout.altitudeM.toFixed(1), readout.speedMps.toFixed(1), String(Math.round(readout.headingDeg) % 360).padStart(3, "0")];
     this.fields.forEach((field, index) => { if (field.textContent !== values[index]) field.textContent = values[index]!; });
-    this.root.style.setProperty("--speed-angle", `${Math.max(0, Math.min(1, readout.speedMps / DIAL_LIMITS.speed)) * 270 - 135}deg`);
-    this.root.style.setProperty("--altitude-angle", `${Math.max(0, Math.min(1, readout.altitudeM / DIAL_LIMITS.altitude)) * 270 - 135}deg`);
-    this.root.style.setProperty("--heading", `${readout.headingDeg}deg`);
+    // An unchanged inherited variable would still invalidate the instrument subtree.
+    if (readout.speedMps !== this.lastReadout?.speedMps)
+      this.root.style.setProperty("--speed-angle", `${Math.max(0, Math.min(1, readout.speedMps / DIAL_LIMITS.speed)) * 270 - 135}deg`);
+    if (readout.altitudeM !== this.lastReadout?.altitudeM)
+      this.root.style.setProperty("--altitude-angle", `${Math.max(0, Math.min(1, readout.altitudeM / DIAL_LIMITS.altitude)) * 270 - 135}deg`);
+    if (readout.headingDeg !== this.lastReadout?.headingDeg)
+      this.root.style.setProperty("--heading", `${readout.headingDeg}deg`);
+    this.lastReadout = readout;
   }
   dispose(): void { this.root.remove(); }
 }
