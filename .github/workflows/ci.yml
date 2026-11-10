@@ -15,8 +15,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Changed components
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: Select checks for main-branch pushes
+        id: filter
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            let python = true, web = true;
+            const before = context.payload.before;
+            // PRs, releases, manual runs and uncertain diffs keep full checks.
+            if (context.eventName === 'push' && context.ref === 'refs/heads/main' && before && !/^0+$/.test(before)) {
+              try {
+                const { data } = await github.rest.repos.compareCommitsWithBasehead({
+                  ...context.repo, basehead: `${before}...${context.sha}`, per_page: 1,
+                });
+                // GitHub returns at most 300 changed files, including renames.
+                if (data.status === 'ahead' && data.files && data.files.length < 300) {
+                  const paths = data.files.flatMap(file => [file.filename, file.previous_filename].filter(Boolean));
+                  python = paths.some(path => /^(src|tests|scenarios|scripts|data|\.github)\//.test(path)
+                    || /\.py$|^pyproject\.toml$|^Makefile$/.test(path)
+                    || /^web\/(scripts|shared)\/|^web\/public\/.*\.(json|csv)$/.test(path));
+                  web = paths.some(path => /^(web|data|src|scenarios|scripts|\.github)\/|^pyproject\.toml$/.test(path));
+                }
+              } catch (error) {
+                core.warning(`Changed files unavailable; running full checks: ${error.message}`);
+              }
+            }
+            core.setOutput('python', String(python));
+            core.setOutput('web', String(web));
+
   python-tests:
     name: Python ${{ matrix.python-version }}
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -29,6 +67,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install package and development tools
         run: python -m pip install -e '.[dev]'
       - name: Set up Node.js for study archives
@@ -43,10 +83,16 @@ jobs:
         if: matrix.python-version == '3.12'
         run: python scripts/validate_committed_data.py
       - name: Run tests with branch coverage
+        if: matrix.python-version == '3.12'
         run: pytest --cov=uav3d --cov-report=term-missing
+      - name: Run compatibility tests
+        if: matrix.python-version != '3.12'
+        run: pytest
 
   python-quality:
     name: Python quality
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -55,6 +101,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install package and development tools
         run: python -m pip install -e '.[dev]'
       - name: Lint
@@ -66,6 +114,8 @@ jobs:
 
   package:
     name: Wheel and CLI smoke test
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -74,6 +124,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Build distributions
         run: |
           python -m pip install build
@@ -93,6 +145,8 @@ jobs:
 
   web:
     name: Static, dynamic, and predictive Web studies
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -112,7 +166,12 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Validate, test, and build
-        run: |
-          pnpm test
-          pnpm build
+      - name: Type-check main branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: pnpm typecheck
+      - name: Test web studies
+        run: pnpm test
+      # Pages builds main; PRs, tags and manual runs still verify a full build here.
+      - name: Validate and build
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        run: pnpm build

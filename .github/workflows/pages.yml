@@ -5,13 +5,8 @@ on:
     branches: [main]
     paths:
       - "web/**"
+      - "!web/tests/**"
       - "data/**"
-      - "src/uav3d/**"
-      - "scenarios/**"
-      - "tests/**"
-      - "pyproject.toml"
-      - "scripts/validate_committed_data.py"
-      - "scripts/committed_inputs.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -35,10 +30,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v5.0.0
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v6.0.0
-        with:
-          python-version: "3.12"
       - name: Set up pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v4.2.0
         with:
@@ -49,17 +40,10 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-      - name: Restore and re-audit committed study data
-        run: |
-          node scripts/study-data.mjs
-          python -m pip install -e '..[dev]'
-          python -m pytest ../tests
-          python ../scripts/validate_committed_data.py
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Test recorded data
-        run: pnpm test
-      - name: Build static site
+      # Full test suites run once in CI; build retains data, hash and type checks.
+      - name: Validate data, type-check, and build static site
         run: pnpm build
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v4.0.0
