@@ -16,7 +16,7 @@ A 3D UAV path-planning simulator built on real Manhattan building data, featurin
 
 </div>
 
-![Predictive Manhattan simulation with shared air traffic, mission routes, and the analog flight dashboard](assets/system-overview.jpg)
+![Dynamic UAV follow view over Manhattan at sunset, with waypoint gates and the flight dashboard](assets/system-overview.jpg)
 
 ## Features
 
