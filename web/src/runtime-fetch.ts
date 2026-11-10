@@ -39,7 +39,10 @@ async function readBytes(response: Response, limit: number): Promise<Uint8Array<
       chunks.push(value);
     }
   } catch (error) { await reader.cancel().catch(() => {}); throw error; }
-  return new Uint8Array(await new Blob(chunks).arrayBuffer());
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return bytes;
 }
 async function verifiedJSON(bytes: Uint8Array<ArrayBuffer>, asset: Asset): Promise<unknown> {
   // Support both raw gzip and hosts which transparently decode Content-Encoding.

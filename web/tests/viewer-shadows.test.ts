@@ -76,7 +76,7 @@ function viewerHarness(Viewer: typeof SceneViewer | typeof DynamicViewer | typeo
   viewer.forecastWindows = new Map();
   viewer.layerVisibility = { buildings: true, zones: true, dynamic: true };
   for (const name of [
-    "buildingsGroup", "zonesGroup", "dynamicGroup",
+    "zonesGroup", "dynamicGroup",
     "evidenceGroup",
   ]) {
     viewer[name] = new THREE.Group();
@@ -574,12 +574,12 @@ describe("shared map background lifecycle", () => {
     const context = viewer.content.getObjectByName("city-context") as THREE.Group;
     const ground = context.getObjectByName("city-ground")!;
     expect(context.parent === viewer.cityLayer.group).toBe(true);
-    expect(viewer.buildingsGroup.getObjectByName("city-context")).toBeUndefined();
+    expect(viewer.cityLayer.buildings.getObjectByName("city-context")).toBeUndefined();
     const cityBounds = viewer.cityBounds.clone();
     const missionBounds = viewer.sceneBounds().clone();
     for (const visible of [false, true, false]) {
       viewer.setLayerVisibility("buildings", visible);
-      expect(viewer.buildingsGroup.visible).toBe(visible);
+      expect(viewer.cityLayer.buildings.visible).toBe(visible);
       expect(effectivelyVisible(context)).toBe(true);
       expect(effectivelyVisible(ground)).toBe(true);
       expect(viewer.cityBounds.equals(cityBounds)).toBe(true);

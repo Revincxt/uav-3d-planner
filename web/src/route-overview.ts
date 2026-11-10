@@ -324,7 +324,13 @@ export class RouteOverview {
         vehicle.position.fromArray(enuToThree(route.points[0]!));
         vehicle.name = `overview-vehicle-${route.id}`; group.add(vehicle);
       }
-      const hold = vehicle ? new THREE.Group() : undefined;
+      // Most routes never hover. Keep their hidden geometry and per-frame phase
+      // lookup out of the scene; only positive-duration recorded holds need it.
+      const hold = route.timedPath?.some((waypoint, i, path) => {
+        if (!i || waypoint.timeS <= path[i - 1]!.timeS) return false;
+        const a = path[i - 1]!.position, b = waypoint.position;
+        return Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) < 1e-8;
+      }) ? new THREE.Group() : undefined;
       if (hold) {
         hold.name = `overview-hold-${route.id}`; hold.visible = false;
         const material = new THREE.MeshBasicMaterial({ color: 0xf5bb60, depthTest: true, depthWrite: false });

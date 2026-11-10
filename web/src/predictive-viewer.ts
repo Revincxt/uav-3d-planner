@@ -16,7 +16,7 @@ import { positionEncounterCamera } from "./encounter-view";
 import { createTrafficAircraft, sizeTrafficAircraft, updateTrafficAircraft } from "./traffic-aircraft";
 import { revealReplayWindow } from "./replay-line";
 import { sameSharedWorld } from "./shared-world";
-import { finalFlight, type FinalFlight } from "./final-flight";
+import { finalFlight } from "./final-flight";
 import { disposeRenderObject } from "./render-resources";
 import { sceneLineStyle } from "./scene-style";
 import { addMissionTaskMarkers, avoidDroneMarkerOverlap, orientMissionTaskGates, sizeMissionTaskMarkers } from "./mission-tasks";
@@ -87,7 +87,6 @@ export class PredictiveViewer {
   private motion?: MapCameraMotion;
   private readonly frames = new FrameRenderer(() => this.drawFrame());
   private readonly content = new THREE.Group();
-  private readonly buildingsGroup = new THREE.Group();
   private readonly zonesGroup = new THREE.Group();
   private readonly dynamicGroup = new THREE.Group();
   private readonly evidenceGroup = new THREE.Group();
@@ -99,7 +98,7 @@ export class PredictiveViewer {
   };
   private scenario: PredictiveScenario | null = null;
   private run: PredictiveRun | null = null;
-  private flight: FinalFlight | null = null;
+  private durationS = 0;
   private currentTimeS = 0;
   private currentView: ViewPreset = "isometric";
   private cityBounds = new THREE.Box3();
@@ -122,7 +121,6 @@ export class PredictiveViewer {
     this.quality = new RenderQuality(this.renderer, () => this.frames.request());
     this.container.append(this.renderer.domElement);
     this.content.add(
-      this.buildingsGroup,
       this.zonesGroup,
       this.dynamicGroup,
       this.evidenceGroup,
@@ -143,7 +141,7 @@ export class PredictiveViewer {
     const shared = sameSharedWorld(this.scenario?.mission, scenario.mission);
     this.scenario = scenario;
     this.run = null;
-    this.flight = null;
+    this.durationS = 0;
     this.currentTimeS = 0;
     if (shared) {
       const tasks = this.content.getObjectByName("mission-task-points");
@@ -186,9 +184,9 @@ export class PredictiveViewer {
   }
 
   setRun(run: PredictiveRun): void {
-    const flight = finalFlight(run);
+    const durationS = finalFlight(run).path.at(-1)!.timeS;
     this.run = run;
-    this.flight = flight;
+    this.durationS = durationS;
     this.replaceMinimumSeparationEvidence();
     this.setTime(0);
   }
@@ -203,8 +201,7 @@ export class PredictiveViewer {
     if (!this.scenario || !this.run) return;
     this.playbackTimeS = timeS;
     this.overview?.setTime(timeS);
-    const path = this.activePath;
-    const duration = path.at(-1)!.timeS;
+    const duration = this.durationS;
     this.currentTimeS = Math.max(0, Math.min(timeS, duration));
     const hazardTime = this.scenario.mission?.sharedWorld ? Math.max(0, timeS) : this.currentTimeS;
 
@@ -287,10 +284,6 @@ export class PredictiveViewer {
     this.renderer.domElement.remove();
   }
 
-  private get activePath() {
-    return this.flight?.path ?? [];
-  }
-
   private buildScene(): void {
     if (!this.scenario) return;
     this.clearContent();
@@ -346,7 +339,6 @@ export class PredictiveViewer {
     this.movingSpheres.clear();
     this.lineMaterials.clear();
     for (const group of [
-      this.buildingsGroup,
       this.zonesGroup,
       this.dynamicGroup,
       this.evidenceGroup,
@@ -359,7 +351,6 @@ export class PredictiveViewer {
     for (const child of [...this.content.children]) {
       if (child === this.cityLayer?.group) continue;
       if (![
-        this.buildingsGroup,
         this.zonesGroup,
         this.dynamicGroup,
         this.evidenceGroup,
@@ -492,12 +483,12 @@ export class PredictiveViewer {
 
 
   private updateLayerVisibility(): void {
-    if (this.buildingsGroup.visible !== this.layerVisibility.buildings
+    const buildings = this.cityLayer?.buildings;
+    if (buildings && buildings.visible !== this.layerVisibility.buildings
       || this.dynamicGroup.visible !== this.layerVisibility.dynamic) {
       this.renderer.shadowMap.needsUpdate = true;
     }
-    this.buildingsGroup.visible = this.layerVisibility.buildings;
-    if (this.cityLayer) this.cityLayer.buildings.visible = this.layerVisibility.buildings;
+    if (buildings) buildings.visible = this.layerVisibility.buildings;
     this.zonesGroup.visible = this.layerVisibility.zones;
     this.dynamicGroup.visible = this.layerVisibility.dynamic;
   }

@@ -188,6 +188,24 @@ describe("four routes, one world", () => {
     expect(overview.group.getObjectByName("overview-vehicle-route-0")!.position.toArray()).toEqual([0, 30, -0]);
     overview.dispose();
   });
+  it("allocates hold symbols only for real timed holds and preserves their replay boundaries", () => {
+    const overview = new RouteOverview(), routes = fixtureRoutes();
+    routes[1]!.timedPath!.splice(1, 0, { timeS: 0, position: routes[1]!.points[0]! });
+    routes[2]!.playbackKind = "reactive";
+    routes[2]!.timedPath!.splice(1, 0, { timeS: 5, position: routes[2]!.points[0]! });
+    routes[3]!.playbackKind = "predictive";
+    routes[3]!.timedPath!.splice(1, 0, { timeS: 5, position: [30 + 5e-9, 0, 30] });
+    overview.setRoutes(routes, routes[0]!.id, 800, 600);
+    for (const route of routes.slice(0, 2)) expect(overview.group.getObjectByName(`overview-hold-${route.id}`)).toBeUndefined();
+    const holds = routes.slice(2).map(route => overview.group.getObjectByName(`overview-hold-${route.id}`)!);
+    expect(holds.every(hold => hold && !hold.visible)).toBe(true);
+    overview.setPlaying(true);
+    for (const [timeS, visible] of [[-1, false], [0, true], [2.5, true], [5, false], [25, false]] as const) {
+      overview.setTime(timeS);
+      expect(holds.map(hold => hold.visible)).toEqual([visible, visible]);
+    }
+    overview.dispose();
+  });
   it("keeps the followed aircraft visible and prominent, then restores its overview symbol", () => {
     const overview = new RouteOverview(), routes = fixtureRoutes();
     overview.setRoutes(routes, routes[0]!.id, 800, 600);

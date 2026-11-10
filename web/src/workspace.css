@@ -36,7 +36,6 @@ dd { margin: 0; }
 .route-legend button { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 4px 7px; border-color: transparent; background: transparent; color: #667587; font-size: 9px; white-space: nowrap; }
 .route-legend button[aria-pressed="true"] { background: #f0f4f7; color: var(--route-color); border-color: #e1e8ee; }
 .route-legend i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; background: var(--route-color); }
-.inspector-card { border-top: 2px solid var(--active-route, #e7ebf0); }
 .workspace-content { display: flex; flex-direction: column; gap: 18px; min-width: 0; min-height: 0; padding: 25px 24px 24px; }
  .run-status, .witness-quality { display: inline-flex; align-items: center; width: fit-content; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: #718093; font-size: 9px; letter-spacing: .01em; white-space: nowrap; }
 .run-status.is-success, .status-success, .metric-positive { color: #248773; }
