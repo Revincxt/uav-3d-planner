@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createMapRenderer, RenderQuality } from "./render-quality";
 import { MapCameraMotion } from "./map-camera-motion";
 import type { RoutePick } from "./route-picking";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -31,6 +32,7 @@ const SCENE_PALETTE = {
 
 export class DynamicViewer {
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly quality: RenderQuality;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.OrthographicCamera();
   private readonly viewport = new THREE.Vector2();
@@ -54,12 +56,8 @@ export class DynamicViewer {
   onFollowChange?: (enabled: boolean) => void;
 
   constructor(private readonly container: HTMLElement) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer = createMapRenderer();
+    this.quality = new RenderQuality(this.renderer, () => this.frames.request());
     this.container.append(this.renderer.domElement);
     this.scene.add(this.content);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0xa3a3a3, 1.2));
@@ -71,7 +69,8 @@ export class DynamicViewer {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     configureMapNavigation(this.controls);
     this.motion = new MapCameraMotion(this.camera, this.controls, () => this.frames.request());
-    this.controls.addEventListener("start", () => this.motion?.cancel());
+    this.controls.addEventListener("start", () => { this.quality.interacting = true; this.motion?.cancel(); });
+    this.controls.addEventListener("end", () => { this.quality.interacting = false; this.frames.request(); });
     this.controls.addEventListener("change", () => this.frames.request());
     this.resizeObserver = new ResizeObserver(() => { this.motion?.cancel(); this.resize(); });
     this.resizeObserver.observe(container);
@@ -106,7 +105,7 @@ export class DynamicViewer {
     return this.overview?.pick(camera, clientX - rect.left, clientY - rect.top, rect.width, rect.height,
       point => this.cityLayer?.blocksSight(camera, point) ?? false, radius) ?? null;
   }
-  setPlaying(playing: boolean): void { this.overview?.setPlaying(playing); this.render(); }
+  setPlaying(playing: boolean): void { this.quality.playing = playing; this.overview?.setPlaying(playing); this.render(); }
   get followedRouteId(): string | null { return this.follow?.routeId ?? null; }
 
   setFollowRoute(id: string | null): void {
@@ -181,7 +180,7 @@ export class DynamicViewer {
 
   dispose(): void {
     this.motion?.cancel();
-    this.follow?.stop();
+    this.follow?.dispose();
     this.frames.cancel();
     this.resizeObserver.disconnect();
     this.controls.dispose();
@@ -262,7 +261,7 @@ export class DynamicViewer {
   private resize(): void {
     const width = Math.max(1, this.container.clientWidth);
     const height = Math.max(1, this.container.clientHeight);
-    this.renderer.setSize(width, height, false);
+    this.quality.resize(width, height);
     if (!this.follow?.resize(width, height))
       fitMapCamera(this.camera, this.sceneBounds(), width, height,
         this.observationBounds ? 1.12 : mapFramingPadding(this.viewPreset === "isometric"));
@@ -301,21 +300,25 @@ export class DynamicViewer {
   private render(): void { this.frames.request(); }
 
   private drawFrame(): void {
-    if (this.motion?.step()) this.frames.request();
+    const startedAt = performance.now();
+    let settling = this.motion?.step() ?? false;
+    if (settling) this.frames.request();
     const drone = this.follow?.routeId ? this.overview?.vehicle(this.follow.routeId) : undefined;
-    if (drone && this.follow?.update(drone.position, this.overview!.heading(this.follow.routeId!, this.playbackTimeS), this.playbackTimeS, performance.now(), this.overview!.timedPath(this.follow.routeId!))) this.frames.request();
+    if (drone && this.follow?.update(drone.position, this.overview!.heading(this.follow.routeId!, this.playbackTimeS), this.playbackTimeS, startedAt, this.overview!.timedPath(this.follow.routeId!))) {
+      settling = true; this.frames.request();
+    }
     const camera = drone ? this.follow!.camera : this.camera;
     const { x: width, y: height } = this.renderer.getSize(this.viewport);
     for (const aircraft of this.movingSpheres.values()) sizeTrafficAircraft(aircraft, camera, height);
     this.overview?.updateSymbols(camera, height, this.follow?.routeId);
     sizeMissionTaskMarkers(this.content, camera, height, Boolean(drone) || Boolean(this.observationBounds));
     avoidDroneMarkerOverlap(this.content, this.overview?.vehicle(this.scenario?.id ?? ""));
-    const pixelRatio = this.renderer.getPixelRatio();
+    const pixelRatio = this.quality.imageryPixelRatio;
     updateMapSurround(this.content, camera, width * pixelRatio,
       height * pixelRatio, this.renderer.capabilities.getMaxAnisotropy());
     const background = this.scene.background;
     if (drone) this.scene.background = this.follow!.sky;
-    this.renderer.render(this.scene, camera);
+    this.quality.render(this.scene, camera, startedAt, settling);
     this.scene.background = background;
   }
 }

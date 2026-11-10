@@ -11,10 +11,33 @@ const YAW_RESPONSE = 8, MAX_YAW_RATE = Math.PI, MAX_YAW_ACCELERATION = 3 * Math.
 const MAX_TRACE_RATE = BASE_PLAYBACK_SPEED * Math.max(...PLAYBACK_RATES);
 const PROBE_HORIZONS = [.12, .24] as const;
 
+/** World-aligned daylight gradient, baked once without external images or animation. */
+function createFollowSky(): THREE.DataTexture {
+  const height = 128, pixels = new Uint8Array(height * 4);
+  const horizon = new THREE.Color(0xb9d5e6), zenith = new THREE.Color(0x3985c8);
+  const lower = new THREE.Color(0xa9c0cf), color = new THREE.Color();
+  for (let row = 0; row < height; row++) {
+    const elevation = Math.sin((row / (height - 1) - .5) * Math.PI);
+    if (elevation >= 0) color.copy(horizon).lerp(zenith, Math.pow(elevation, .55));
+    else color.copy(horizon).lerp(lower, Math.pow(-elevation, .4));
+    color.convertLinearToSRGB();
+    pixels[row * 4] = Math.round(color.r * 255);
+    pixels[row * 4 + 1] = Math.round(color.g * 255);
+    pixels[row * 4 + 2] = Math.round(color.b * 255);
+    pixels[row * 4 + 3] = 255;
+  }
+  const sky = new THREE.DataTexture(pixels, 1, height);
+  sky.colorSpace = THREE.SRGBColorSpace;
+  sky.mapping = THREE.EquirectangularReflectionMapping;
+  sky.minFilter = sky.magFilter = THREE.LinearFilter;
+  sky.needsUpdate = true;
+  return sky;
+}
+
 /** Close, centered chase camera; the overview and its orbit state remain untouched. */
 export class DroneFollow {
   readonly camera = new THREE.PerspectiveCamera(70, 1, 0.15, 8000);
-  readonly sky = new THREE.Color(0xe9f0f6);
+  readonly sky = createFollowSky();
   routeId: string | null = null;
   private previousControlsEnabled = true;
   private clock = 0;
@@ -157,6 +180,8 @@ export class DroneFollow {
     this.controls.enabled = this.previousControlsEnabled;
     this.onChange?.(false);
   }
+
+  dispose(): void { this.stop(); this.sky.dispose(); }
 }
 
 interface FollowViewer {

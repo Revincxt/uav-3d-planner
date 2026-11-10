@@ -1,4 +1,4 @@
-import { Vector3, Vector4 } from "three";
+import { Matrix4, Vector3, Vector4 } from "three";
 import type { Line2 } from "three/addons/lines/Line2.js";
 import type { DisplayCamera } from "./camera-scale";
 
@@ -45,6 +45,7 @@ export function pickVisibleRoutes(routes: readonly PickableRoute[], camera: Disp
   width: number, height: number, occluded: (position: Vector3) => boolean = () => false, radius = 7): RoutePick | null {
   if (width <= 0 || height <= 0 || x < 0 || y < 0 || x > width || y > height) return null;
   camera.updateMatrixWorld();
+  const projection = new Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   const candidates: Array<RoutePick & { depth: number }> = [];
   const a = new Vector3(), b = new Vector3(), ca = new Vector4(), cb = new Vector4();
   for (const route of routes) for (const line of route.lines) {
@@ -60,8 +61,8 @@ export function pickVisibleRoutes(routes: readonly PickableRoute[], camera: Disp
       const ax = a.x, ay = a.y, az = a.z, bx = b.x, by = b.y, bz = b.z;
       a.set(ax + (bx - ax) * window[0], ay + (by - ay) * window[0], az + (bz - az) * window[0]);
       b.set(ax + (bx - ax) * window[1], ay + (by - ay) * window[1], az + (bz - az) * window[1]);
-      ca.set(a.x, a.y, a.z, 1).applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix);
-      cb.set(b.x, b.y, b.z, 1).applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix);
+      ca.set(a.x, a.y, a.z, 1).applyMatrix4(projection);
+      cb.set(b.x, b.y, b.z, 1).applyMatrix4(projection);
       const clip = frustumWindow(ca, cb);
       if (!clip) continue;
       if (clip[0] > 0 || clip[1] < 1) {

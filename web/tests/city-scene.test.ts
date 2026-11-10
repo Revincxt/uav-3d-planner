@@ -93,6 +93,35 @@ describe("real planning city presentation", () => {
     expect(bounds.containsPoint(new THREE.Vector3(600, 95, -700))).toBe(true);
   });
 
+  it("culls distant blocks without uploading new indices and restores all shadow casters", () => {
+    const host = new THREE.Group(), scene = new THREE.Scene();
+    addCityBuildings(host, Array.from({ length: 13 }, (_, index) => {
+      const y = index * 1000;
+      return { min: [0, y, 0], max: [20, y + 20, 40], footprint: [
+        [[0, y], [20, y], [20, y + 20], [0, y + 20], [0, y]],
+      ] };
+    }));
+    scene.add(host); scene.updateMatrixWorld(true);
+    const mesh = host.getObjectByName("planning-city-buildings-0") as THREE.Mesh;
+    const geometry = mesh.geometry, indices = geometry.index!, array = indices.array;
+    const camera = new THREE.OrthographicCamera(-100, 100, 100, -100, 1, 2000);
+    camera.position.set(10, 500, -10); camera.lookAt(10, 0, -10); camera.updateMatrixWorld(true);
+    const draw = () => mesh.onBeforeRender(null!, scene, camera, geometry, mesh.material as THREE.Material, null!);
+    draw();
+    const closeRange = { ...geometry.drawRange };
+    expect(closeRange.count).toBeGreaterThan(0);
+    expect(closeRange.count).toBe(indices.count / 3);
+    const shadowCamera = new THREE.OrthographicCamera(-15000, 15000, 15000, -15000, 1, 2000);
+    shadowCamera.position.set(10, 500, -6000); shadowCamera.lookAt(10, 0, -6000); shadowCamera.updateMatrixWorld(true);
+    mesh.onBeforeShadow(null!, scene, camera, shadowCamera, geometry, mesh.material as THREE.Material, null!);
+    expect(geometry.drawRange.count).toBe(indices.count);
+    draw(); expect(geometry.drawRange).toEqual(closeRange);
+    camera.position.x = 100000; camera.lookAt(100000, 0, -10); camera.updateMatrixWorld(true);
+    draw(); expect(geometry.drawRange.count).toBe(0);
+    expect(geometry.index!.array).toBe(array);
+    expect(geometry.index!.version).toBe(0);
+  });
+
   it('frames a single-pass replay iterator without flattening its history', () => {
     const points = [[300, 400, 65], [600, 700, 95]];
     let visits = 0;

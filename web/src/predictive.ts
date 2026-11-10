@@ -423,7 +423,8 @@ async function start(): Promise<void> {
     currentScenario.runs[0]!;
   let currentFlight = finalFlight(currentRun);
   const requestedInitialTimeS = Math.max(0, Number(query.get("time")) || 0);
-  mountInspector();
+  const inspector = element(".inspector-card");
+  mountInspector(() => renderInspector());
   mountTabs();
   let currentTimeS = requestedInitialTimeS;
   const playbackClock = new PlaybackClock();
@@ -511,13 +512,40 @@ async function start(): Promise<void> {
   const avoidanceCache = new WeakMap<PredictiveRun, AvoidanceEvent[]>();
   let avoidanceEvents = predictiveAvoidanceEvents(currentRun);
   avoidanceCache.set(currentRun, avoidanceEvents);
+  const renderInspector = (): void => {
+    const path = currentPath(), total = duration(), position = timedPosition(path, currentTimeS);
+    const event = mostRecentEvent(currentFlight, currentTimeS);
+    const focusedTime = Math.min(currentTimeS, path.at(-1)!.timeS);
+    const activeZones = currentScenario.temporaryNoFlyZones.filter(
+      zone => zone.activeFromS <= focusedTime && focusedTime < zone.activeUntilS,
+    );
+    updateChartCursor(element("#altitude-chart"), currentTimeS, position[2], "m");
+    updateChartCursor(
+      element("#turn-chart"),
+      currentTimeS,
+      sampledValue(turnSamples(path), currentTimeS),
+      "°",
+    );
+    const currentRows: Array<[string, string]> = [
+      ["Position", formatPosition(position)],
+      ["Altitude", `${position[2].toFixed(1)} m`],
+      ["Active hazards", `${activeZones.length} zones · ${currentScenario.movingSpheres.length} moving`],
+    ];
+    setDefinitionRows(element("#current-meta"), currentRows);
+    element("#current-event").textContent = event?.event
+      ? `${event.event.label} · ${event.timeS.toFixed(1)} s`
+      : "Ready to depart";
+    element("#frame-summary").textContent =
+      `${currentTimeS.toFixed(1)} s of ${total.toFixed(1)} s · ` +
+      `${position[2].toFixed(1)} m altitude`;
+  };
   let lastReadoutMs = -Infinity;
   const renderTime = (timeS: number, shouldAnnounce = false, notify = false): void => {
     const previousTimeS = currentTimeS;
     const total = duration();
     currentTimeS = Math.max(0, Math.min(timeS, total));
-    // Motion/arrivals remain frame-rate driven; text and hidden inspector readouts
-    // need only 10 Hz. Explicit seeking always refreshes immediately.
+    // Motion/arrivals remain frame-rate driven; visible readouts need only 10 Hz.
+    // The inspector refreshes immediately when opened or explicitly seeking.
     timeline.value = String(currentTimeS);
     viewer?.setTime(currentTimeS);
     if (notify) taskNotice.advance(routes.find(route => route.id === viewer?.followedRouteId), previousTimeS, currentTimeS);
@@ -536,7 +564,6 @@ async function start(): Promise<void> {
     const events = visibleEvents(currentFlight).filter(
       ({ frame }) => frame.timeS <= total + EPSILON,
     );
-    const event = mostRecentEvent(currentFlight, currentTimeS);
     const focusedTime = Math.min(currentTimeS, path.at(-1)!.timeS);
     const activeZones = currentScenario.temporaryNoFlyZones.filter(
       (zone) => zone.activeFromS <= focusedTime && focusedTime < zone.activeUntilS,
@@ -557,25 +584,7 @@ async function start(): Promise<void> {
       element("#viewer-witness-detail").textContent =
         `${witness.exact ? "Exact" : "Approximate"} witness · ${witness.timeS.toFixed(2)} s`;
     }
-    updateChartCursor(element("#altitude-chart"), currentTimeS, position[2], "m");
-    updateChartCursor(
-      element("#turn-chart"),
-      currentTimeS,
-      sampledValue(turnSamples(path), currentTimeS),
-      "°",
-    );
-    const currentRows: Array<[string, string]> = [
-      ["Position", formatPosition(position)],
-      ["Altitude", `${position[2].toFixed(1)} m`],
-      ["Active hazards", `${activeZones.length} zones · ${currentScenario.movingSpheres.length} moving`],
-    ];
-    setDefinitionRows(element("#current-meta"), currentRows);
-    element("#current-event").textContent = event?.event
-      ? `${event.event.label} · ${event.timeS.toFixed(1)} s`
-      : "Ready to depart";
-    element("#frame-summary").textContent =
-      `${currentTimeS.toFixed(1)} s of ${total.toFixed(1)} s · ` +
-      `${position[2].toFixed(1)} m altitude`;
+    if (!inspector.inert) renderInspector();
     element("#canvas-summary").textContent =
       `${currentScenario.label}. At ${currentTimeS.toFixed(1)} seconds the vehicle is at ` +
       `${formatPosition(position)}. ${activeZones.length} temporary restrictions are active and ` +

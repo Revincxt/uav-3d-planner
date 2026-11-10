@@ -216,6 +216,8 @@ export class TerrainMapLayer extends THREE.Group {
   private readonly viewProjection = new THREE.Matrix4();
   private viewWidth = 0;
   private viewHeight = 0;
+  private selectionTime = -Infinity;
+  private selectionTimer?: ReturnType<typeof setTimeout>;
   private readonly tiles = new Map<string, TileVisual>();
   private queue: TileVisual[] = [];
   private pending = 0;
@@ -227,6 +229,7 @@ export class TerrainMapLayer extends THREE.Group {
   private template = MAP_SURROUND.source.tileTemplate;
   private launchTimer?: ReturnType<typeof setTimeout>;
   private listening = false;
+  private disposed = false;
   private readonly recover = () => {
     this.template = MAP_SURROUND.source.tileTemplate;
     for (const visual of this.tiles.values()) if (visual.state === "failed" && this.wanted.has(visual.tile.key)) {
@@ -244,12 +247,28 @@ export class TerrainMapLayer extends THREE.Group {
   }
 
   update(camera: THREE.Camera, width: number, height: number, maxAnisotropy = 8): void {
+    if (this.disposed) return;
     // Aircraft playback does not move the overview camera. In that common case
     // retain the exact tile decision, without repeating ground/frustum projection.
     // Camera identity matters when entering/leaving the perspective follow view.
     camera.updateMatrixWorld(true);
     if (camera === this.viewCamera && width === this.viewWidth && height === this.viewHeight
       && this.viewMatrix.equals(camera.matrixWorld) && this.viewProjection.equals(camera.projectionMatrix)) return;
+    const now = performance.now();
+    // Follow cameras move every frame; tile selection and requests need only 10 Hz.
+    // Preserve the decoded ground while moving, then request the final view even
+    // when playback stops before the next selection deadline.
+    if (camera instanceof THREE.PerspectiveCamera && camera === this.viewCamera
+      && width === this.viewWidth && height === this.viewHeight
+      && this.viewProjection.equals(camera.projectionMatrix)
+      && now - this.selectionTime < MAP_SURROUND.updateDelayMs) {
+      this.selectionTimer ??= setTimeout(() => {
+        this.selectionTimer = undefined; this.onReady?.();
+      }, MAP_SURROUND.updateDelayMs - (now - this.selectionTime));
+      return;
+    }
+    clearTimeout(this.selectionTimer); this.selectionTimer = undefined;
+    this.selectionTime = now;
     this.viewCamera = camera; this.viewWidth = width; this.viewHeight = height;
     this.viewMatrix.copy(camera.matrixWorld); this.viewProjection.copy(camera.projectionMatrix);
     let recovered = false;
@@ -281,12 +300,7 @@ export class TerrainMapLayer extends THREE.Group {
       texture.addEventListener("dispose", () => {
         clearTimeout(visual.retry); visual.retry = undefined;
         if ([...this.tiles.values()].every(item => item.texture.userData.viewerDisposed)) {
-          clearTimeout(this.launchTimer); this.launchTimer = undefined;
-          if (typeof window !== "undefined") window.removeEventListener("online", this.recover);
-          if (typeof document !== "undefined") document.removeEventListener?.("visibilitychange", this.resume);
-          this.listening = false;
-          if (this.decodeFrame !== undefined) cancelAnimationFrame(this.decodeFrame);
-          this.decodeFrame = undefined; this.decodeQueue.length = 0;
+          this.stop();
         }
       });
       texture.colorSpace = THREE.SRGBColorSpace;
@@ -315,6 +329,21 @@ export class TerrainMapLayer extends THREE.Group {
     // Camera fitting fires several synchronous renders. Request only the settled view,
     // not transient initialization frames or every intermediate pan position.
     this.schedule();
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.stop();
+  }
+
+  private stop(): void {
+    clearTimeout(this.launchTimer); this.launchTimer = undefined;
+    clearTimeout(this.selectionTimer); this.selectionTimer = undefined;
+    if (typeof window !== "undefined") window.removeEventListener("online", this.recover);
+    if (typeof document !== "undefined") document.removeEventListener?.("visibilitychange", this.resume);
+    this.listening = false;
+    if (this.decodeFrame !== undefined) cancelAnimationFrame(this.decodeFrame);
+    this.decodeFrame = undefined; this.decodeQueue.length = 0;
   }
 
   private schedule(): void {
@@ -379,7 +408,7 @@ export class TerrainMapLayer extends THREE.Group {
   }
 
   private pump(): void {
-    if (typeof document === "undefined" || this.launchTimer !== undefined
+    if (this.disposed || typeof document === "undefined" || this.launchTimer !== undefined
       || !this.queue.some(item => !item.texture.userData.viewerDisposed)) return;
     while (this.pending < MAP_SURROUND.maxConcurrentRequests && this.queue.length) {
       const visual = this.queue.shift()!;

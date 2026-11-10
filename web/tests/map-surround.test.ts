@@ -53,6 +53,37 @@ function mockTiles() {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("continuous satellite-style imagery map", () => {
+  it("coalesces moving follow views and commits the final view after motion stops", async () => {
+    mockTiles();
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const view = new THREE.PerspectiveCamera(70, 1.5, .15, 8000);
+    view.position.set(1100, 200, -1100); view.lookAt(1100, 0, -2100);
+    const ready = vi.fn(() => layer.update(view, 1200, 800));
+    const layer = new TerrainMapLayer(bounds, ready);
+    const project = vi.spyOn(THREE.Vector3.prototype, "unproject");
+    layer.update(view, 1200, 800); project.mockClear();
+    for (now = 1; now < 90; now++) { view.position.x++; layer.update(view, 1200, 800); }
+    expect(project).not.toHaveBeenCalled();
+    now = 101; await vi.advanceTimersByTimeAsync(101);
+    expect(ready).toHaveBeenCalledOnce();
+    expect(project).toHaveBeenCalled();
+    now = 110; view.position.x++; layer.update(view, 1200, 800);
+    disposeRenderObject(layer);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(ready).toHaveBeenCalledOnce();
+  });
+  it("cancels a deferred view even when no tiles have been allocated", async () => {
+    mockTiles();
+    let now = 0; vi.spyOn(performance, "now").mockImplementation(() => now);
+    const view = new THREE.PerspectiveCamera(70, 1.5, .15, 8000);
+    view.position.set(1000000, 200, 0); view.lookAt(1000000, 0, -1000);
+    const ready = vi.fn(), layer = new TerrainMapLayer(bounds, ready);
+    layer.update(view, 1200, 800); expect(layer.children).toHaveLength(0);
+    now = 1; view.position.x++; layer.update(view, 1200, 800);
+    disposeRenderObject(layer); await vi.advanceTimersByTimeAsync(200);
+    expect(ready).not.toHaveBeenCalled();
+  });
   it("retains a stationary camera's tile decision but invalidates pan, projection and Retina changes", () => {
     const view = camera(), layer = new TerrainMapLayer(bounds);
     const project = vi.spyOn(THREE.Vector3.prototype, "unproject");

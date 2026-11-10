@@ -6,6 +6,7 @@ export function disposeRenderObject(object: THREE.Object3D): void {
   const geometries = new Set<THREE.BufferGeometry>();
   const ownedMaterials = new Set<THREE.Material>();
   object.traverse((child) => {
+    if (child instanceof THREE.Group) (child as THREE.Group & { dispose?: () => void }).dispose?.();
     if (child instanceof THREE.InstancedMesh) child.dispose();
     if ("geometry" in child && child.geometry instanceof THREE.BufferGeometry) {
       if (!geometries.has(child.geometry)) {

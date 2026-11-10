@@ -35,7 +35,7 @@ describe("shared navigation and flight controls", () => {
   );
 });
 
-function inspectorFixture(id = "") {
+function inspectorFixture(id = "", onOpen?: () => void) {
   function button() {
     const attributes = new Map<string, string>();
     const events = new Map<string, () => void>();
@@ -65,7 +65,7 @@ function inspectorFixture(id = "") {
     createElement: vi.fn().mockReturnValueOnce(toggle).mockReturnValueOnce(close),
     addEventListener: (name: string, listener: (event: { key: string }) => void) => events.set(name, listener),
   });
-  mountInspector();
+  mountInspector(onOpen);
   return { toggle, close, panel, toolbar, events };
 }
 
@@ -80,7 +80,8 @@ describe("Inspector control", () => {
   });
 
   it("keeps its label and changes only the open state and tooltip", () => {
-    const f = inspectorFixture("existing-panel");
+    const refresh = vi.fn(), f = inspectorFixture("existing-panel", refresh);
+    expect(refresh).not.toHaveBeenCalled();
     expect(f.toggle.attributes.get("aria-controls")).toBe("existing-panel");
     f.toggle.events.get("click")!();
     expect(f.panel.classList.contains("inspector-open")).toBe(true);
@@ -88,11 +89,13 @@ describe("Inspector control", () => {
     expect(f.toggle.attributes.get("aria-expanded")).toBe("true");
     expect(f.toggle.title).toBe("Close inspector");
     expect(f.toggle.textContent).toBe("Inspector");
+    expect(refresh).toHaveBeenCalledOnce();
     f.toggle.events.get("click")!();
     expect(f.panel.classList.contains("inspector-open")).toBe(false);
     expect((f.panel as typeof f.panel & { inert: boolean }).inert).toBe(true);
     expect(f.toggle.attributes.get("aria-expanded")).toBe("false");
     expect(f.toggle.title).toBe("Open inspector");
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
   it("returns focus to the control when the panel close button is used", () => {

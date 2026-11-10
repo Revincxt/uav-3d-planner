@@ -166,6 +166,7 @@ async function start(): Promise<void> {
   const routeInteraction = new RouteInteraction(viewerHost, viewer, scenarioSelect, () => routes);
   const routeStates = new RouteStatusStrip();
   const flightAnnouncements = new FlightAnnouncements(element(".stage-viewport"));
+  const inspector = element(".inspector-card");
   const avoidanceCache = new WeakMap<DynamicRun, AvoidanceEvent[]>();
   let avoidanceEvents: AvoidanceEvent[] = [];
   const renderTime = (timeS: number, shouldAnnounce = false, notify = false): void => {
@@ -187,7 +188,7 @@ async function start(): Promise<void> {
     routeInteraction.update(currentTimeS, !notify);
     routeStates.update(routes, currentTimeS, !notify);
     showPlaybackState(element("#playback-state"), "reactive", playbackAction(route.timedPath!, currentTimeS, route.mission, frame), false, flightPhase(route, currentTimeS));
-    if (frame !== lastMetricsFrame) {
+    if (!inspector.inert && frame !== lastMetricsFrame) {
       renderFrameMetrics(frame, frameIndex, currentRun.frames.length);
       lastMetricsFrame = frame;
     }
@@ -315,7 +316,11 @@ async function start(): Promise<void> {
     scenarios: bundle.scenarios,
     select: scenarioSelect,
   });
-  mountInspector();
+  mountInspector(() => {
+    const frame = currentRun.frames[frameIndex]!;
+    renderFrameMetrics(frame, frameIndex, currentRun.frames.length);
+    lastMetricsFrame = frame;
+  });
   mountTabs();
   routeStates.update(routes, currentTimeS, true);
   mountFollowControls(viewer, scenarioSelect, enabled => { taskNotice.reset(); flightAnnouncements.reset(); routeInteraction.followChanged(enabled); });

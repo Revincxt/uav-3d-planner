@@ -5,6 +5,7 @@ import { addMapBackground, MAP_PALETTE } from "./map-background";
 import { addMapSurround } from "./map-surround";
 
 type CityPoint = readonly number[];
+const BUILDING_BATCH_WIDTH_M = 512;
 export interface CityBox {
   min: CityPoint;
   max: CityPoint;
@@ -134,14 +135,14 @@ function indexBuildingGeometry(geometry: THREE.BufferGeometry, groundLevel: bool
   geometry.clearGroups();
 }
 
-/** Thousands of sourced footprint prisms share a handful of GPU draw calls. */
+/** Spatial batches retain every sourced prism while culling off-screen blocks. */
 export function addCityBuildings(host: THREE.Group, buildings: readonly CityBox[]): void {
   if (!buildings.some((building) => building.footprint)) {
     buildings.forEach((building, index) => addCityBuilding(host, building, index));
     return;
   }
   const shades = [0xbcbcbc, 0xcdcdcd, 0xb1b1b1, 0xc4c4c4, 0xd2d2d2, 0xb8b8b8];
-  const batches: THREE.BufferGeometry[][] = shades.map(() => []);
+  const batches = shades.map(() => new Map<string, THREE.BufferGeometry[]>());
   const facadeVertices: number[] = [];
   buildings.forEach((building, index) => {
     let geometry: THREE.BufferGeometry;
@@ -180,15 +181,56 @@ export function addCityBuildings(host: THREE.Group, buildings: readonly CityBox[
     }
     geometry.deleteAttribute("uv");
     indexBuildingGeometry(geometry, building.min[2]! <= 0);
-    batches[index % shades.length]!.push(geometry);
+    const cell = `${Math.floor((building.min[0]! + building.max[0]!) / (2 * BUILDING_BATCH_WIDTH_M))},${Math.floor((building.min[1]! + building.max[1]!) / (2 * BUILDING_BATCH_WIDTH_M))}`;
+    const batch = batches[index % shades.length]!;
+    const geometries = batch.get(cell) ?? [];
+    geometries.push(geometry); batch.set(cell, geometries);
   });
-  batches.forEach((geometries, index) => {
-    if (geometries.length === 0) return;
-    const merged = mergeGeometries(geometries, false)!;
-    geometries.forEach((geometry) => geometry.dispose());
-    const mesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ color: shades[index], roughness: 0.94, metalness: 0 }));
+  batches.forEach((cells, index) => {
+    if (cells.size === 0) return;
+    const chunks: THREE.BufferGeometry[] = [];
+    let indices = 0, buildingCount = 0;
+    for (const geometries of cells.values()) {
+      const merged = mergeGeometries(geometries, false)!;
+      indices += merged.index!.count;
+      buildingCount += geometries.length;
+      geometries.forEach(geometry => geometry.dispose());
+      chunks.push(merged);
+    }
+    for (const geometry of chunks) geometry.computeBoundingSphere();
+    // North/south ordering makes the retained range useful along the long island.
+    chunks.sort((a, b) => a.boundingSphere!.center.z - b.boundingSphere!.center.z);
+    let offset = 0;
+    const ranges = chunks.map(geometry => {
+      const range = { sphere: geometry.boundingSphere!, start: offset, count: geometry.index!.count };
+      offset += range.count; return range;
+    });
+    const merged = mergeGeometries(chunks, false)!;
+    chunks.forEach(geometry => geometry.dispose());
+    const mesh = new THREE.Mesh(merged,
+      new THREE.MeshStandardMaterial({ color: shades[index], roughness: 0.94, metalness: 0 }));
+    const world = new THREE.Matrix4(), projection = new THREE.Matrix4(), model = new THREE.Matrix4();
+    const combined = new THREE.Matrix4(), frustum = new THREE.Frustum();
+    let lastCamera: THREE.Camera | undefined;
+    const selectRange = (camera: THREE.Camera): void => {
+      if (camera === lastCamera && world.equals(camera.matrixWorld)
+        && projection.equals(camera.projectionMatrix) && model.equals(mesh.matrixWorld)) return;
+      combined.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(mesh.matrixWorld);
+      frustum.setFromProjectionMatrix(combined);
+      let first = indices, last = 0;
+      for (const range of ranges) if (frustum.intersectsSphere(range.sphere)) {
+        first = Math.min(first, range.start); last = Math.max(last, range.start + range.count);
+      }
+      // One ordinary indexed draw per shade, without per-frame GPU uploads or
+      // a multi-draw extension. Invisible blocks between the extremes are harmless.
+      merged.setDrawRange(first, Math.max(0, last - first));
+      lastCamera = camera; world.copy(camera.matrixWorld);
+      projection.copy(camera.projectionMatrix); model.copy(mesh.matrixWorld);
+    };
+    mesh.onBeforeRender = (_renderer, _scene, camera) => selectRange(camera);
+    mesh.onBeforeShadow = (_renderer, _object, _camera, shadowCamera) => selectRange(shadowCamera);
     mesh.name = `planning-city-buildings-${index}`;
-    mesh.userData.buildingCount = geometries.length;
+    mesh.userData.buildingCount = buildingCount;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     host.add(mesh);

@@ -61,6 +61,7 @@ function effectivelyVisible(object: THREE.Object3D): boolean {
 function viewerHarness(Viewer: typeof SceneViewer | typeof DynamicViewer | typeof PredictiveViewer) {
   const viewer = Object.create(Viewer.prototype);
   viewer.renderer = { shadowMap: { autoUpdate: false, needsUpdate: false } };
+  viewer.quality = { resize: (...args: unknown[]) => viewer.renderer.setSize(...args, false) };
   viewer.scene = new THREE.Scene();
   viewer.content = new THREE.Group();
   viewer.scene.add(viewer.content);

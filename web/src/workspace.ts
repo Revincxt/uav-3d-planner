@@ -64,7 +64,7 @@ export function mountWorkspace({ scenarios, select }: WorkspaceOptions): void {
   synchronize();
 }
 
-export function mountInspector(): void {
+export function mountInspector(onOpen?: () => void): void {
   const panel = document.querySelector<HTMLElement>(".inspector-card");
   const toolbar = document.querySelector(".stage-toolbar");
   if (!panel || !toolbar) return;
@@ -95,6 +95,7 @@ export function mountInspector(): void {
     panel.inert = !open;
     toggle.setAttribute("aria-expanded", String(open));
     toggle.title = open ? "Close inspector" : "Open inspector";
+    if (open) onOpen?.();
   });
   toolbar.append(toggle);
   document.addEventListener("keydown", (event) => {
