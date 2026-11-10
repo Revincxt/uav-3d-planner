@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      full_python_matrix:
+        description: Run all supported Python versions and the independent dataset audit
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -30,7 +35,7 @@ jobs:
           script: |
             let python = true, web = true;
             const before = context.payload.before;
-            // PRs, releases, manual runs and uncertain diffs keep full checks.
+            // PRs, releases, manual runs and uncertain diffs check all components.
             if (context.eventName === 'push' && context.ref === 'refs/heads/main' && before && !/^0+$/.test(before)) {
               try {
                 const { data } = await github.rest.repos.compareCommitsWithBasehead({
@@ -45,7 +50,7 @@ jobs:
                   web = paths.some(path => /^(web|data|src|scenarios|scripts|\.github)\/|^pyproject\.toml$/.test(path));
                 }
               } catch (error) {
-                core.warning(`Changed files unavailable; running full checks: ${error.message}`);
+                core.warning(`Changed files unavailable; checking all components: ${error.message}`);
               }
             }
             core.setOutput('python', String(python));
@@ -59,7 +64,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        # Daily regression uses one baseline; releases/manual checks cover compatibility.
+        python-version: ${{ fromJSON((startsWith(github.ref, 'refs/tags/v') || inputs.full_python_matrix == true) && '["3.11","3.12","3.13","3.14"]' || '["3.12"]') }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -80,7 +86,7 @@ jobs:
       - name: Verify curated scenarios
         run: python scripts/export_scenarios.py --check
       - name: Re-audit committed web study data
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.12' && (startsWith(github.ref, 'refs/tags/v') || inputs.full_python_matrix == true)
         run: python scripts/validate_committed_data.py
       - name: Run tests with branch coverage
         if: matrix.python-version == '3.12'
