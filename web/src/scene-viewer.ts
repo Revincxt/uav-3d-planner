@@ -122,6 +122,7 @@ export class SceneViewer {
     const drone = this.overview?.vehicle(id);
     if (!drone) return;
     this.follow ??= new DroneFollow(this.controls);
+    this.scene.add(this.follow.stars);
     this.follow.setBuildings(this.scenario?.buildings ?? []);
     this.follow.onChange = enabled => this.onFollowChange?.(enabled);
     this.follow.start(id, drone.position, this.overview!.heading(id, this.playbackTimeS), this.container.clientWidth, this.container.clientHeight);

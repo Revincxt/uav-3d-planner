@@ -60,10 +60,37 @@ function createFollowSky(): THREE.DataTexture {
   return sky;
 }
 
+/** Small, fixed sky points stay crisp without enlarging the panorama texture. */
+function createDaylightStars(): THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> {
+  const positions = [];
+  for (let i = 0; i < 36; i++) {
+    const longitude = i * Math.PI * (3 - Math.sqrt(5));
+    const elevation = THREE.MathUtils.degToRad(i % 3 === 0 ? 24 + i * 17 % 37 : 9 + i * 11 % 14);
+    positions.push(7000 * Math.cos(elevation) * Math.cos(longitude),
+      7000 * Math.sin(elevation), 7000 * Math.cos(elevation) * Math.sin(longitude));
+  }
+  const pixels = new Uint8Array(16 * 16 * 4);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const offset = (y * 16 + x) * 4, radiusSq = ((x + .5) / 8 - 1) ** 2 + ((y + .5) / 8 - 1) ** 2;
+    pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = 255;
+    pixels[offset + 3] = Math.round(255 * Math.max(0, 1 - radiusSq) ** 2);
+  }
+  const sprite = new THREE.DataTexture(pixels, 16, 16);
+  sprite.minFilter = sprite.magFilter = THREE.LinearFilter; sprite.needsUpdate = true;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  const stars = new THREE.Points(geometry, new THREE.PointsMaterial({ map: sprite,
+    color: 0xf3f6ff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: .68,
+    depthTest: true, depthWrite: false, toneMapped: false }));
+  stars.name = "follow-daylight-stars"; stars.visible = false; stars.renderOrder = -1;
+  return stars;
+}
+
 /** Close, centered chase camera; the overview and its orbit state remain untouched. */
 export class DroneFollow {
   readonly camera = new THREE.PerspectiveCamera(70, 1, 0.15, 8000);
   readonly sky = createFollowSky();
+  readonly stars = createDaylightStars();
   routeId: string | null = null;
   private previousControlsEnabled = true;
   private clock = 0;
@@ -82,7 +109,9 @@ export class DroneFollow {
   private readonly hit = new THREE.Vector3();
   private readonly seen = new Set<THREE.Box3>();
   onChange?: (enabled: boolean) => void;
-  constructor(private readonly controls: OrbitControls) {}
+  constructor(private readonly controls: OrbitControls) {
+    this.stars.layers.set(1); this.camera.layers.enable(1);
+  }
 
   setBuildings(buildings: readonly CityBox[]): void {
     if (buildings === this.buildingSource) return;
@@ -102,6 +131,7 @@ export class DroneFollow {
     if (this.routeId === null) this.previousControlsEnabled = this.controls.enabled;
     this.routeId = id; this.clock = performance.now(); this.traceTime = undefined;
     this.controls.enabled = false;
+    this.stars.visible = true;
     this.resize(width, height);
     this.place(position, heading, true, 0, 0, 0);
     this.onChange?.(true);
@@ -182,6 +212,7 @@ export class DroneFollow {
     this.camera.position.copy(position).addScaledVector(rear, this.boomDistance);
     this.camera.rotation.set(-MIN_MAP_ELEVATION_RAD, this.yaw, 0, "YXZ");
     this.camera.updateMatrixWorld(true);
+    this.stars.position.copy(this.camera.position);
     return turning || movingBoom;
   }
 
@@ -203,11 +234,16 @@ export class DroneFollow {
   stop(): void {
     if (this.routeId === null) return;
     this.routeId = null; this.traceTime = undefined;
+    this.stars.visible = false;
     this.controls.enabled = this.previousControlsEnabled;
     this.onChange?.(false);
   }
 
-  dispose(): void { this.stop(); this.sky.dispose(); }
+  dispose(): void {
+    this.stop(); this.sky.dispose();
+    this.stars.removeFromParent(); this.stars.geometry.dispose();
+    this.stars.material.map!.dispose(); this.stars.material.dispose();
+  }
 }
 
 interface FollowViewer {
