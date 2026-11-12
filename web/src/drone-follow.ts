@@ -11,20 +11,20 @@ const YAW_RESPONSE = 8, MAX_YAW_RATE = Math.PI, MAX_YAW_ACCELERATION = 3 * Math.
 const MAX_TRACE_RATE = BASE_PLAYBACK_SPEED * Math.max(...PLAYBACK_RATES);
 const PROBE_HORIZONS = [.12, .24] as const;
 
-/** World-aligned sunset and thin cloud ribbons, baked once rather than shaded per frame. */
+/** Blue evening sky with a westward sunset and thin clouds, baked once per viewer. */
 function createFollowSky(): THREE.DataTexture {
   const width = 512, height = 256, pixels = new Uint8Array(width * height * 4);
   const stops = [
-    [-90, 0xa5a9bd], [-8, 0xc4afb9], [0, 0xf3c19d], [7, 0xe8adb0],
-    [19, 0xb5a2c3], [40, 0x7e91b7], [90, 0x4d6d9a],
+    [-90, 0x9daeb9], [-8, 0xb1c2ce], [0, 0xc8d5dc], [6, 0xb0c7d9],
+    [16, 0x88aac8], [36, 0x5e87ad], [90, 0x355f8a],
   ].map(([elevation, hex]) => ({ elevation: elevation!, color: new THREE.Color(hex!) }));
-  const glow = new THREE.Color(0xffd5a0), cloudShade = new THREE.Color(0x9a829e), cloudLight = new THREE.Color(0xffd1b1);
+  const glow = new THREE.Color(0xffd09e), cloudShade = new THREE.Color(0x91a3b4), cloudLight = new THREE.Color(0xf5e2c9);
   const base = new THREE.Color(), color = new THREE.Color();
   const columns = Array.from({ length: width }, (_, column) => {
     const longitude = column / width * Math.PI * 2 - Math.PI;
-    const sunward = ((1 - Math.cos(longitude)) / 2) ** 4;
+    const sunward = ((1 - Math.cos(longitude)) / 2) ** 6;
     return { sunward, wave4: longitude * 4, wave9: longitude * 9, wave17: longitude * 17,
-      warp: Math.sin(longitude * 2), cloud: cloudShade.clone().lerp(cloudLight, .45 + .45 * sunward) };
+      warp: Math.sin(longitude * 2), cloud: cloudShade.clone().lerp(cloudLight, .2 + .55 * sunward) };
   });
   for (let row = 0; row < height; row++) {
     const elevation = row / (height - 1) * 180 - 90;
@@ -32,16 +32,16 @@ function createFollowSky(): THREE.DataTexture {
     const left = stops[Math.max(0, upper - 1)]!, right = stops[upper]!;
     const fraction = right.elevation === left.elevation ? 0 : (elevation - left.elevation) / (right.elevation - left.elevation);
     base.copy(left.color).lerp(right.color, THREE.MathUtils.smoothstep(fraction, 0, 1));
-    const haze = Math.exp(-(((elevation - 2) / 10) ** 2));
+    const haze = Math.exp(-(((elevation - 1) / 7.5) ** 2));
     const cloudBand = Math.exp(-(((elevation - 13) / 7) ** 2)) + .35 * Math.exp(-(((elevation - 27) / 5) ** 2));
     for (let column = 0; column < width; column++) {
       const { sunward, wave4, wave9, wave17, warp, cloud } = columns[column]!;
       // The warmer glow stays in the geographic west as the aircraft turns.
-      color.copy(base).lerp(glow, sunward * haze * .32);
+      color.copy(base).lerp(glow, sunward * haze * .65);
       if (cloudBand > .005) {
         const wisps = .5 + .23 * Math.sin(wave4 + elevation * .75 + warp)
           + .14 * Math.sin(wave9 - elevation * 1.3) + .08 * Math.sin(wave17 + elevation * 2.1);
-        color.lerp(cloud, THREE.MathUtils.smoothstep(wisps, .52, .82) * cloudBand * (.42 + .24 * sunward));
+        color.lerp(cloud, THREE.MathUtils.smoothstep(wisps, .52, .82) * cloudBand * (.22 + .18 * sunward));
       }
       color.convertLinearToSRGB();
       const offset = (row * width + column) * 4;
