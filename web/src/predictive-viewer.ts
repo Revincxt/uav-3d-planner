@@ -180,6 +180,7 @@ export class PredictiveViewer {
     this.scene.add(this.follow.stars);
     this.follow.setBuildings(this.scenario?.buildings ?? []);
     this.follow.onChange = active => this.onFollowChange?.(active);
+    this.follow.onSkyChange = () => this.frames.request();
     this.follow.start(id, drone.position, this.overview!.heading(id, this.playbackTimeS), this.container.clientWidth, this.container.clientHeight);
     this.render();
   }

@@ -62,12 +62,15 @@ function createFollowSky(): THREE.DataTexture {
 
 /** Small, fixed sky points stay crisp without enlarging the panorama texture. */
 function createDaylightStars(): THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> {
-  const positions = [];
-  for (let i = 0; i < 36; i++) {
+  const positions = [], colors = [];
+  for (let i = 0; i < 32; i++) {
     const longitude = i * Math.PI * (3 - Math.sqrt(5));
-    const elevation = THREE.MathUtils.degToRad(i % 3 === 0 ? 24 + i * 17 % 37 : 9 + i * 11 % 14);
+    // Leave the bright western sunset clear; keep stars inside the chase view.
+    if (Math.cos(longitude) < -.55) continue;
+    const elevation = THREE.MathUtils.degToRad(6 + 9 * (i * Math.SQRT2 % 1));
     positions.push(7000 * Math.cos(elevation) * Math.cos(longitude),
       7000 * Math.sin(elevation), 7000 * Math.cos(elevation) * Math.sin(longitude));
+    colors.push(1, 1, 1, .65 + .35 * (i * Math.sqrt(3) % 1));
   }
   const pixels = new Uint8Array(16 * 16 * 4);
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
@@ -79,8 +82,9 @@ function createDaylightStars(): THREE.Points<THREE.BufferGeometry, THREE.PointsM
   sprite.minFilter = sprite.magFilter = THREE.LinearFilter; sprite.needsUpdate = true;
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 4).setUsage(THREE.DynamicDrawUsage));
   const stars = new THREE.Points(geometry, new THREE.PointsMaterial({ map: sprite,
-    color: 0xf3f6ff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: .68,
+    color: 0xffffff, vertexColors: true, size: 3.6, sizeAttenuation: false, transparent: true, opacity: .9,
     depthTest: true, depthWrite: false, toneMapped: false }));
   stars.name = "follow-daylight-stars"; stars.visible = false; stars.renderOrder = -1;
   return stars;
@@ -108,9 +112,15 @@ export class DroneFollow {
   private readonly ray = new THREE.Ray();
   private readonly hit = new THREE.Vector3();
   private readonly seen = new Set<THREE.Box3>();
+  private readonly starAlpha: Float32Array;
+  private starSampleMs = -Infinity;
+  private starTimer?: ReturnType<typeof setInterval>;
   onChange?: (enabled: boolean) => void;
+  onSkyChange?: () => void;
   constructor(private readonly controls: OrbitControls) {
     this.stars.layers.set(1); this.camera.layers.enable(1);
+    const colors = this.stars.geometry.getAttribute("color");
+    this.starAlpha = Float32Array.from({ length: colors.count }, (_, i) => colors.getW(i));
   }
 
   setBuildings(buildings: readonly CityBox[]): void {
@@ -134,6 +144,9 @@ export class DroneFollow {
     this.stars.visible = true;
     this.resize(width, height);
     this.place(position, heading, true, 0, 0, 0);
+    if (this.onSkyChange && this.starTimer === undefined) this.starTimer = setInterval(() => {
+      if (typeof document === "undefined" || !document.hidden) this.onSkyChange?.();
+    }, 180);
     this.onChange?.(true);
   }
 
@@ -145,6 +158,16 @@ export class DroneFollow {
 
   update(position: THREE.Vector3, heading: THREE.Vector3, timeS: number, now = performance.now(), path?: readonly RouteWaypoint[]): boolean {
     if (!this.routeId) return false;
+    if (now - this.starSampleMs >= 125) {
+      const colors = this.stars.geometry.getAttribute("color"), seconds = now / 1000;
+      for (let i = 0; i < colors.count; i++) {
+        const phase = i * 2.399963;
+        const shimmer = .835 + .13 * Math.sin(seconds * (.9 + i * .37 % .8) + phase)
+          + .035 * Math.sin(seconds * 2.3 + phase * 1.7);
+        colors.setW(i, this.starAlpha[i]! * shimmer);
+      }
+      colors.needsUpdate = true; this.starSampleMs = now;
+    }
     const elapsed = Math.max(0, (now - this.clock) / 1000);
     const advance = this.traceTime === undefined ? 0 : timeS - this.traceTime;
     // Normal 2× playback advances eight trace seconds per wall second. A slow
@@ -235,6 +258,8 @@ export class DroneFollow {
     if (this.routeId === null) return;
     this.routeId = null; this.traceTime = undefined;
     this.stars.visible = false;
+    if (this.starTimer !== undefined) clearInterval(this.starTimer);
+    this.starTimer = undefined;
     this.controls.enabled = this.previousControlsEnabled;
     this.onChange?.(false);
   }
