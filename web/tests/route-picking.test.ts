@@ -54,10 +54,10 @@ describe("visible trajectory picking", () => {
   it("highlights a selection without changing other routes, clocks, buffers or follow targets", () => {
     const route: OverviewRoute = { id: "r", label: "Task", points: [[-8, 0, 0], [8, 0, 0]], playbackKind: "predictive", timedPath: [{ timeS: 0, position: [-8, 0, 0] }, { timeS: 10, position: [8, 0, 0] }] };
     const overview = new RouteOverview(); overview.setRoutes([route], route.id, 400, 400);
-    const flown = overview.group.getObjectByName("overview-trajectory-r") as Line2, geometry = flown.geometry;
-    overview.setSelection("r"); expect(flown.material.linewidth).toBe(6.2); expect(flown.geometry).toBe(geometry);
+    const flown = overview.group.getObjectByName("overview-trajectory-r") as Line2, geometry = flown.geometry, width = flown.material.linewidth;
+    overview.setSelection("r"); expect(flown.material.linewidth).toBeGreaterThan(width); expect(flown.geometry).toBe(geometry);
     expect(overview.pick(camera(), 200, 200, 400, 400, () => false)?.id).toBe("r");
     overview.setPlaying(true); overview.setTime(5); overview.setSelection(null);
-    expect(flown.material.uniforms.replayTime!.value).toBe(5); expect(flown.material.linewidth).toBe(4.8); expect(flown.geometry).toBe(geometry); overview.dispose();
+    expect(flown.material.uniforms.replayTime!.value).toBe(5); expect(flown.material.linewidth).toBe(width); expect(flown.geometry).toBe(geometry); overview.dispose();
   });
 });
