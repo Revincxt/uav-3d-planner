@@ -41,15 +41,29 @@ describe("flight semantics", () => {
     expect(planMeaning({ ...route, playbackKind: "reactive", plannedFrames: [] })).toBe("local");
     expect(planMeaning({ ...route, playbackKind: "fixed" })).toBe("fixed");
   });
-  it("aligns remaining-route appearance without inventing scheduled knowledge for reactive algorithms", () => {
-    const overview = new RouteOverview();
-    for (const playbackKind of ["reactive", "predictive"] as const) {
-      overview.setRoutes([{ ...route, playbackKind, points: route.timedPath!.map(w => w.position) }], route.id, 800, 600);
+  it("keeps mission colors while distinguishing fixed, local, scheduled and recorded futures", () => {
+    const overview = new RouteOverview(), points = route.timedPath!.map(w => w.position);
+    const localFrames = [{ timeS: 0, path: points }] as NonNullable<OverviewRoute["plannedFrames"]>;
+    const choices: Array<{ displayed: OverviewRoute; meaning: string; lead: boolean }> = [
+      { displayed: { ...route, points, playbackKind: "fixed" }, meaning: "fixed", lead: false },
+      { displayed: { ...route, points, playbackKind: "reactive", plannedFrames: localFrames }, meaning: "local", lead: true },
+      { displayed: { ...route, points }, meaning: "scheduled", lead: true },
+      { displayed: { ...route, points, playbackKind: "reactive" }, meaning: "recorded", lead: false },
+    ];
+    for (const { displayed, meaning, lead } of choices) {
+      overview.setRoutes([displayed], route.id, 800, 600);
       const pending = overview.group.getObjectByName(`overview-plan-${route.id}`) as Line2;
-      expect(pending.material.color.getHex()).toBe(routeColor(0)); expect(pending.material.linewidth).toBe(3); expect(pending.material.dashed).toBe(true); expect(pending.material.dashSize).toBe(14);
-      expect(pending.userData.meaning).toBe(playbackKind === "predictive" ? "scheduled" : "recorded");
+      expect(pending.material.color.getHex()).toBe(routeColor(0));
+      expect(pending.material.depthTest).toBe(true);
+      expect(pending.material.dashed).toBe(meaning !== "fixed");
+      if (meaning === "recorded") expect(pending.material.dashSize).toBeLessThan(pending.material.gapSize);
+      else if (meaning !== "fixed") expect(pending.material.dashSize).toBeGreaterThan(pending.material.linewidth);
+      expect(pending.userData.meaning).toBe(meaning);
+      expect(Boolean(overview.group.getObjectByName(`overview-lookahead-${route.id}`))).toBe(lead);
+      expect(Boolean(overview.group.getObjectByName(`overview-time-marks-${route.id}`))).toBe(meaning === "scheduled");
     }
-    expect(PLAN_LABELS.scheduled).toBe(PLAN_LABELS.recorded); overview.dispose();
+    expect(PLAN_LABELS.scheduled).not.toBe(PLAN_LABELS.recorded);
+    overview.dispose();
   });
   it("stabilizes a tiny backtracking knot without changing coordinates or time", () => {
     const path = [
@@ -69,12 +83,15 @@ describe("flight semantics", () => {
     const flown = overview.group.getObjectByName(`overview-trajectory-${route.id}`) as Line2;
     const pending = overview.group.getObjectByName(`overview-plan-${route.id}`) as Line2;
     expect(overview.group.userData.presentation).toBe("result-preview");
-    expect(flown.material.uniforms.replayTime!.value).toBe(10);
-    expect(pending.visible).toBe(false);
+    expect(flown.material.uniforms.replayTime!.value).toBe(0);
+    expect(pending.visible).toBe(true);
     overview.setPlaying(true); overview.setTime(5); overview.setPlaying(false);
     expect(overview.group.userData.presentation).toBe("paused");
     expect(flown.material.uniforms.replayTime!.value).toBe(5);
-    expect(pending.material.uniforms.windowStart!.value).toBe(5);
+    const near = overview.group.getObjectByName(`overview-lookahead-${route.id}`) as Line2 | undefined;
+    const immediate = near?.visible ? near : pending;
+    expect(immediate.material.uniforms.windowStart!.value).toBe(5);
+    if (near?.visible) expect(pending.material.uniforms.windowStart!.value).toBe(near.material.uniforms.windowEnd!.value);
     expect(pending.material.uniforms.windowEnd!.value).toBe(10);
     expect(pending.visible).toBe(true);
     expect(pending.geometry).not.toBe(flown.geometry);
@@ -82,7 +99,8 @@ describe("flight semantics", () => {
     expect(pending.visible).toBe(false);
     overview.setTime(0);
     expect(overview.group.userData.presentation).toBe("result-preview");
-    expect(flown.material.uniforms.replayTime!.value).toBe(10);
+    expect(flown.material.uniforms.replayTime!.value).toBe(0);
+    expect(pending.visible).toBe(true);
     overview.dispose();
   });
   it("marks only genuine holds, not a finished mission or a vertical climb", () => {

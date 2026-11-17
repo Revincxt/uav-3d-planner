@@ -17,6 +17,8 @@ describe("faithful temporal route presentation", () => {
     expect(material.uniforms.windowStart).toBe(window.start); expect(material.uniforms.windowEnd).toBe(window.end);
     expect(material.vertexShader).toContain("vec4( clippedStart, 1.0 )");
     expect(material.vertexShader).toContain("vec4( clippedEnd, 1.0 )");
+    expect(material.vertexShader).toContain("dashScale * mix(instanceDistanceStart, instanceDistanceEnd, from)");
+    expect(material.vertexShader).toContain("dashScale * mix(instanceDistanceStart, instanceDistanceEnd, to)");
     expect(material.fragmentShader).toContain("windowVisible < 0.5) discard");
     expect(material.depthTest).toBe(true);
     geometry.dispose(); material.dispose();
@@ -60,7 +62,7 @@ describe("faithful temporal route presentation", () => {
     const line = overview.group.getObjectByName("overview-trajectory-one") as Line2;
     const halo = overview.group.getObjectByName("overview-outline-one") as Line2;
     expect(halo.geometry).toBe(line.geometry);
-    expect(line.geometry.instanceCount).toBe(20);
+    expect(line.geometry.instanceCount).toBe(2);
     overview.setPlaying(true);
     const upload = vi.spyOn(line.geometry, "setPositions");
     const positions = line.geometry.getAttribute("instanceStart");
@@ -77,24 +79,30 @@ describe("faithful temporal route presentation", () => {
     overview.dispose();
   });
 
-  it.each(["reactive", "predictive"] as const)("shows the complete %s result at time zero and restores the real clock on playback", kind => {
+  it.each(["fixed", "reactive", "predictive"] as const)("never presents the future %s route as already flown", kind => {
     const route: OverviewRoute = { id: "one", label: "One", plannerId: "selected-planner", points: [[0, 0, 10], [100, 0, 10]],
       timedPath: [{ timeS: 0, position: [0, 0, 10] }, { timeS: 10, position: [100, 0, 10] }], playbackKind: kind };
     const overview = new RouteOverview(); overview.setRoutes([route], route.id, 800, 600);
     const line = overview.group.getObjectByName("overview-trajectory-one") as Line2;
-    const clock = line.material.uniforms.replayTime!, pending = overview.group.getObjectByName("overview-plan-one");
+    const clock = line.material.uniforms.replayTime!, pending = overview.group.getObjectByName("overview-plan-one") as Line2;
     const upload = vi.spyOn(line.geometry, "setPositions");
-    expect(clock.value).toBe(10); expect(overview.group.userData.presentation).toBe("result-preview");
-    if (pending) expect(pending.visible).toBe(false);
+    expect(clock.value).toBe(0); expect(overview.group.userData.presentation).toBe("result-preview");
+    expect(pending.visible).toBe(true);
+    const near = overview.group.getObjectByName("overview-lookahead-one") as Line2 | undefined;
+    const firstFuture = near?.visible ? near : pending;
+    expect(firstFuture.material.uniforms.windowStart!.value).toBe(0);
+    if (near?.visible) expect(pending.material.uniforms.windowStart!.value).toBe(near.material.uniforms.windowEnd!.value);
+    expect(pending.material.uniforms.windowEnd!.value).toBe(10);
     overview.setPlaying(true); expect(clock.value).toBe(0);
-    if (pending) expect(pending.visible).toBe(true);
     overview.setTime(4); expect(clock.value).toBe(4);
     const position = overview.vehicle(route.id)!.position.clone();
     overview.setPlaying(false); expect(clock.value).toBe(4);
     expect(overview.vehicle(route.id)!.position.equals(position)).toBe(true);
-    if (pending) expect(pending.visible).toBe(true);
+    expect(pending.visible).toBe(true);
     overview.setPlaying(true); expect(clock.value).toBe(4);
-    overview.setTime(10); if (pending) expect(pending.visible).toBe(false);
+    overview.setTime(10); expect(pending.visible).toBe(false);
+    overview.setPlaying(false); overview.setTime(0);
+    expect(clock.value).toBe(0); expect(pending.visible).toBe(true);
     expect(upload).not.toHaveBeenCalled(); overview.dispose();
   });
 

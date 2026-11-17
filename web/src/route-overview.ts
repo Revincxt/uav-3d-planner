@@ -16,6 +16,7 @@ import type { DisplayCamera } from "./camera-scale";
 import { staticPlaybackPath } from "./static-playback";
 import { revealReplayLine, revealReplayWindow } from "./replay-line";
 import { flightPhase, planMeaning } from "./trajectory-semantics";
+import { dynamicAvoidanceEvents } from "./flight-announcements";
 import { metresPerPixelAt } from "./camera-scale";
 import type { PlaybackKind } from "./playback-state";
 import type { DynamicFrame } from "./dynamic-schema";
@@ -36,6 +37,7 @@ export interface OverviewRoute {
   cruiseSpeedMps?: number;
   maxClimbRateMps?: number;
   waits?: { startTimeS: number; endTimeS: number; reason: string; position: RoutePoint }[];
+  rerouteTimes?: readonly number[];
 }
 
 // Color identifies the mission, never the planner or qualification status.
@@ -191,7 +193,8 @@ export function dynamicRoutes(scenarios: DynamicScenario[], planner: string): Ov
     if (!timedPath?.length) throw new Error(`Missing exact ${planner} trace in ${s.id}`);
     const route: OverviewRoute = { id: s.id, plannerId: planner, label: s.label, mission: s.mission, points: run.frames.at(-1)!.executedPath, timedPath,
       playbackKind: "reactive", plannedFrames: run.frames, cruiseSpeedMps: Number(run.parameters.cruiseSpeedMps),
-      maxClimbRateMps: run.parameters.maxClimbRateMps };
+      maxClimbRateMps: run.parameters.maxClimbRateMps,
+      rerouteTimes: dynamicAvoidanceEvents(s, run).filter(event => event.kind === "reroute").map(event => event.timeS) };
     cache.set(planner, route);
     return route;
   });
@@ -223,6 +226,9 @@ interface RouteVisual {
   clock?: { value: number }; pending?: Line2; planFrame?: DynamicFrame;
   planTimes?: Float64Array;
   window?: ReturnType<typeof revealReplayWindow>; hold?: THREE.Group;
+  lead?: Line2; leadWindow?: ReturnType<typeof revealReplayWindow>;
+  ticks?: THREE.InstancedMesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  preview?: boolean;
   tasks?: THREE.InstancedMesh; start: THREE.Object3D; goal: THREE.Object3D;
 }
 
@@ -237,6 +243,8 @@ export class RouteOverview {
   private readonly position: RoutePoint = [0, 0, 0];
   private readonly point = new THREE.Vector3();
   private readonly screenUp = new THREE.Vector3();
+  private readonly tickMatrix = new THREE.Matrix4();
+  private readonly tickScale = new THREE.Vector3();
   constructor() { this.group.name = "mission-route-overview"; this.group.userData.presentation = "result-preview"; }
 
   setRoutes(routes: OverviewRoute[], activeId: string, width: number, height: number): void {
@@ -246,6 +254,7 @@ export class RouteOverview {
       return route.id === previous.id && route.plannerId === previous.plannerId && route.mission === previous.mission
         && route.playbackKind === previous.playbackKind && route.plannedFrames === previous.plannedFrames
         && route.cruiseSpeedMps === previous.cruiseSpeedMps && route.maxClimbRateMps === previous.maxClimbRateMps && route.waits === previous.waits
+        && route.rerouteTimes === previous.rerouteTimes
         && (route.timedPath ? route.timedPath === previous.timedPath : route.points === previous.points);
     })) {
       this.setFocus(activeId);
@@ -254,6 +263,7 @@ export class RouteOverview {
     }
     this.clear();
     let gateGeometry: THREE.BufferGeometry | undefined;
+    let tickGeometry: THREE.RingGeometry | undefined;
     routes.forEach((route, index) => {
       if (route.points.length < 2) throw new Error(`Empty overview route: ${route.id}`);
       const color = routeColor(index), group = new THREE.Group();
@@ -262,7 +272,7 @@ export class RouteOverview {
       const geometry = new LineGeometry();
       const reveal = route.timedPath && route.playbackKind;
       geometry.setPositions((reveal ? route.timedPath!.map(w => w.position) : route.points).flatMap(enuToThree));
-      const material = new LineMaterial({ linewidth: 4, worldUnits: false, color,
+      const material = new LineMaterial({ linewidth: 4, worldUnits: false, color, transparent: true,
         depthTest: true, depthWrite: false, alphaToCoverage: true });
       material.resolution.set(Math.max(1, width), Math.max(1, height));
       const haloMaterial = new LineMaterial({ linewidth: 6.5, worldUnits: false, color: 0xffffff,
@@ -278,6 +288,7 @@ export class RouteOverview {
       const clock = reveal ? revealReplayLine(geometry, route.timedPath!.map(w => w.timeS), [material, haloMaterial]) : undefined;
       let pending: Line2 | undefined;
       let window: RouteVisual["window"];
+      let lead: Line2 | undefined, leadWindow: RouteVisual["leadWindow"], ticks: RouteVisual["ticks"];
       const planTimes = route.plannedFrames
         ? new Float64Array(Math.max(2, ...route.plannedFrames.map(frame => frame.path.length))) : undefined;
       if (route.playbackKind) {
@@ -288,9 +299,11 @@ export class RouteOverview {
           pendingGeometry.setPositions(new Float32Array(planTimes.length * 3));
           (pendingGeometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute).data.setUsage(THREE.DynamicDrawUsage);
         }
-        const pendingMaterial = new LineMaterial({ linewidth: 3, worldUnits: false,
-          color, dashed: meaning !== "fixed", dashSize: 14, gapSize: 9,
-          transparent: true, opacity: 0.85, depthTest: true, depthWrite: false });
+        const pendingMaterial = new LineMaterial({ linewidth: meaning === "fixed" ? 3 : 2.6, worldUnits: false,
+          color, dashed: meaning !== "fixed", dashSize: meaning === "recorded" ? 2 : meaning === "scheduled" ? 26 : 18,
+          gapSize: meaning === "recorded" ? 18 : 20,
+          transparent: true, opacity: meaning === "fixed" ? .68 : meaning === "recorded" ? .72 : .5,
+          depthTest: true, depthWrite: false });
         pendingMaterial.resolution.copy(material.resolution);
         pending = new Line2(pendingGeometry, pendingMaterial);
         pending.name = `overview-plan-${route.id}`; pending.renderOrder = 1;
@@ -298,6 +311,24 @@ export class RouteOverview {
         pending.computeLineDistances();
         window = revealReplayWindow(pendingGeometry, planTimes ?? route.timedPath!.map(w => w.timeS), pendingMaterial);
         group.add(pending);
+        if (meaning === "local" || meaning === "scheduled") {
+          const leadMaterial = new LineMaterial({ color, linewidth: 4.8, worldUnits: false,
+            dashed: true, dashSize: pendingMaterial.dashSize, gapSize: pendingMaterial.gapSize,
+            transparent: true, opacity: 1, depthTest: true, depthWrite: false, alphaToCoverage: true });
+          leadMaterial.resolution.copy(material.resolution);
+          lead = new Line2(pendingGeometry, leadMaterial);
+          lead.name = `overview-lookahead-${route.id}`; lead.renderOrder = 2;
+          leadWindow = revealReplayWindow(pendingGeometry, planTimes ?? route.timedPath!.map(w => w.timeS), leadMaterial);
+          group.add(lead);
+          if (meaning === "scheduled") {
+            ticks = new THREE.InstancedMesh(tickGeometry ??= new THREE.RingGeometry(.58, 1, 16),
+              new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .95, side: THREE.DoubleSide,
+                depthTest: true, depthWrite: false }), 4);
+            ticks.name = `overview-time-marks-${route.id}`; ticks.visible = false;
+            ticks.instanceMatrix.setUsage(THREE.DynamicDrawUsage); ticks.frustumCulled = false;
+            ticks.renderOrder = 4; group.add(ticks);
+          }
+        }
       }
       const endpoints = {} as { start: THREE.Object3D; goal: THREE.Object3D };
       for (const role of ["start", "goal"] as const) {
@@ -341,7 +372,8 @@ export class RouteOverview {
         }
         group.add(hold);
       }
-      this.visuals.push({ route, group, line, halo, vehicle, clock, pending, window, planTimes, hold, tasks: markers, ...endpoints });
+      this.visuals.push({ route, group, line, halo, vehicle, clock, pending, window, planTimes, lead, leadWindow, ticks,
+        hold, tasks: markers, ...endpoints });
       this.group.add(group);
       for (const point of route.points) this.bounds.expandByPoint(this.point.set(point[0], point[2], -point[1]));
     });
@@ -364,15 +396,40 @@ export class RouteOverview {
     for (const visual of this.visuals) this.styleSelection(visual);
   }
   private styleSelection(visual: RouteVisual): void {
-    const selected = visual.route.id === this.selectedId, focused = visual.group.userData.focused;
-    visual.line.material.linewidth = selected ? 6.2 : focused ? 4.8 : 4;
-    visual.halo.material.linewidth = selected ? 9.2 : focused ? 7.3 : 6.5;
-    if (visual.pending) visual.pending.material.linewidth = selected ? 4.5 : 3;
+    const selected = visual.route.id === this.selectedId, primary = this.highlighted(visual);
+    const meaning = planMeaning(visual.route), resultPreview = visual.preview && meaning === "local";
+    visual.line.material.linewidth = resultPreview ? primary ? 1.9 : 1.1 : primary ? selected ? 4.4 : 3.8 : 1.7;
+    visual.line.material.opacity = resultPreview ? primary ? .24 : .17 : primary ? 1 : .34;
+    visual.line.material.alphaToCoverage = primary && !resultPreview;
+    visual.halo.visible = primary && !resultPreview;
+    visual.halo.material.linewidth = selected ? 6 : 5.2;
+    if (visual.pending) {
+      visual.pending.material.linewidth = primary ? meaning === "fixed" ? 2.6 : 2.2 : 1.2;
+      visual.pending.material.opacity = primary ? meaning === "fixed" || meaning === "recorded" ? .72 : .45 : .28;
+    }
     visual.group.userData.selected = selected;
+    this.updateLookahead(visual);
+  }
+  private highlighted(visual: RouteVisual): boolean {
+    return this.selectedId ? visual.route.id === this.selectedId : Boolean(visual.group.userData.focused);
+  }
+  private updateLookahead(visual: RouteVisual): void {
+    const { lead, leadWindow, route } = visual;
+    if (!lead || !leadWindow) return;
+    lead.visible = this.highlighted(visual) && Boolean(visual.pending?.visible) && leadWindow.end.value > leadWindow.start.value;
+    // The bright near segment and faint far context occupy disjoint windows.
+    if (visual.window) visual.window.start.value = lead.visible ? leadWindow.end.value : leadWindow.start.value;
+    let emphasis = 0;
+    for (let i = (route.rerouteTimes?.length ?? 0) - 1; i >= 0; i--) {
+      const age = this.timeS - route.rerouteTimes![i]!;
+      if (age >= 0) { emphasis = Math.max(0, 1 - age / 8); break; }
+    }
+    lead.material.linewidth = (visual.group.userData.selected ? 4.2 : 3.6) + emphasis;
+    if (visual.ticks) visual.ticks.visible = lead.visible;
   }
   pick(camera: DisplayCamera, x: number, y: number, width: number, height: number,
     occluded: (point: THREE.Vector3) => boolean, radius = 7): RoutePick | null {
-    return pickVisibleRoutes(this.visuals.map(v => ({ id: v.route.id, lines: [v.line, v.pending] })), camera, x, y, width, height, occluded, radius);
+    return pickVisibleRoutes(this.visuals.map(v => ({ id: v.route.id, lines: [v.line, v.pending, v.lead] })), camera, x, y, width, height, occluded, radius);
   }
 
   setTime(timeS: number): void {
@@ -380,16 +437,21 @@ export class RouteOverview {
     const preview = !this.playing && timeS <= 0;
     this.group.userData.presentation = preview ? "result-preview" : this.playing ? "playback" : "paused";
     for (const visual of this.visuals) {
-      const { route, vehicle, clock, pending, window, hold } = visual;
-      // Only the initial map is a result preview. Pause/seek retain the actual
-      // elapsed/future split, rather than revealing all eight futures as flown.
+      const { route, vehicle, clock, pending, window, hold, lead, leadWindow } = visual;
+      const meaning = planMeaning(route), resultPreview = preview && meaning === "local";
+      // A reactive page can preview its complete recorded result, but that faint
+      // context is distinct from the current plan available to the aircraft.
+      if (visual.preview !== preview) {
+        visual.preview = preview;
+        this.styleSelection(visual);
+      }
       if (clock) {
-        clock.value = preview ? route.timedPath!.at(-1)!.timeS : timeS;
+        clock.value = resultPreview ? route.timedPath!.at(-1)!.timeS : timeS;
         // Skip the unreached suffix before vertex shading. Keep a boundary segment
         // for Float32 clock rounding; the existing shader still trims it exactly.
         visual.line.geometry.instanceCount = Math.min(route.timedPath!.length - 1, waypointIndex(route.timedPath!, clock.value) + 2);
       }
-      if (pending) pending.visible = !preview && timeS < route.timedPath!.at(-1)!.timeS;
+      if (pending) pending.visible = timeS < route.timedPath!.at(-1)!.timeS;
       if (window) { window.start.value = timeS; window.end.value = route.timedPath!.at(-1)!.timeS; }
       if (pending && route.plannedFrames) {
         const frame = route.plannedFrames[waypointIndex(route.plannedFrames, timeS)]!;
@@ -412,6 +474,11 @@ export class RouteOverview {
           visual.window.start.value = localPlanClock(route, frame.timeS, timeS);
           visual.window.end.value = 1e9;
         }
+      }
+      if (lead && leadWindow && visual.window) {
+        leadWindow.start.value = visual.window.start.value;
+        leadWindow.end.value = Math.min(visual.window.end.value, leadWindow.start.value + (meaning === "scheduled" ? 20 : 30));
+        this.updateLookahead(visual);
       }
       if (!vehicle || !route.timedPath) continue;
       // Finished missions remain at their real goal; no looping or invented continuation.
@@ -460,6 +527,7 @@ export class RouteOverview {
       visual.line.material.resolution.set(width, height);
       visual.halo.material.resolution.set(width, height);
       visual.pending?.material.resolution.set(width, height);
+      visual.lead?.material.resolution.set(width, height);
     }
   }
 
@@ -470,17 +538,36 @@ export class RouteOverview {
   }
   updateSymbols(camera: DisplayCamera, height: number, followedId: string | null = null): void {
     this.screenUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
-    for (const { vehicle, group, route, hold, tasks, start, goal } of this.visuals) if (vehicle) {
+    for (const { vehicle, group, route, hold, tasks, start, goal, ticks, pending, lead } of this.visuals) if (vehicle) {
       const followed = route.id === followedId;
       vehicle.visible = true;
       sizeDrone(vehicle, camera, height, followed ? Math.min(128, Math.max(24, height * 0.18)) : group.userData.focused ? 32 : 24,
         followed ? 0 : 0.8);
+      // In chase views use the street ahead, rather than the nearby aircraft,
+      // as the dash scale reference; distant curves then retain readable gaps.
+      if (camera instanceof THREE.PerspectiveCamera) this.point.set(0, 0, -80).applyQuaternion(camera.quaternion).add(camera.position);
+      else this.point.copy(vehicle.position);
+      const dashScale = 1 / Math.max(.01, metresPerPixelAt(camera, this.point, height));
+      if (pending?.material.dashed) pending.material.dashScale = dashScale;
+      if (lead) lead.material.dashScale = dashScale;
       if (hold?.visible) {
         const scale = metresPerPixelAt(camera, vehicle.position, height) * 11;
         hold.scale.setScalar(scale); hold.quaternion.copy(camera.quaternion);
         hold.position.copy(vehicle.position).addScaledVector(this.screenUp, scale * 2.7);
       }
       if (tasks) tasks.visible = !group.userData.focused && route.id !== followedId;
+      if (ticks?.visible) {
+        let count = 0;
+        for (let ahead = 5; ahead <= 20; ahead += 5) {
+          if (this.timeS + ahead >= route.timedPath!.at(-1)!.timeS) break;
+          const position = timedPosition(route.timedPath!, this.timeS + ahead, this.position);
+          this.point.set(position[0], position[2], -position[1]);
+          this.tickScale.setScalar(metresPerPixelAt(camera, this.point, height) * 3.6);
+          this.tickMatrix.compose(this.point, camera.quaternion, this.tickScale);
+          ticks.setMatrixAt(count++, this.tickMatrix);
+        }
+        ticks.count = count; ticks.instanceMatrix.needsUpdate = true;
+      }
       // The hollow finish stays visible; only the start marker yields to the body.
       start.visible = start.position.distanceTo(vehicle.position) > Math.max(15, vehicle.scale.x);
       goal.visible = true;

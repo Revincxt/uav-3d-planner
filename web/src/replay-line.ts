@@ -38,6 +38,9 @@ varying float windowVisible;\n` + material.vertexShader;
     vec3 clippedEnd = mix(instanceStart, instanceEnd, to > from ? to : 1.0);`);
   material.vertexShader = material.vertexShader.replace("vec4( instanceStart, 1.0 )", "vec4( clippedStart, 1.0 )");
   material.vertexShader = material.vertexShader.replace("vec4( instanceEnd, 1.0 )", "vec4( clippedEnd, 1.0 )");
+  // Clip the distance domain too, so a partial segment preserves its dash phase.
+  material.vertexShader = material.vertexShader.replace("dashScale * instanceDistanceStart", "dashScale * mix(instanceDistanceStart, instanceDistanceEnd, from)");
+  material.vertexShader = material.vertexShader.replace("dashScale * instanceDistanceEnd", "dashScale * mix(instanceDistanceStart, instanceDistanceEnd, to)");
   material.fragmentShader = "varying float windowVisible;\n" + material.fragmentShader;
   material.fragmentShader = material.fragmentShader.replace("void main() {", "void main() { if (windowVisible < 0.5) discard;");
   material.needsUpdate = true;

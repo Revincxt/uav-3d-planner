@@ -114,6 +114,25 @@ describe("retained flight HUD", () => {
     f.hud.update({ ...route, timedPath: [] }, 0, 0);
     expect(f.root.hidden).toBe(true);
   });
+  it.each([
+    { meaning: "fixed", displayed: { ...route, playbackKind: "fixed" as const }, label: "Fixed route", preview: "", title: "does not change the plan" },
+    { meaning: "local", displayed: { ...route, playbackKind: "reactive" as const, plannedFrames: [] }, label: "Local plan", preview: "Result", title: "30 seconds" },
+    { meaning: "scheduled", displayed: { ...route, playbackKind: "predictive" as const }, label: "Timed route", preview: "", title: "5-second intervals" },
+    { meaning: "recorded", displayed: { ...route, playbackKind: "reactive" as const }, label: "Recorded path", preview: "", title: "no intermediate reactive plans" },
+  ])("distinguishes $meaning route knowledge and its initial preview from flown history", ({ meaning, displayed, label, preview, title }) => {
+    const f = fixture(), history = f.fields.get(".hud-key-flown")!;
+    f.hud.update(displayed, 0, 0, true);
+    expect(f.root.dataset.planMeaning).toBe(meaning);
+    expect(f.fields.get(".hud-key-plan")!.textContent).toBe(label);
+    expect(f.fields.get(".hud-key-plan")).toHaveProperty("title", expect.stringContaining(title));
+    expect(history.textContent).toBe(preview); expect(history.hidden).toBe(!preview);
+    expect(history.dataset.kind).toBe(preview === "Result" ? "result" : "flown");
+    f.hud.update(displayed, 7.5, 0, true);
+    expect(history.textContent).toBe("Flown"); expect(history.hidden).toBe(false);
+    expect(history.dataset.kind).toBe("flown");
+    f.hud.update(displayed, 0, 0, true);
+    expect(history.textContent).toBe(preview); expect(history.hidden).toBe(!preview);
+  });
   it("retains one concise altitude hint and clears it immediately when seeking into a wait", () => {
     const f = fixture(), hint = f.fields.get(".hud-altitude-trend")!;
     f.hud.update(route, 7.5, 0);

@@ -91,7 +91,7 @@ export class FlightHud {
       <div class="hud-readouts" role="group" aria-label="Flight instruments">${instrumentDial("speed", "SPD", "m/s")}
       <div class="hud-reading hud-heading-reading"><span>HDG <small>°</small></span><output data-readout="heading">—</output></div>
       ${instrumentDial("altitude", "ALT", "m")}</div>
-      </div><div class="hud-heading" role="group" aria-label="Aircraft and route legend"><span class="hud-aircraft">UAV 01</span><span class="hud-route-key"><span class="hud-key-flown">Flown</span><span class="hud-key-plan">Fixed route</span></span></div></div>`;
+      </div><div class="hud-heading" role="group" aria-label="Aircraft and route legend"><span class="hud-aircraft">UAV 01</span><span class="hud-route-key"><span class="hud-key-flown" hidden></span><span class="hud-key-plan">Fixed route</span></span></div></div>`;
     this.name = this.root.querySelector<HTMLElement>(".hud-aircraft")!;
     this.key = this.root.querySelector<HTMLElement>(".hud-key-plan")!;
     this.historyKey = this.root.querySelector<HTMLElement>(".hud-key-flown")!;
@@ -129,16 +129,19 @@ export class FlightHud {
       else delete this.altitudeHint.dataset.direction;
     }
     const meaning = planMeaning(route);
-    const history = timeS <= 0 ? "Result" : "Flown";
+    const history = timeS <= 0 ? meaning === "local" ? "Result" : "" : "Flown";
+    const historyKind = history === "Result" ? "result" : "flown";
+    if (this.historyKey.hidden !== !history) this.historyKey.hidden = !history;
     if (this.historyKey.textContent !== history) this.historyKey.textContent = history;
+    if (this.historyKey.dataset.kind !== historyKind) this.historyKey.dataset.kind = historyKind;
     if (this.root.dataset.planMeaning !== meaning) {
       this.root.dataset.planMeaning = meaning;
       if (this.key.textContent !== PLAN_LABELS[meaning]) this.key.textContent = PLAN_LABELS[meaning];
       this.key.title = meaning === "recorded"
-        ? "Future recorded result for comparison, not knowledge available to the reactive planner."
-        : meaning === "local" ? "Latest recorded local plan; replaced when the UAV replans."
-        : meaning === "scheduled" ? "Preplanned space-time route checked against known traffic schedules."
-        : "Fixed route around static obstacles; playback does not replan.";
+        ? "Remaining recorded flight for comparison; no intermediate reactive plans are available in this dataset."
+        : meaning === "local" ? "Latest recorded local plan; its next 30 seconds are emphasized for display. This window is not the planner's horizon."
+        : meaning === "scheduled" ? "Scheduled space-time route. The next 20 seconds are emphasized; hollow markers show positions at 5-second intervals. This display window is not the planner's horizon."
+        : "Fixed route around static obstacles; flight progress does not change the plan.";
     }
     if (changed) {
       this.routeId = route.id; this.root.dataset.routeId = route.id;

@@ -168,9 +168,12 @@ body { background: var(--page); font-size: var(--ui-size); }
 .hud-aircraft::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--hud-route); box-shadow: 0 0 6px color-mix(in srgb, var(--hud-route) 35%, transparent); }
 .hud-route-key { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 10px; font-weight: 500; line-height: 1.2; color: var(--muted); pointer-events: auto; }
 .hud-route-key > span { display: inline-flex; align-items: center; gap: 5px; }
-.hud-route-key > span::before { content: ""; width: 10px; height: 0; border-top: 2px solid var(--hud-route); }
-.hud-route-key > .hud-key-plan::before { border-top-style: dashed; }
-.flight-hud[data-plan-meaning="fixed"] .hud-key-plan::before { border-top-style: solid; }
+.hud-route-key > span::before { content: ""; width: 14px; height: 0; border-top: 2px solid var(--hud-route); }
+.hud-key-flown[data-kind="result"]::before { border-top-width: 1px; opacity: .35; }
+.hud-route-key > .hud-key-plan::before { border-top: 1px solid var(--hud-route); opacity: .65; }
+.flight-hud[data-plan-meaning="local"] .hud-key-plan::before { height: 2px; border: 0; opacity: .9; background: repeating-linear-gradient(90deg, var(--hud-route) 0 10px, transparent 10px 14px); }
+.flight-hud[data-plan-meaning="scheduled"] .hud-key-plan::before { height: 6px; border: 0; opacity: .9; background: radial-gradient(circle, transparent 0 1px, var(--hud-route) 1px 2px, transparent 2px), repeating-linear-gradient(90deg, var(--hud-route) 0 6px, transparent 6px 9px) center / 100% 1px no-repeat; }
+.flight-hud[data-plan-meaning="recorded"] .hud-key-plan::before { border-top: 2px dotted var(--hud-route); opacity: .55; }
 .hud-altitude-trend { position: absolute; top: 31%; left: 50%; transform: translateX(-50%); display: none; align-items: center; justify-content: center; gap: 5px; min-height: 16px; color: #c5dac7; white-space: nowrap; font-size: 10.5px; font-weight: 500; line-height: 16px; letter-spacing: .04em; pointer-events: none; }
 .workspace:has(#follow-toggle[aria-pressed="true"]) .hud-altitude-trend:not([hidden]) { display: inline-flex; }
 .hud-altitude-trend::before { content: "↑"; font: 500 12px/1 var(--ui-mono); }

@@ -6,7 +6,7 @@ export function planMeaning(route: OverviewRoute): PlanMeaning {
     : route.playbackKind === "predictive" ? "scheduled" : "recorded";
 }
 export const PLAN_LABELS: Record<PlanMeaning, string> = {
-  fixed: "Fixed route", local: "Local plan", scheduled: "Remaining route", recorded: "Remaining route",
+  fixed: "Fixed route", local: "Local plan", scheduled: "Timed route", recorded: "Recorded path",
 };
 
 export interface FlightPhase {

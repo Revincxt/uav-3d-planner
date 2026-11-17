@@ -144,9 +144,16 @@ describe("four routes, one world", () => {
       expect(line.material.depthTest).toBe(true);
       expect(line.material.depthWrite).toBe(false);
       expect(line.material.worldUnits).toBe(false);
-      expect(line.material.linewidth).toBeGreaterThanOrEqual(4);
+      expect(line.material.linewidth).toBeGreaterThan(0);
+      expect(line.material.opacity).toBeGreaterThan(0);
       expect(line.material.resolution.toArray()).toEqual([800, 600]);
     });
+    for (const line of lines.slice(1)) {
+      expect(lines[0]!.material.linewidth).toBeGreaterThan(line.material.linewidth);
+      expect(lines[0]!.material.opacity).toBeGreaterThan(line.material.opacity);
+    }
+    expect(routes.map(route => overview.group.getObjectByName(`overview-outline-${route.id}`)!.visible))
+      .toEqual([true, false, false, false]);
     expect(new Set(lines.map(l => l.material.color.getHex())).size).toBe(4);
     expect(routeColorCSS(0)).toBe("#009b87");
     overview.dispose();
@@ -160,6 +167,9 @@ describe("four routes, one world", () => {
     overview.setRoutes(routes, routes[0]!.id, 800, 600);
     const line = overview.group.getObjectByName(`overview-trajectory-${routes[0]!.id}`) as Line2;
     const pending = overview.group.getObjectByName(`overview-plan-${routes[0]!.id}`) as Line2;
+    const lead = overview.group.getObjectByName(`overview-lookahead-${routes[0]!.id}`) as Line2;
+    expect(lead.geometry).toBe(pending.geometry);
+    const disposePlan = vi.spyOn(pending.geometry, "dispose"), planUpload = vi.spyOn(pending.geometry, "setPositions");
     const planPositions = pending.geometry.getAttribute("instanceStart");
     const planBuffers = ["instanceEnd", "instanceDistanceStart", "instanceDistanceEnd", "instanceTimeStart", "instanceTimeEnd"]
       .map(name => [name, pending.geometry.getAttribute(name)] as const);
@@ -168,12 +178,134 @@ describe("four routes, one world", () => {
     overview.setRoutes(routes.map(route => ({ ...route })), routes[2]!.id, 600, 400);
     expect(overview.group.getObjectByName(line.name) === line).toBe(true);
     expect(dispose).not.toHaveBeenCalled();
-    expect(upload).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled(); expect(planUpload).not.toHaveBeenCalled();
     expect(pending.geometry.getAttribute("instanceStart")).toBe(planPositions);
     for (const [name, buffer] of planBuffers) expect(pending.geometry.getAttribute(name)).toBe(buffer);
     expect(overview.group.children.every(group => group.visible)).toBe(true);
     overview.dispose();
-    expect(dispose).toHaveBeenCalledOnce();
+    expect(dispose).toHaveBeenCalledOnce(); expect(disposePlan).toHaveBeenCalledOnce();
+  });
+  it("separates reactive result context from local knowledge and only emphasizes causal reroutes", () => {
+    const timedPath: RouteWaypoint[] = [
+      { timeS: 0, position: [0, 0, 30] }, { timeS: 10, position: [0, 0, 30] },
+      { timeS: 20, position: [100, 0, 30] }, { timeS: 60, position: [500, 0, 30] },
+    ];
+    const local: OverviewRoute = { id: "local", label: "Local", points: timedPath.map(w => w.position), timedPath,
+      playbackKind: "reactive", cruiseSpeedMps: 10, rerouteTimes: [20], plannedFrames: [
+        { timeS: 0, path: [[0, 0, 30], [500, 0, 30]], replanned: true, replanReason: "initial" },
+        { timeS: 20, path: [[100, 0, 30], [100, 200, 30], [500, 0, 30]], replanned: true, replanReason: "safety-gate" },
+        { timeS: 30, path: [[200, 0, 30], [500, 0, 30]], replanned: true, replanReason: "scheduled" },
+      ] as NonNullable<OverviewRoute["plannedFrames"]> };
+    const original = structuredClone(timedPath), overview = new RouteOverview();
+    overview.setRoutes([local], local.id, 800, 600);
+    const history = overview.group.getObjectByName("overview-trajectory-local") as Line2;
+    const halo = overview.group.getObjectByName("overview-outline-local")!;
+    const pending = overview.group.getObjectByName("overview-plan-local") as Line2;
+    const lead = overview.group.getObjectByName("overview-lookahead-local") as Line2;
+    expect(history.material.uniforms.replayTime!.value).toBe(60);
+    expect(history.material.opacity).toBeLessThan(.5); expect(halo.visible).toBe(false);
+    expect(pending.visible && lead.visible).toBe(true); expect(lead.geometry).toBe(pending.geometry);
+    const positions = pending.geometry.getAttribute("instanceStart");
+    overview.setPlaying(true); overview.setTime(5);
+    expect(history.material.uniforms.replayTime!.value).toBe(5);
+    expect(history.material.opacity).toBe(1); expect(halo.visible).toBe(true);
+    // A genuine hold does not consume the spatial plan's 30-second lead.
+    expect(lead.material.uniforms.windowStart!.value).toBe(0);
+    expect(lead.material.uniforms.windowEnd!.value).toBe(30);
+    const normalWidth = lead.material.linewidth;
+    overview.setTime(20); const rerouteWidth = lead.material.linewidth;
+    expect(rerouteWidth).toBeGreaterThan(normalWidth);
+    expect(lead.material.uniforms.windowStart!.value).toBe(20);
+    expect(lead.material.uniforms.windowEnd!.value).toBe(50);
+    overview.setTime(24); expect(lead.material.linewidth).toBeLessThan(rerouteWidth);
+    expect(lead.material.linewidth).toBeGreaterThan(normalWidth);
+    overview.setTime(28); expect(lead.material.linewidth).toBe(normalWidth);
+    overview.setTime(30); expect(lead.material.linewidth).toBe(normalWidth); // Routine replanning is not an obstacle event.
+    overview.setTime(5); expect(lead.material.uniforms.windowStart!.value).toBe(0);
+    expect(pending.geometry.getAttribute("instanceStart")).toBe(positions);
+    overview.setTime(60); expect(pending.visible || lead.visible).toBe(false);
+    overview.setPlaying(false); overview.setTime(0);
+    expect(history.material.opacity).toBeLessThan(.5); expect(halo.visible).toBe(false);
+    expect(pending.visible && lead.visible).toBe(true); expect(timedPath).toEqual(original);
+    overview.dispose();
+  });
+  it("places scheduled time marks at real future positions and retains them through selection and rewind", () => {
+    const timedPath: RouteWaypoint[] = [
+      { timeS: 0, position: [0, 0, 30] }, { timeS: 5, position: [0, 0, 30] },
+      { timeS: 5, position: [0, 0, 30] }, { timeS: 15, position: [100, 0, 30] },
+      { timeS: 30, position: [100, 150, 45] }, { timeS: 50, position: [200, 150, 45] },
+    ];
+    const route: OverviewRoute = { id: "scheduled", label: "Scheduled", playbackKind: "predictive",
+      points: timedPath.map(w => w.position), timedPath };
+    const original = structuredClone(timedPath), overview = new RouteOverview(), other = { ...route, id: "other" };
+    overview.setRoutes([route, other], route.id, 800, 600);
+    const marks = overview.group.getObjectByName("overview-time-marks-scheduled") as THREE.InstancedMesh;
+    const otherMarks = overview.group.getObjectByName("overview-time-marks-other") as THREE.InstancedMesh;
+    const lead = overview.group.getObjectByName("overview-lookahead-scheduled") as Line2;
+    const matrixBuffer = marks.instanceMatrix.array, geometry = marks.geometry;
+    expect((marks.material as THREE.MeshBasicMaterial).depthTest).toBe(true);
+    expect((marks.material as THREE.MeshBasicMaterial).depthWrite).toBe(false);
+    const disposed = vi.spyOn(geometry, "dispose"), matrix = new THREE.Matrix4(), position = new THREE.Vector3();
+    const camera = new THREE.OrthographicCamera(-1000, 1000, 750, -750, -10000, 10000);
+    camera.position.set(600, 800, 1000); camera.lookAt(100, 30, -50); camera.updateMatrixWorld(true);
+    expect(otherMarks.geometry).toBe(geometry); expect(otherMarks.visible).toBe(false);
+    for (const timeS of [0, 12, 32, 46, 50, 0]) {
+      overview.setTime(timeS); overview.updateSymbols(camera, 600);
+      expect(lead.material.uniforms.windowStart!.value).toBe(timeS);
+      expect(lead.material.uniforms.windowEnd!.value).toBe(Math.min(50, timeS + 20));
+      expect(marks.visible).toBe(timeS < 50);
+      if (marks.visible) {
+        const aheadTimes = [5, 10, 15, 20].filter(ahead => timeS + ahead < 50);
+        expect(marks.count).toBe(aheadTimes.length);
+        aheadTimes.forEach((ahead, index) => {
+          const point = timedPosition(timedPath, timeS + ahead);
+          marks.getMatrixAt(index, matrix); position.setFromMatrixPosition(matrix);
+          expect(position.x).toBeCloseTo(point[0], 4);
+          expect(position.y).toBeCloseTo(point[2], 4);
+          expect(position.z).toBeCloseTo(-point[1], 4);
+        });
+      }
+      expect(marks.instanceMatrix.array).toBe(matrixBuffer);
+    }
+    overview.setSelection(other.id); overview.updateSymbols(camera, 600);
+    expect(marks.visible).toBe(false); expect(otherMarks.visible).toBe(true);
+    overview.setSelection(null); overview.updateSymbols(camera, 600);
+    expect(marks.visible).toBe(true); expect(otherMarks.visible).toBe(false);
+    expect(timedPath).toEqual(original);
+    overview.dispose(); expect(disposed).toHaveBeenCalledOnce();
+  });
+  it("keeps the near future clickable and restores plan context when changing selection while paused", () => {
+    const routes: OverviewRoute[] = [0, 200].map((north, index) => {
+      const timedPath: RouteWaypoint[] = [
+        { timeS: 0, position: [0, north, 30] }, { timeS: 100, position: [1000, north, 30] },
+      ];
+      return { id: `scheduled-${index}`, label: `Scheduled ${index}`, playbackKind: "predictive",
+        points: timedPath.map(point => point.position), timedPath };
+    });
+    const overview = new RouteOverview();
+    overview.setRoutes(routes, routes[0]!.id, 800, 600);
+    overview.setPlaying(true); overview.setTime(10); overview.setPlaying(false);
+    const plans = routes.map(route => overview.group.getObjectByName(`overview-plan-${route.id}`) as Line2);
+    const leads = routes.map(route => overview.group.getObjectByName(`overview-lookahead-${route.id}`) as Line2);
+    const starts = () => plans.map(plan => plan.material.uniforms.windowStart!.value);
+    const camera = new THREE.OrthographicCamera(-100, 1100, 300, -300, .1, 10000);
+    camera.position.set(0, 1000, 0); camera.up.set(0, 0, -1); camera.lookAt(0, 0, 0); camera.updateMatrixWorld(true);
+    const pickNear = (index: number) => {
+      const screen = new THREE.Vector3(150, 30, -index * 200).project(camera);
+      return overview.pick(camera, (screen.x + 1) * 400, (1 - screen.y) * 300, 800, 600, () => false)?.id;
+    };
+    expect(starts()).toEqual([30, 10]);
+    expect(leads.map(lead => lead.visible)).toEqual([true, false]);
+    expect(pickNear(0)).toBe(routes[0]!.id); // History ends at 100 m; context starts at 300 m.
+    overview.setSelection(routes[1]!.id);
+    expect(starts()).toEqual([10, 30]);
+    expect(leads.map(lead => lead.visible)).toEqual([false, true]);
+    expect(pickNear(0)).toBe(routes[0]!.id); expect(pickNear(1)).toBe(routes[1]!.id);
+    overview.setSelection(null);
+    expect(starts()).toEqual([30, 10]);
+    expect(leads.map(lead => lead.visible)).toEqual([true, false]);
+    expect(pickNear(0)).toBe(routes[0]!.id);
+    overview.dispose();
   });
   it("moves all four vehicles at once and keeps finished ones at their own goals", () => {
     const overview = new RouteOverview(), routes = fixtureRoutes();
@@ -262,7 +394,17 @@ describe("real eight-route records", () => {
           const line = group.getObjectByName(`overview-trajectory-${route.id}`) as Line2;
           expect(group.userData.plannerId).toBe(route.plannerId);
           expect(line.visible).toBe(true); expect(line.geometry.getAttribute("instanceStart").count).toBeGreaterThan(1);
-          if (line.material.uniforms.replayTime) expect(line.material.uniforms.replayTime.value).toBe(route.timedPath!.at(-1)!.timeS);
+          if (line.material.uniforms.replayTime) expect(line.material.uniforms.replayTime.value)
+            .toBe(route.plannedFrames ? route.timedPath!.at(-1)!.timeS : 0);
+          const pending = group.getObjectByName(`overview-plan-${route.id}`) as Line2;
+          expect(pending.visible).toBe(true);
+          expect(line.material.opacity).toBeGreaterThan(0);
+          expect(line.material.opacity).toBeLessThanOrEqual(1);
+          if (route.plannedFrames) expect(line.material.opacity).toBeLessThan(.5);
+          if (route.id !== routes[0]!.id) {
+            const primary = overview.group.getObjectByName(`overview-trajectory-${routes[0]!.id}`) as Line2;
+            expect(line.material.opacity).toBeLessThan(primary.material.opacity);
+          }
           const first = line.geometry.getAttribute("instanceStart");
           expect(first.getX(0)).toBeCloseTo(route.points[0]![0], 3);
           expect(first.getY(0)).toBeCloseTo(route.points[0]![2], 3);
@@ -329,6 +471,8 @@ describe("real eight-route records", () => {
       const run = predictiveBundle.scenarios[index]!.runs.find(r => r.plannerId === planner.id)!;
       expect(route.timedPath).toBe(run.executionTimedPath);
       expect(route.waits).toBe(run.executionWaitIntervals);
+      expect(route.plannedFrames).toBeUndefined();
+      expect(route.playbackKind).toBe(run.predictive ? "predictive" : "reactive");
       auditMissionTaskVisits(route.timedPath!.map(w => w.position), route.mission, route.timedPath!.map(w => w.timeS));
     });
   });
