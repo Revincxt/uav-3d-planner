@@ -6,7 +6,7 @@ import { mountPageLifecycle } from "./page-lifecycle";
 import { prepareScene, runScene } from "./page-loading";
 import { RouteInteraction } from "./route-interaction";
 import { FlightHud } from "./flight-hud";
-import { dynamicAvoidanceEvents, FlightAnnouncements, type AvoidanceEvent } from "./flight-announcements";
+import { FlightAnnouncements } from "./flight-announcements";
 
 import { loadDynamicBundle } from "./dynamic-data";
 import type {
@@ -20,7 +20,7 @@ import { mountFollowControls } from "./drone-follow";
 import { TaskArrivalNotice } from "./task-arrival-notice";
 import { PlaybackClock, mountPlaybackSpeedControls } from "./playback-clock";
 import { mountInspector, mountTabs, mountWorkspace } from "./workspace";
-import { dynamicRoutes, overviewDuration, waypointIndex, type OverviewRoute } from "./route-overview";
+import { dynamicRoutes, overviewDuration, recentReroute, waypointIndex, type OverviewRoute } from "./route-overview";
 import { playbackAction, showPlaybackButton, showPlaybackState } from "./playback-state";
 import { encounterView, mountEncounterControl } from "./encounter-view";
 import { flightPhase, RouteStatusStrip } from "./trajectory-semantics";
@@ -167,8 +167,6 @@ async function start(): Promise<void> {
   const routeStates = new RouteStatusStrip();
   const flightAnnouncements = new FlightAnnouncements(element(".stage-viewport"));
   const inspector = element(".inspector-card");
-  const avoidanceCache = new WeakMap<DynamicRun, AvoidanceEvent[]>();
-  let avoidanceEvents: AvoidanceEvent[] = [];
   const renderTime = (timeS: number, shouldAnnounce = false, notify = false): void => {
     const previousTimeS = currentTimeS;
     currentTimeS = Math.max(0, Math.min(timeS, duration()));
@@ -183,12 +181,14 @@ async function start(): Promise<void> {
     if (notify) taskNotice.advance(routes.find(route => route.id === viewer?.followedRouteId), previousTimeS, currentTimeS);
     else taskNotice.reset();
     const route = routes.find(route => route.id === currentScenario.id)!;
-    if (notify) flightAnnouncements.advance(route.id, routes.indexOf(route), avoidanceEvents, previousTimeS, currentTimeS);
+    if (notify) flightAnnouncements.advance(route.id, routes.indexOf(route), route.avoidanceEvents ?? [], previousTimeS, currentTimeS);
     else flightAnnouncements.reset();
     flightHud.update(route, currentTimeS, routes.indexOf(route), !notify);
     routeInteraction.update(currentTimeS, !notify);
     routeStates.update(routes, currentTimeS, !notify);
-    showPlaybackState(element("#playback-state"), "reactive", playbackAction(route.timedPath!, currentTimeS, route.mission, frame), false, flightPhase(route, currentTimeS));
+    const action = playbackAction(route.timedPath!, currentTimeS, route.mission);
+    showPlaybackState(element("#playback-state"), "reactive", action === "Flying" && recentReroute(route, currentTimeS) ? "Rerouted" : action,
+      false, flightPhase(route, currentTimeS));
     if (!inspector.inert && frame !== lastMetricsFrame) {
       renderFrameMetrics(frame, frameIndex, currentRun.frames.length);
       lastMetricsFrame = frame;
@@ -205,7 +205,8 @@ async function start(): Promise<void> {
     }
     showPlaybackButton(playPause, playing);
   };
-  mountEncounterControl(() => encounterView(routes.find(route => route.id === currentScenario.id)!, currentScenario.movingSpheres, currentScenario.temporaryNoFlyZones), view => {
+  mountEncounterControl(() => encounterView(routes.find(route => route.id === currentScenario.id)!, currentScenario.movingSpheres,
+    currentScenario.temporaryNoFlyZones, currentTimeS), view => {
     setPlaying(false); renderTime(view.timeS); viewer?.observeEncounter(view.position);
   });
 
@@ -232,8 +233,6 @@ async function start(): Promise<void> {
     const run = currentScenario.runs.find((candidate) => candidate.plannerId === plannerId);
     if (!run) throw new Error(`Missing ${plannerId} run in ${currentScenario.id}`);
     currentRun = run;
-    avoidanceEvents = avoidanceCache.get(run) ?? dynamicAvoidanceEvents(currentScenario, run);
-    avoidanceCache.set(run, avoidanceEvents);
     routes = dynamicRoutes(bundle.scenarios, plannerId);
     viewer?.setRoutes(routes, currentScenario.id);
     timeline.max = String(duration());

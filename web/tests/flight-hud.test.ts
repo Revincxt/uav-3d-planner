@@ -116,7 +116,7 @@ describe("retained flight HUD", () => {
   });
   it.each([
     { meaning: "fixed", displayed: { ...route, playbackKind: "fixed" as const }, label: "Fixed route", preview: "", title: "does not change the plan" },
-    { meaning: "local", displayed: { ...route, playbackKind: "reactive" as const, plannedFrames: [] }, label: "Local plan", preview: "Result", title: "30 seconds" },
+    { meaning: "local", displayed: { ...route, playbackKind: "reactive" as const, plannedFrames: [] }, label: "Current plan", preview: "Result", title: "fading amber" },
     { meaning: "scheduled", displayed: { ...route, playbackKind: "predictive" as const }, label: "Timed route", preview: "", title: "5-second intervals" },
     { meaning: "recorded", displayed: { ...route, playbackKind: "reactive" as const }, label: "Recorded path", preview: "", title: "no intermediate reactive plans" },
   ])("distinguishes $meaning route knowledge and its initial preview from flown history", ({ meaning, displayed, label, preview, title }) => {

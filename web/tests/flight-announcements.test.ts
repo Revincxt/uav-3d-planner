@@ -28,9 +28,12 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("causal dynamic avoidance announcements", () => {
   it("reports a recorded detour around a cargo UAV", () => {
-    expect(dynamicAvoidanceEvents(scenario, dynamic({ movingSpheres: [aircraft] }))).toEqual([
-      { id: "replan-1", timeS: 10, kind: "reroute", message: "避让障碍无人机，航路已调整" },
-    ]);
+    const events = dynamicAvoidanceEvents(scenario, dynamic({ movingSpheres: [aircraft] }));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ id: "replan-1", timeS: 10, kind: "reroute", message: "避让障碍无人机，航路已调整" });
+    const previous = events[0]!.previousPlan!;
+    expect(previous.length).toBeGreaterThan(1);
+    expect(previous.every(([x, y, z]) => x > 0 && x < 100 && y === 0 && z === 10)).toBe(true);
   });
   it("reports an active airspace detour, not the activation alone", () => {
     const events = dynamicAvoidanceEvents(scenario, dynamic({ activeTemporaryZoneIds: [zone.id] }));

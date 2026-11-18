@@ -16,7 +16,7 @@ import type { DisplayCamera } from "./camera-scale";
 import { staticPlaybackPath } from "./static-playback";
 import { revealReplayLine, revealReplayWindow } from "./replay-line";
 import { flightPhase, planMeaning } from "./trajectory-semantics";
-import { dynamicAvoidanceEvents } from "./flight-announcements";
+import { dynamicAvoidanceEvents, type DynamicAvoidanceEvent } from "./flight-announcements";
 import { metresPerPixelAt } from "./camera-scale";
 import type { PlaybackKind } from "./playback-state";
 import type { DynamicFrame } from "./dynamic-schema";
@@ -37,7 +37,15 @@ export interface OverviewRoute {
   cruiseSpeedMps?: number;
   maxClimbRateMps?: number;
   waits?: { startTimeS: number; endTimeS: number; reason: string; position: RoutePoint }[];
-  rerouteTimes?: readonly number[];
+  avoidanceEvents?: readonly DynamicAvoidanceEvent[];
+}
+
+const REROUTE_DISPLAY_S = 8;
+export function recentReroute(route: OverviewRoute, timeS: number): DynamicAvoidanceEvent | undefined {
+  const events = route.avoidanceEvents;
+  if (!events?.length || timeS < events[0]!.timeS) return undefined;
+  const event = events[waypointIndex(events, timeS)]!;
+  if (event.previousPlan && timeS - event.timeS < REROUTE_DISPLAY_S) return event;
 }
 
 // Color identifies the mission, never the planner or qualification status.
@@ -194,7 +202,7 @@ export function dynamicRoutes(scenarios: DynamicScenario[], planner: string): Ov
     const route: OverviewRoute = { id: s.id, plannerId: planner, label: s.label, mission: s.mission, points: run.frames.at(-1)!.executedPath, timedPath,
       playbackKind: "reactive", plannedFrames: run.frames, cruiseSpeedMps: Number(run.parameters.cruiseSpeedMps),
       maxClimbRateMps: run.parameters.maxClimbRateMps,
-      rerouteTimes: dynamicAvoidanceEvents(s, run).filter(event => event.kind === "reroute").map(event => event.timeS) };
+      avoidanceEvents: dynamicAvoidanceEvents(s, run) };
     cache.set(planner, route);
     return route;
   });
@@ -227,9 +235,16 @@ interface RouteVisual {
   planTimes?: Float64Array;
   window?: ReturnType<typeof revealReplayWindow>; hold?: THREE.Group;
   lead?: Line2; leadWindow?: ReturnType<typeof revealReplayWindow>;
+  superseded?: Line2; drawnReroute?: DynamicAvoidanceEvent;
   ticks?: THREE.InstancedMesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   preview?: boolean;
   tasks?: THREE.InstancedMesh; start: THREE.Object3D; goal: THREE.Object3D;
+}
+
+function mutableLineGeometry(capacity: number): LineGeometry {
+  const geometry = new LineGeometry().setPositions(new Float32Array(capacity * 3));
+  (geometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute).data.setUsage(THREE.DynamicDrawUsage);
+  return geometry;
 }
 
 /** Mission queries in one obstacle world. Geometry is retained during playback. */
@@ -254,7 +269,7 @@ export class RouteOverview {
       return route.id === previous.id && route.plannerId === previous.plannerId && route.mission === previous.mission
         && route.playbackKind === previous.playbackKind && route.plannedFrames === previous.plannedFrames
         && route.cruiseSpeedMps === previous.cruiseSpeedMps && route.maxClimbRateMps === previous.maxClimbRateMps && route.waits === previous.waits
-        && route.rerouteTimes === previous.rerouteTimes
+        && route.avoidanceEvents === previous.avoidanceEvents
         && (route.timedPath ? route.timedPath === previous.timedPath : route.points === previous.points);
     })) {
       this.setFocus(activeId);
@@ -287,48 +302,52 @@ export class RouteOverview {
       group.add(line);
       const clock = reveal ? revealReplayLine(geometry, route.timedPath!.map(w => w.timeS), [material, haloMaterial]) : undefined;
       let pending: Line2 | undefined;
+      let superseded: Line2 | undefined;
       let window: RouteVisual["window"];
       let lead: Line2 | undefined, leadWindow: RouteVisual["leadWindow"], ticks: RouteVisual["ticks"];
       const planTimes = route.plannedFrames
         ? new Float64Array(Math.max(2, ...route.plannedFrames.map(frame => frame.path.length))) : undefined;
       if (route.playbackKind) {
         const meaning = planMeaning(route);
-        const pendingGeometry = new LineGeometry();
-        if (!route.plannedFrames) pendingGeometry.setPositions(route.timedPath!.flatMap(w => enuToThree(w.position)));
-        if (planTimes) {
-          pendingGeometry.setPositions(new Float32Array(planTimes.length * 3));
-          (pendingGeometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute).data.setUsage(THREE.DynamicDrawUsage);
-        }
+        const pendingGeometry = planTimes ? mutableLineGeometry(planTimes.length)
+          : new LineGeometry().setPositions(route.timedPath!.flatMap(w => enuToThree(w.position)));
         const pendingMaterial = new LineMaterial({ linewidth: meaning === "fixed" ? 3 : 2.6, worldUnits: false,
           color, dashed: meaning !== "fixed", dashSize: meaning === "recorded" ? 2 : meaning === "scheduled" ? 26 : 18,
-          gapSize: meaning === "recorded" ? 18 : 20,
+          gapSize: meaning === "recorded" ? 18 : meaning === "local" ? 12 : 20,
           transparent: true, opacity: meaning === "fixed" ? .68 : meaning === "recorded" ? .72 : .5,
           depthTest: true, depthWrite: false });
         pendingMaterial.resolution.copy(material.resolution);
         pending = new Line2(pendingGeometry, pendingMaterial);
-        pending.name = `overview-plan-${route.id}`; pending.renderOrder = 1;
+        pending.name = `overview-plan-${route.id}`; pending.renderOrder = meaning === "local" ? 2 : 1;
         pending.userData.meaning = meaning;
         pending.computeLineDistances();
         window = revealReplayWindow(pendingGeometry, planTimes ?? route.timedPath!.map(w => w.timeS), pendingMaterial);
         group.add(pending);
-        if (meaning === "local" || meaning === "scheduled") {
+        if (meaning === "scheduled") {
           const leadMaterial = new LineMaterial({ color, linewidth: 4.8, worldUnits: false,
             dashed: true, dashSize: pendingMaterial.dashSize, gapSize: pendingMaterial.gapSize,
             transparent: true, opacity: 1, depthTest: true, depthWrite: false, alphaToCoverage: true });
           leadMaterial.resolution.copy(material.resolution);
           lead = new Line2(pendingGeometry, leadMaterial);
           lead.name = `overview-lookahead-${route.id}`; lead.renderOrder = 2;
-          leadWindow = revealReplayWindow(pendingGeometry, planTimes ?? route.timedPath!.map(w => w.timeS), leadMaterial);
+          leadWindow = revealReplayWindow(pendingGeometry, route.timedPath!.map(w => w.timeS), leadMaterial);
           group.add(lead);
-          if (meaning === "scheduled") {
-            ticks = new THREE.InstancedMesh(tickGeometry ??= new THREE.RingGeometry(.58, 1, 16),
-              new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .95, side: THREE.DoubleSide,
-                depthTest: true, depthWrite: false }), 4);
-            ticks.name = `overview-time-marks-${route.id}`; ticks.visible = false;
-            ticks.instanceMatrix.setUsage(THREE.DynamicDrawUsage); ticks.frustumCulled = false;
-            ticks.renderOrder = 4; group.add(ticks);
-          }
+          ticks = new THREE.InstancedMesh(tickGeometry ??= new THREE.RingGeometry(.58, 1, 16),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .95, side: THREE.DoubleSide,
+              depthTest: true, depthWrite: false }), 4);
+          ticks.name = `overview-time-marks-${route.id}`; ticks.visible = false;
+          ticks.instanceMatrix.setUsage(THREE.DynamicDrawUsage); ticks.frustumCulled = false;
+          ticks.renderOrder = 4; group.add(ticks);
         }
+      }
+      const supersededCapacity = Math.max(0, ...(route.avoidanceEvents ?? []).map(event => event.previousPlan?.length ?? 0));
+      if (supersededCapacity >= 2) {
+        const retiredMaterial = new LineMaterial({ color: 0xffb16c, linewidth: 2.6, dashed: true, dashSize: 7, gapSize: 8,
+          transparent: true, depthTest: true, depthWrite: false });
+        retiredMaterial.resolution.copy(material.resolution);
+        superseded = new Line2(mutableLineGeometry(supersededCapacity), retiredMaterial);
+        superseded.name = `overview-superseded-${route.id}`; superseded.visible = false; superseded.renderOrder = 1;
+        superseded.computeLineDistances(); group.add(superseded);
       }
       const endpoints = {} as { start: THREE.Object3D; goal: THREE.Object3D };
       for (const role of ["start", "goal"] as const) {
@@ -372,7 +391,7 @@ export class RouteOverview {
         }
         group.add(hold);
       }
-      this.visuals.push({ route, group, line, halo, vehicle, clock, pending, window, planTimes, lead, leadWindow, ticks,
+      this.visuals.push({ route, group, line, halo, vehicle, clock, pending, window, planTimes, lead, leadWindow, ticks, superseded,
         hold, tasks: markers, ...endpoints });
       this.group.add(group);
       for (const point of route.points) this.bounds.expandByPoint(this.point.set(point[0], point[2], -point[1]));
@@ -404,28 +423,36 @@ export class RouteOverview {
     visual.halo.visible = primary && !resultPreview;
     visual.halo.material.linewidth = selected ? 6 : 5.2;
     if (visual.pending) {
-      visual.pending.material.linewidth = primary ? meaning === "fixed" ? 2.6 : 2.2 : 1.2;
-      visual.pending.material.opacity = primary ? meaning === "fixed" || meaning === "recorded" ? .72 : .45 : .28;
+      visual.pending.material.linewidth = primary ? { fixed: 2.6, local: selected ? 4 : 3.4, scheduled: 2.2, recorded: 2.2 }[meaning] : 1.2;
+      visual.pending.material.opacity = primary ? { fixed: .72, local: .95, scheduled: .45, recorded: .72 }[meaning] : .28;
     }
     visual.group.userData.selected = selected;
     this.updateLookahead(visual);
+    this.updateSupersededPlan(visual);
   }
   private highlighted(visual: RouteVisual): boolean {
     return this.selectedId ? visual.route.id === this.selectedId : Boolean(visual.group.userData.focused);
   }
   private updateLookahead(visual: RouteVisual): void {
-    const { lead, leadWindow, route } = visual;
+    const { lead, leadWindow } = visual;
     if (!lead || !leadWindow) return;
     lead.visible = this.highlighted(visual) && Boolean(visual.pending?.visible) && leadWindow.end.value > leadWindow.start.value;
     // The bright near segment and faint far context occupy disjoint windows.
     if (visual.window) visual.window.start.value = lead.visible ? leadWindow.end.value : leadWindow.start.value;
-    let emphasis = 0;
-    for (let i = (route.rerouteTimes?.length ?? 0) - 1; i >= 0; i--) {
-      const age = this.timeS - route.rerouteTimes![i]!;
-      if (age >= 0) { emphasis = Math.max(0, 1 - age / 8); break; }
-    }
-    lead.material.linewidth = (visual.group.userData.selected ? 4.2 : 3.6) + emphasis;
+    lead.material.linewidth = visual.group.userData.selected ? 4.2 : 3.6;
     if (visual.ticks) visual.ticks.visible = lead.visible;
+  }
+  private updateSupersededPlan(visual: RouteVisual): void {
+    const line = visual.superseded;
+    if (!line) return;
+    const event = this.highlighted(visual) && visual.pending?.visible ? recentReroute(visual.route, this.timeS) : undefined;
+    line.visible = Boolean(event);
+    if (!event) return;
+    if (event !== visual.drawnReroute) {
+      this.updatePlanPositions(line.geometry, event.previousPlan!);
+      visual.drawnReroute = event;
+    }
+    line.material.opacity = .85 * (1 - (this.timeS - event.timeS) / REROUTE_DISPLAY_S);
   }
   pick(camera: DisplayCamera, x: number, y: number, width: number, height: number,
     occluded: (point: THREE.Vector3) => boolean, radius = 7): RoutePick | null {
@@ -466,20 +493,20 @@ export class RouteOverview {
           }
           times.fill(clock, frame.path.length);
           visual.window = revealReplayWindow(pending.geometry, times, pending.material);
-          visual.window.start.value = timeS;
-          visual.window.end.value = times.at(-1)!;
           visual.planFrame = frame;
         }
         if (visual.window) {
           visual.window.start.value = localPlanClock(route, frame.timeS, timeS);
-          visual.window.end.value = 1e9;
+          visual.window.end.value = visual.planTimes!.at(-1)!;
+          pending.visible &&= visual.window.end.value > visual.window.start.value;
         }
       }
       if (lead && leadWindow && visual.window) {
         leadWindow.start.value = visual.window.start.value;
-        leadWindow.end.value = Math.min(visual.window.end.value, leadWindow.start.value + (meaning === "scheduled" ? 20 : 30));
+        leadWindow.end.value = Math.min(visual.window.end.value, leadWindow.start.value + 20);
         this.updateLookahead(visual);
       }
+      this.updateSupersededPlan(visual);
       if (!vehicle || !route.timedPath) continue;
       // Finished missions remain at their real goal; no looping or invented continuation.
       const position = timedPosition(route.timedPath, timeS, this.position);
@@ -528,6 +555,7 @@ export class RouteOverview {
       visual.halo.material.resolution.set(width, height);
       visual.pending?.material.resolution.set(width, height);
       visual.lead?.material.resolution.set(width, height);
+      visual.superseded?.material.resolution.set(width, height);
     }
   }
 
@@ -538,7 +566,7 @@ export class RouteOverview {
   }
   updateSymbols(camera: DisplayCamera, height: number, followedId: string | null = null): void {
     this.screenUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
-    for (const { vehicle, group, route, hold, tasks, start, goal, ticks, pending, lead } of this.visuals) if (vehicle) {
+    for (const { vehicle, group, route, hold, tasks, start, goal, ticks, pending, lead, superseded } of this.visuals) if (vehicle) {
       const followed = route.id === followedId;
       vehicle.visible = true;
       sizeDrone(vehicle, camera, height, followed ? Math.min(128, Math.max(24, height * 0.18)) : group.userData.focused ? 32 : 24,
@@ -550,6 +578,7 @@ export class RouteOverview {
       const dashScale = 1 / Math.max(.01, metresPerPixelAt(camera, this.point, height));
       if (pending?.material.dashed) pending.material.dashScale = dashScale;
       if (lead) lead.material.dashScale = dashScale;
+      if (superseded?.visible) superseded.material.dashScale = dashScale;
       if (hold?.visible) {
         const scale = metresPerPixelAt(camera, vehicle.position, height) * 11;
         hold.scale.setScalar(scale); hold.quaternion.copy(camera.quaternion);

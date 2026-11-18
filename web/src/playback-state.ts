@@ -1,10 +1,9 @@
 import type { CityMission } from "./city-schema";
-import type { DynamicFrame } from "./dynamic-schema";
 import { timedPosition, waypointIndex, type RouteWaypoint } from "./route-overview";
 import { phaseLabel, type FlightPhase } from "./trajectory-semantics";
 
 export type PlaybackKind = "fixed" | "reactive" | "predictive";
-export type PlaybackAction = "Ready" | "Flying" | "Service" | "Waiting" | "Replanning" | "Arrived";
+export type PlaybackAction = "Ready" | "Flying" | "Service" | "Waiting" | "Rerouted" | "Arrived";
 
 /** Keep the SVG icon mounted while exposing its current action to assistive technology. */
 export function showPlaybackButton(button: HTMLButtonElement, playing: boolean): void {
@@ -14,7 +13,7 @@ export function showPlaybackButton(button: HTMLButtonElement, playing: boolean):
 }
 
 export function playbackAction(
-  path: readonly RouteWaypoint[], timeS: number, mission?: CityMission, frame?: DynamicFrame,
+  path: readonly RouteWaypoint[], timeS: number, mission?: CityMission,
 ): PlaybackAction {
   if (!path.length || timeS <= path[0]!.timeS) return "Ready";
   if (timeS >= path.at(-1)!.timeS) return "Arrived";
@@ -27,13 +26,12 @@ export function playbackAction(
     while (arrival > 0 && Math.hypot(...path[arrival - 1]!.position.map((v, axis) => v - position[axis]!)) <= 1e-6) arrival--;
     return task && timeS - path[arrival]!.timeS < task.serviceDurationS ? "Service" : "Waiting";
   }
-  if (frame?.replanned && timeS >= frame.timeS && timeS - frame.timeS < 1) return "Replanning";
   return "Flying";
 }
 
 export function showPlaybackState(host: HTMLElement, kind: PlaybackKind, action: PlaybackAction, counterpart = false, phase?: FlightPhase): void {
   const name = kind === "fixed" ? "Fixed route" : kind === "predictive" ? "Space-time" : counterpart ? "Reactive baseline" : "Live replanning";
-  const label = phase && action !== "Replanning" && action !== "Service" ? phaseLabel(phase) : action;
+  const label = phase && action !== "Rerouted" && action !== "Service" ? phaseLabel(phase) : action;
   if (host.textContent === `${name} · ${label}` && host.dataset.kind === kind) return;
   host.textContent = `${name} · ${label}`;
   host.dataset.kind = kind;
@@ -44,5 +42,5 @@ export function showPlaybackState(host: HTMLElement, kind: PlaybackKind, action:
     : kind === "predictive"
       ? "Dashed: the scheduled future route. Solid: already flown. Amber pause marker: explicit hold with countdown."
       : counterpart ? "Colored dashed: remaining recorded route, not advance knowledge of the reactive planner. Solid: already flown."
-      : "Solid: already flown. Dashed: the current recorded local plan, updated at each replan.";
+      : "Solid: flown. Dashed: current plan. Fading amber: the section of the prior plan replaced by avoidance.";
 }

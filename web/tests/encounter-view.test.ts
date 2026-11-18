@@ -46,6 +46,13 @@ describe("Physical traffic and event-local observation", () => {
   });
   it("focuses an actual active encounter, not decorative map bounds", () => {
     expect(encounterView(route, [aircraft])).toEqual({ timeS: 22, position: [50, 0, 100] });
+    const reactive: OverviewRoute = { ...route, avoidanceEvents: [
+      { id: "first", timeS: 20, kind: "reroute", message: "Traffic", previousPlan: [[40, 0, 100], [60, 0, 100]] },
+      { id: "next", timeS: 30, kind: "reroute", message: "Traffic", previousPlan: [[60, 0, 100], [70, 0, 100]] },
+    ] };
+    expect(encounterView(reactive, [aircraft])?.timeS).toBe(20);
+    expect(encounterView(reactive, [aircraft], [], 20)).toEqual({ timeS: 30, position: [60, 0, 100] });
+    expect(encounterView(reactive, [aircraft], [], 30)?.timeS).toBe(20);
     expect(encounterBounds([50, 0, 100]).getSize(new Vector3()).toArray()).toEqual([360, 80, 360]);
   });
   it("has no invented observation for legacy tasks without a challenge", () => {

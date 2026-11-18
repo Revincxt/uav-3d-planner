@@ -46,7 +46,7 @@ describe("flight semantics", () => {
     const localFrames = [{ timeS: 0, path: points }] as NonNullable<OverviewRoute["plannedFrames"]>;
     const choices: Array<{ displayed: OverviewRoute; meaning: string; lead: boolean }> = [
       { displayed: { ...route, points, playbackKind: "fixed" }, meaning: "fixed", lead: false },
-      { displayed: { ...route, points, playbackKind: "reactive", plannedFrames: localFrames }, meaning: "local", lead: true },
+      { displayed: { ...route, points, playbackKind: "reactive", plannedFrames: localFrames }, meaning: "local", lead: false },
       { displayed: { ...route, points }, meaning: "scheduled", lead: true },
       { displayed: { ...route, points, playbackKind: "reactive" }, meaning: "recorded", lead: false },
     ];

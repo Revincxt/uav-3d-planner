@@ -21,9 +21,17 @@ export function positionEncounterCamera(camera: THREE.OrthographicCamera, contro
 }
 
 export interface EncounterView { timeS: number; position: Vec3 }
-export function encounterView(route: OverviewRoute, traffic: MovingSphereDefinition[] = [], zones: TemporaryNoFlyZone[] = []): EncounterView | null {
+export function encounterView(route: OverviewRoute, traffic: MovingSphereDefinition[] = [], zones: TemporaryNoFlyZone[] = [], afterS = 0): EncounterView | null {
   const challenge = route.mission?.challenge, path = route.timedPath;
-  if (!challenge || !path?.length) return null;
+  if (!path?.length) return null;
+  const reroutes = route.avoidanceEvents?.filter(event => event.previousPlan);
+  const reroute = reroutes?.find(event => event.timeS > afterS) ?? reroutes?.[0];
+  if (reroute) {
+    const vehicle = timedPosition(path, reroute.timeS), oldEnd = reroute.previousPlan!.at(-1)!;
+    const position: Vec3 = [(vehicle[0] + oldEnd[0]) / 2, (vehicle[1] + oldEnd[1]) / 2, (vehicle[2] + oldEnd[2]) / 2];
+    return { timeS: reroute.timeS, position };
+  }
+  if (!challenge) return null;
   let best = Infinity, time = challenge.startTimeS, position = challenge.focusPosition;
   for (const waypoint of path) {
     if (challenge.kind === "static") {
@@ -56,7 +64,7 @@ export function mountEncounterControl(get: () => EncounterView | null, observe: 
   button.type = "button"; button.id = "observe-encounter";
   button.setAttribute("aria-label", "Observe encounter");
   button.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="5.5" stroke="currentColor" stroke-width="1.4" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><path d="M10 2v4m0 8v4M2 10h4m8 0h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>';
-  button.title = "Close view of this mission's fixed constraint or closest active encounter";
+  button.title = "Close view of the mission constraint or recorded avoidance encounter";
   button.addEventListener("click", () => { const view = get(); if (view) observe(view); });
   host.append(button);
 }

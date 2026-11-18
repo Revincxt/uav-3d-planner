@@ -53,8 +53,8 @@ dd { margin: 0; }
 .playback-state[data-kind="fixed"]::before { background: #718096; }
 .playback-state[data-kind="predictive"]::before { background: #865bd8; }
 .playback-state[data-action="service"]::before, .playback-state[data-action="waiting"]::before { background: #d59452; }
-.playback-state[data-action="replanning"] { color: #a65f0d; border-color: #edd6b4; }
-.playback-state[data-action="replanning"]::before { background: #d59452; }
+.playback-state[data-action="rerouted"] { color: #a65f0d; border-color: #edd6b4; }
+.playback-state[data-action="rerouted"]::before { background: #ffb16c; }
 .playback-state[data-action="arrived"]::before { background: #248773; }
 .map-attribution { position: absolute; left: var(--hud-gap); bottom: var(--hud-gap); z-index: 3; max-width: calc(100% - 36px); padding: 4px 8px; border-radius: 3px; background: var(--hud-surface); backdrop-filter: blur(5px); color: #d7e3eb; font-size: 10px; line-height: 14px; text-align: left; pointer-events: none; }
 .map-attribution a { color: inherit; text-decoration: none; pointer-events: auto; }

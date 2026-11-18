@@ -139,7 +139,7 @@ export class FlightHud {
       if (this.key.textContent !== PLAN_LABELS[meaning]) this.key.textContent = PLAN_LABELS[meaning];
       this.key.title = meaning === "recorded"
         ? "Remaining recorded flight for comparison; no intermediate reactive plans are available in this dataset."
-        : meaning === "local" ? "Latest recorded local plan; its next 30 seconds are emphasized for display. This window is not the planner's horizon."
+        : meaning === "local" ? "Current planned leg or avoidance maneuver. A fading amber line marks the displaced section after a reroute."
         : meaning === "scheduled" ? "Scheduled space-time route. The next 20 seconds are emphasized; hollow markers show positions at 5-second intervals. This display window is not the planner's horizon."
         : "Fixed route around static obstacles; flight progress does not change the plan.";
     }

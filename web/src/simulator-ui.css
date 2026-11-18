@@ -95,7 +95,7 @@ body { background: var(--page); font-size: var(--ui-size); }
 .workspace:not(.workspace-results) .view-controls button[aria-pressed="true"] { color: #c1e6fb; background: var(--control-active); border-color: var(--control-border); }
 .workspace:not(.workspace-results) .playback-state { top: var(--hud-gap); left: 50%; transform: translateX(-50%); display: flex; align-items: center; width: max-content; min-height: 34px; max-width: calc(100% - 36px); padding: 7px 10px; white-space: nowrap; background: var(--hud-surface); color: var(--muted); font-size: var(--ui-size); border-color: var(--hud-border); backdrop-filter: blur(8px); }
 .workspace .playback-state[data-action="flying"] { color: var(--success); }
-.workspace .playback-state:is([data-action="waiting"], [data-action="replanning"]) { color: var(--warning); border-color: #e5b77c4c; }
+.workspace .playback-state:is([data-action="waiting"], [data-action="rerouted"]) { color: var(--warning); border-color: #e5b77c4c; }
 .workspace:not(.workspace-results) .app-header .route-legend {
   position: static; grid-area: routes; justify-self: start; margin: 0; max-width: 100%;
   display: flex; flex-wrap: nowrap; align-items: center; min-height: 44px; pointer-events: auto;

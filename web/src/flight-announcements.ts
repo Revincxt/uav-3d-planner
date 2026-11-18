@@ -9,24 +9,65 @@ export interface AvoidanceEvent {
   message: string;
 }
 
+export interface DynamicAvoidanceEvent extends AvoidanceEvent {
+  previousPlan?: Vec3[];
+}
+
 const distance2 = (a: readonly number[], b: readonly number[]): number =>
   a.reduce((sum, value, i) => sum + (value - b[i]!) ** 2, 0);
 
-function segmentDistance2(a: readonly number[], b: readonly number[], point: readonly number[]): number {
+function segmentFraction(a: readonly number[], b: readonly number[], point: readonly number[]): number {
   const length = distance2(a, b);
-  const fraction = length ? Math.max(0, Math.min(1,
+  return length ? Math.max(0, Math.min(1,
     a.reduce((sum, value, i) => sum + (point[i]! - value) * (b[i]! - value), 0) / length)) : 0;
+}
+
+const pointOnSegment = (a: Vec3, b: Vec3, fraction: number): Vec3 =>
+  [a[0] + (b[0] - a[0]) * fraction, a[1] + (b[1] - a[1]) * fraction, a[2] + (b[2] - a[2]) * fraction];
+
+function segmentDistance2(a: readonly number[], b: readonly number[], point: readonly number[]): number {
+  const fraction = segmentFraction(a, b, point);
   return a.reduce((sum, value, i) => sum + (value + (b[i]! - value) * fraction - point[i]!) ** 2, 0);
 }
 
 /** Drop consumed geometry; a hazard behind the UAV cannot explain a new detour. */
 function remainingPlan(path: Vec3[], position: Vec3): Vec3[] {
+  if (path.length < 2) return path;
   let closest = Infinity, index = 0;
   for (let i = 0; i + 1 < path.length; i++) {
     const distance = segmentDistance2(path[i]!, path[i + 1]!, position);
     if (distance < closest) { closest = distance; index = i; }
   }
-  return [position, ...path.slice(index + 1)];
+  const a = path[index]!, b = path[index + 1]!;
+  return [pointOnSegment(a, b, segmentFraction(a, b, position)), ...path.slice(index + 1)];
+}
+
+/** Keep just the first nearby branch that visibly differs from the replacement. */
+function supersededBranch(previous: Vec3[], replacement: Vec3[]): Vec3[] | undefined {
+  const branch: Vec3[] = [];
+  let distance = 0, branchStart = 0;
+  for (let i = 1; i < previous.length && distance < 300; i++) {
+    const a = previous[i - 1]!, b = previous[i]!;
+    const length = Math.sqrt(distance2(a, b));
+    if (length < 1e-8) continue;
+    const steps = Math.ceil(length / 8);
+    for (let step = 0; step <= steps; step++) {
+      if (step === 0 && i > 1) continue;
+      const along = distance + length * step / steps;
+      if (along > 300 || (branch.length && along - branchStart > 140)) break;
+      const point = pointOnSegment(a, b, step / steps);
+      const overlaps = replacement.some((end, j) => j > 0 && segmentDistance2(replacement[j - 1]!, end, point) <= 4 ** 2);
+      if (overlaps) {
+        if (branch.length >= 2) return branch;
+        branch.length = 0;
+        continue;
+      }
+      if (!branch.length) branchStart = along;
+      branch.push(point);
+    }
+    distance += length;
+  }
+  return branch.length >= 2 ? branch : undefined;
 }
 
 function hitsCylinder(a: Vec3, b: Vec3, zone: DynamicScenario["temporaryNoFlyZones"][number], padding: number): boolean {
@@ -46,8 +87,8 @@ function hitsCylinder(a: Vec3, b: Vec3, zone: DynamicScenario["temporaryNoFlyZon
 /** Display-only causal evidence, never a replacement for the native collision certificate.
  * Scheduled updates count only when the remaining old plan is blocked by a current
  * dynamic volume and the newly recorded plan avoids that same volume. */
-export function dynamicAvoidanceEvents(scenario: DynamicScenario, run: DynamicRun): AvoidanceEvent[] {
-  const events: AvoidanceEvent[] = [];
+export function dynamicAvoidanceEvents(scenario: DynamicScenario, run: DynamicRun): DynamicAvoidanceEvent[] {
+  const events: DynamicAvoidanceEvent[] = [];
   const padding = scenario.constraints.vehicleRadiusM + scenario.constraints.safetyMarginM;
   let lastEpisodeTime = -Infinity;
   for (let i = 1; i < run.frames.length; i++) {
@@ -80,7 +121,8 @@ export function dynamicAvoidanceEvents(scenario: DynamicScenario, run: DynamicRu
     if (last?.kind === kind && last.message === message && frame.timeS - lastEpisodeTime <= 6) {
       lastEpisodeTime = frame.timeS; continue;
     }
-    events.push({ id: `replan-${i}`, timeS: frame.timeS, kind, message });
+    const previousPlan = kind === "reroute" && plan.length >= 2 ? supersededBranch(oldPlan, plan) : undefined;
+    events.push({ id: `replan-${i}`, timeS: frame.timeS, kind, message, ...(previousPlan ? { previousPlan } : {}) });
     lastEpisodeTime = frame.timeS;
   }
   return events;

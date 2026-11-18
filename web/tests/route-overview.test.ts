@@ -167,8 +167,7 @@ describe("four routes, one world", () => {
     overview.setRoutes(routes, routes[0]!.id, 800, 600);
     const line = overview.group.getObjectByName(`overview-trajectory-${routes[0]!.id}`) as Line2;
     const pending = overview.group.getObjectByName(`overview-plan-${routes[0]!.id}`) as Line2;
-    const lead = overview.group.getObjectByName(`overview-lookahead-${routes[0]!.id}`) as Line2;
-    expect(lead.geometry).toBe(pending.geometry);
+    expect(overview.group.getObjectByName(`overview-lookahead-${routes[0]!.id}`)).toBeUndefined();
     const disposePlan = vi.spyOn(pending.geometry, "dispose"), planUpload = vi.spyOn(pending.geometry, "setPositions");
     const planPositions = pending.geometry.getAttribute("instanceStart");
     const planBuffers = ["instanceEnd", "instanceDistanceStart", "instanceDistanceEnd", "instanceTimeStart", "instanceTimeEnd"]
@@ -185,13 +184,15 @@ describe("four routes, one world", () => {
     overview.dispose();
     expect(dispose).toHaveBeenCalledOnce(); expect(disposePlan).toHaveBeenCalledOnce();
   });
-  it("separates reactive result context from local knowledge and only emphasizes causal reroutes", () => {
+  it("shows the complete current leg and fades only the displaced branch of a recorded reroute", () => {
     const timedPath: RouteWaypoint[] = [
       { timeS: 0, position: [0, 0, 30] }, { timeS: 10, position: [0, 0, 30] },
       { timeS: 20, position: [100, 0, 30] }, { timeS: 60, position: [500, 0, 30] },
     ];
     const local: OverviewRoute = { id: "local", label: "Local", points: timedPath.map(w => w.position), timedPath,
-      playbackKind: "reactive", cruiseSpeedMps: 10, rerouteTimes: [20], plannedFrames: [
+      playbackKind: "reactive", cruiseSpeedMps: 10, avoidanceEvents: [
+        { id: "replan-1", timeS: 20, kind: "reroute", message: "Rerouted", previousPlan: [[120, 0, 30], [230, 0, 30]] },
+      ], plannedFrames: [
         { timeS: 0, path: [[0, 0, 30], [500, 0, 30]], replanned: true, replanReason: "initial" },
         { timeS: 20, path: [[100, 0, 30], [100, 200, 30], [500, 0, 30]], replanned: true, replanReason: "safety-gate" },
         { timeS: 30, path: [[200, 0, 30], [500, 0, 30]], replanned: true, replanReason: "scheduled" },
@@ -201,32 +202,34 @@ describe("four routes, one world", () => {
     const history = overview.group.getObjectByName("overview-trajectory-local") as Line2;
     const halo = overview.group.getObjectByName("overview-outline-local")!;
     const pending = overview.group.getObjectByName("overview-plan-local") as Line2;
-    const lead = overview.group.getObjectByName("overview-lookahead-local") as Line2;
+    const superseded = overview.group.getObjectByName("overview-superseded-local") as Line2;
     expect(history.material.uniforms.replayTime!.value).toBe(60);
     expect(history.material.opacity).toBeLessThan(.5); expect(halo.visible).toBe(false);
-    expect(pending.visible && lead.visible).toBe(true); expect(lead.geometry).toBe(pending.geometry);
+    expect(pending.visible).toBe(true); expect(superseded.visible).toBe(false);
     const positions = pending.geometry.getAttribute("instanceStart");
     overview.setPlaying(true); overview.setTime(5);
     expect(history.material.uniforms.replayTime!.value).toBe(5);
     expect(history.material.opacity).toBe(1); expect(halo.visible).toBe(true);
-    // A genuine hold does not consume the spatial plan's 30-second lead.
-    expect(lead.material.uniforms.windowStart!.value).toBe(0);
-    expect(lead.material.uniforms.windowEnd!.value).toBe(30);
-    const normalWidth = lead.material.linewidth;
-    overview.setTime(20); const rerouteWidth = lead.material.linewidth;
-    expect(rerouteWidth).toBeGreaterThan(normalWidth);
-    expect(lead.material.uniforms.windowStart!.value).toBe(20);
-    expect(lead.material.uniforms.windowEnd!.value).toBe(50);
-    overview.setTime(24); expect(lead.material.linewidth).toBeLessThan(rerouteWidth);
-    expect(lead.material.linewidth).toBeGreaterThan(normalWidth);
-    overview.setTime(28); expect(lead.material.linewidth).toBe(normalWidth);
-    overview.setTime(30); expect(lead.material.linewidth).toBe(normalWidth); // Routine replanning is not an obstacle event.
-    overview.setTime(5); expect(lead.material.uniforms.windowStart!.value).toBe(0);
+    // A hold consumes none of the recorded leg, including portions beyond 30 seconds.
+    expect(pending.material.uniforms.windowStart!.value).toBe(0);
+    expect(pending.material.uniforms.windowEnd!.value).toBe(50);
+    overview.setTime(20);
+    expect(superseded.visible).toBe(true);
+    expect(superseded.geometry.getAttribute("instanceStart").getX(0)).toBe(120);
+    expect(pending.material.uniforms.windowStart!.value).toBe(20);
+    expect(pending.material.uniforms.windowEnd!.value).toBeCloseTo(40 + Math.hypot(400, 200) / 10);
+    expect(pending.geometry.getAttribute("instanceEnd").getZ(0)).toBe(-200);
+    const firstOpacity = superseded.material.opacity;
+    overview.setTime(24); expect(superseded.material.opacity).toBeLessThan(firstOpacity);
+    overview.setTime(28); expect(superseded.visible).toBe(false);
+    overview.setTime(30); expect(superseded.visible).toBe(false); // Routine replanning is not an obstacle event.
+    overview.setTime(5); expect(pending.material.uniforms.windowStart!.value).toBe(0); expect(superseded.visible).toBe(false);
+    overview.setTime(24); expect(superseded.visible).toBe(true);
     expect(pending.geometry.getAttribute("instanceStart")).toBe(positions);
-    overview.setTime(60); expect(pending.visible || lead.visible).toBe(false);
+    overview.setTime(60); expect(pending.visible || superseded.visible).toBe(false);
     overview.setPlaying(false); overview.setTime(0);
     expect(history.material.opacity).toBeLessThan(.5); expect(halo.visible).toBe(false);
-    expect(pending.visible && lead.visible).toBe(true); expect(timedPath).toEqual(original);
+    expect(pending.visible).toBe(true); expect(superseded.visible).toBe(false); expect(timedPath).toEqual(original);
     overview.dispose();
   });
   it("places scheduled time marks at real future positions and retains them through selection and rewind", () => {
